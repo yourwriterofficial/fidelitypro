@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { TrendingUp, Shield, Users, CheckCircle } from 'lucide-react';
+import { CheckCircle } from 'lucide-react';
 
 export default function Plans() {
   const plans = [
@@ -20,10 +20,18 @@ export default function Plans() {
             <div key={plan.name} className="bg-white rounded-2xl shadow-lg border border-gray-100 p-8 hover:shadow-xl transition">
               <h3 className="text-2xl font-bold text-gray-900 mb-4">{plan.name}</h3>
               <ul className="space-y-3 text-sm text-gray-600">
-                <li className="flex items-center gap-2"><CheckCircle className="text-green-500" size={18} /> Min: ${plan.min}</li>
-                <li className="flex items-center gap-2"><CheckCircle className="text-green-500" size={18} /> Max: ${plan.max}</li>
-                <li className="flex items-center gap-2"><CheckCircle className="text-green-500" size={18} /> Daily Return: {plan.dailyReturn}%</li>
-                <li className="flex items-center gap-2"><CheckCircle className="text-green-500" size={18} /> Duration: {plan.duration} days</li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle className="text-green-500" size={18} /> Min: ${plan.min}
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle className="text-green-500" size={18} /> Max: ${plan.max}
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle className="text-green-500" size={18} /> Daily Return: {plan.dailyReturn}%
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle className="text-green-500" size={18} /> Duration: {plan.duration} days
+                </li>
               </ul>
               <div className="mt-6">
                 <Link to="/signup" className="block w-full bg-brand hover:bg-brand-dark text-white text-center font-semibold py-3 rounded-xl transition">

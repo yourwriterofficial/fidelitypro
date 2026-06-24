@@ -1,9 +1,13 @@
+import { Link } from 'react-router-dom';
+
 export default function HowItWorks() {
   return (
     <div className="min-h-screen bg-gray-50 py-20">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         <h1 className="text-4xl font-bold text-center text-gray-900 mb-6">How It Works</h1>
-        <p className="text-center text-gray-600 mb-12">Getting started with FidelityPro is simple. Follow these three steps.</p>
+        <p className="text-center text-gray-600 mb-12">
+          Getting started with FidelityPro is simple. Follow these three steps.
+        </p>
         <div className="space-y-8">
           <div className="bg-white rounded-2xl shadow-md p-6 border border-gray-100">
             <div className="flex items-start gap-4">
