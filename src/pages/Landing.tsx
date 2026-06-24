@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { ArrowRight, TrendingUp, Shield, Users, Zap, Clock, CheckCircle, Star, DollarSign, BarChart3 } from 'lucide-react';
+import { ArrowRight, TrendingUp, Shield, Users } from 'lucide-react';
 
 export default function Landing() {
   return (
