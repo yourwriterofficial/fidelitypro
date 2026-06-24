@@ -13,6 +13,13 @@ export interface Profile {
   referred_by?: string;
   referral_code?: string;
   created_at: string;
+  // ⬇️ ADD THESE
+  can_withdraw: boolean;
+  can_invest: boolean;
+  can_stake: boolean;
+  can_property: boolean;
+  restriction_reason: string;
+  fee_required: number;
 }
 
 interface AuthState {
@@ -20,7 +27,6 @@ interface AuthState {
   profile: Profile | null;
   loading: boolean;
   isAdmin: boolean;
-  // Impersonation
   isImpersonating: boolean;
   originalUser: User | null;
   originalProfile: Profile | null;
@@ -153,12 +159,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   impersonateUser: (profile: Profile) => {
     const { user, profile: currentProfile } = get();
-    // Store original user and profile
     set({
       originalUser: user,
       originalProfile: currentProfile,
       isImpersonating: true,
-      user: { ...user, id: profile.id } as User, // override with impersonated user
+      user: { ...user, id: profile.id } as User,
       profile,
       isAdmin: profile.is_admin,
     });

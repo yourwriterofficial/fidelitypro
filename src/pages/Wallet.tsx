@@ -34,7 +34,7 @@ export default function WalletPage() {
   const [copied, setCopied] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(true);
 
-  // Check restriction (only for withdrawal)
+  // Check restriction – if can_withdraw is false, show a message
   if (profile && !profile.can_withdraw) {
     return (
       <div className="max-w-4xl mx-auto p-8 text-center">
@@ -170,16 +170,12 @@ export default function WalletPage() {
     }
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('deposits')
-        .insert({
-          user_id: profile.id,
-          amount: amount,
-          transaction_hash: selectedCurrency,
-          status: 'pending',
-        })
-        .select()
-        .single();
+      const { error } = await supabase.from('deposits').insert({
+        user_id: profile.id,
+        amount: amount,
+        transaction_hash: selectedCurrency,
+        status: 'pending',
+      });
       if (error) throw error;
       toast.success('Deposit recorded. Waiting for confirmation.');
       setDepositAmount('');

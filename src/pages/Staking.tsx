@@ -3,7 +3,8 @@ import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 import { useAuthStore } from '../store/authStore';
 import { toast } from 'sonner';
-import { Lock, Clock, TrendingUp, AlertCircle, Calculator, ChevronDown, ChevronUp, Wallet, ArrowRight } from 'lucide-react';
+import { AlertCircle, Calculator, ChevronDown, ChevronUp, Wallet } from 'lucide-react';
+// remove Lock, Clock, TrendingUp, ArrowRight
 
 interface StakingProduct {
   id: string;
@@ -282,9 +283,7 @@ export default function Staking() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-3xl font-bold bg-gradient-to-r from-brand to-brand-dark bg-clip-text text-transparent">Locked Savings (Staking)</h1>
-          <p className="text-gray-600 mt-2">
-            Lock your funds for a fixed period and earn a guaranteed APY.
-          </p>
+          <p className="text-gray-600 mt-2">Lock your funds for a fixed period and earn a guaranteed APY.</p>
         </div>
         <div className="flex items-center gap-2 text-sm bg-green-50 px-4 py-2 rounded-full border border-green-200">
           <Wallet size={18} className="text-green-600" />
@@ -351,9 +350,7 @@ export default function Staking() {
                     <p className="font-semibold">{formatCurrency(calcResult.dailyInterest)}</p>
                   </div>
                 </div>
-                <p className="text-xs text-gray-400 mt-2">
-                  * Estimates based on {calcProduct?.lock_days} days lock. Early withdrawal penalty applies.
-                </p>
+                <p className="text-xs text-gray-400 mt-2">* Estimates based on {calcProduct?.lock_days} days lock. Early withdrawal penalty applies.</p>
               </div>
             )}
           </div>
@@ -402,18 +399,9 @@ export default function Staking() {
                   placeholder={`Min $${selectedProduct.min_amount}`}
                   required
                 />
-                {(() => {
-                  const numAmount = parseFloat(amount) || 0;
-                  const interest = numAmount * (selectedProduct.apy / 100) * (selectedProduct.lock_days / 365);
-                  const total = numAmount + interest;
-                  return (
-                    <div className="text-xs text-gray-500 mt-1 space-y-1">
-                      <p>Principal: <strong>{formatCurrency(numAmount)}</strong></p>
-                      <p>Interest: <strong className="text-green-600">+{formatCurrency(interest)}</strong></p>
-                      <p className="font-semibold text-brand">Total at maturity: {formatCurrency(total)}</p>
-                    </div>
-                  );
-                })()}
+                <p className="text-xs text-gray-500 mt-1">
+                  At maturity you will receive {formatCurrency(parseFloat(amount) + parseFloat(amount) * (selectedProduct.apy/100) * (selectedProduct.lock_days/365))} (including principal).
+                </p>
               </div>
               <button type="submit" className="w-full bg-brand hover:bg-brand-dark text-white font-semibold py-3 rounded-xl transition">Lock Now</button>
               <button type="button" onClick={() => setModalOpen(false)} className="w-full bg-gray-200 hover:bg-gray-300 py-2 rounded-xl">Cancel</button>

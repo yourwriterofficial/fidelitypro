@@ -3,7 +3,8 @@ import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 import { useAuthStore } from '../store/authStore';
 import { toast } from 'sonner';
-import { Building, Users, TrendingUp, CheckCircle, AlertCircle } from 'lucide-react';
+import { Users, AlertCircle } from 'lucide-react';
+// remove Building
 
 interface Property {
   id: string;

@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
-import { ArrowRight, Check, TrendingUp, Shield, Users } from 'lucide-react';
+import { ArrowRight, TrendingUp, Shield, Users } from 'lucide-react';
+// remove Check
 
 export default function Landing() {
   return (

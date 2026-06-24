@@ -7,8 +7,6 @@ import { User, Mail, Lock, Save, UserCircle } from 'lucide-react';
 export default function Settings() {
   const { profile, refreshProfile } = useAuthStore();
   const [name, setName] = useState(profile?.name || '');
-  const [email, setEmail] = useState(profile?.email || '');
-  const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -49,7 +47,6 @@ export default function Settings() {
       });
       if (error) throw error;
       toast.success('Password updated');
-      setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
     } catch (err: any) {
@@ -87,7 +84,7 @@ export default function Settings() {
               <Mail className="absolute left-3 top-3 text-gray-400" size={18} />
               <input
                 type="email"
-                value={email}
+                value={profile?.email || ''}
                 disabled
                 className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl bg-gray-50 text-gray-500"
               />

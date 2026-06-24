@@ -1,9 +1,6 @@
 import { Outlet, Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
-import { 
-  LogOut, Home, Wallet, Briefcase, Settings, User, Shield, Lock, Gift, Building, 
-  LayoutDashboard, Menu, X, MoreHorizontal
-} from 'lucide-react';
+import { LogOut, Home, Wallet, Briefcase, Settings, Shield, Lock, Gift, Building, LayoutDashboard, Menu, X, MoreHorizontal } from 'lucide-react';
 import NotificationBell from './NotificationBell';
 import { useState } from 'react';
 

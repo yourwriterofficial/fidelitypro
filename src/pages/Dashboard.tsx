@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { supabase } from '../lib/supabaseClient';
-import { Wallet, TrendingUp, DollarSign, Activity, Bell, Lock, Building, PieChart } from 'lucide-react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from 'recharts';
+import { Wallet, TrendingUp, DollarSign, Bell, PieChart } from 'lucide-react';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useAnnouncements } from '../hooks/useAnnouncements';
 import InactivityBanner from '../components/InactivityBanner';
 
@@ -73,7 +73,6 @@ export default function Dashboard() {
       if (transactions && transactions.length > 0) {
         // Aggregate by day
         const dayMap: { [key: string]: number } = {};
-        let runningBalance = 0;
         // Use last 7 days
         const now = new Date();
         for (let i = 6; i >= 0; i--) {

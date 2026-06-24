@@ -66,7 +66,6 @@ export default function EmailTemplates() {
       toast.success('Template updated');
       setEditingId(null);
       setEditData({});
-      // Refetch to show latest
       await fetchTemplates();
     } catch (err: any) {
       toast.error(err.message);
@@ -94,7 +93,7 @@ export default function EmailTemplates() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold">Email Templates</h1>
-        <p className="text-sm text-gray-500">Edit system email templates. Use {{variable}} placeholders.</p>
+        <p className="text-sm text-gray-500">Edit system email templates. Use {'{{variable}}'} placeholders.</p>
       </div>
 
       <div className="grid grid-cols-1 gap-4">
@@ -137,7 +136,7 @@ export default function EmailTemplates() {
                     className="w-full border border-gray-300 rounded-xl px-4 py-2 focus:ring-2 focus:ring-brand font-mono text-sm"
                   />
                 </div>
-                <div className="text-xs text-gray-500">Available variables: <code className="bg-gray-100 px-1 rounded">{{name}}, {{amount}}, {{site_url}}, {{plan_name}}, {{daily_return}}, {{duration_days}}, {{address}}</code></div>
+                <div className="text-xs text-gray-500">Available variables: <code className="bg-gray-100 px-1 rounded">{'{{name}}, {{amount}}, {{site_url}}, {{plan_name}}, {{daily_return}}, {{duration_days}}, {{address}}'}</code></div>
               </div>
             ) : (
               <div className="flex justify-between items-center">

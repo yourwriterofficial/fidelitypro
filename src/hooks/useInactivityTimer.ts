@@ -29,7 +29,7 @@ export function useInactivityTimer() {
         .select('id')
         .eq('user_id', profile.id)
         .limit(1);
-      setHasInvestment(orders && orders.length > 0);
+      setHasInvestment(!!(orders && orders.length > 0));
     };
 
     fetchSettingsAndCheck();

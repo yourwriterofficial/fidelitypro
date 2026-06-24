@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabaseClient';
-import { Users, Package, DollarSign, ShoppingCart, Lock, Building, Gift, Bell, Plus, UserPlus, Activity } from 'lucide-react';
 import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
+import { Users, Package, DollarSign, ShoppingCart, Lock, Building, Gift, Bell, UserPlus, Activity } from 'lucide-react';
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState({
@@ -68,7 +68,6 @@ export default function AdminDashboard() {
 
   const fetchRecentActivity = async () => {
     try {
-      // Get latest 5 events from all tables (simplified)
       const { data: withdrawals } = await supabase
         .from('withdrawals')
         .select('id, user_id, amount, status, created_at, profiles(name, email)')
@@ -103,7 +102,7 @@ export default function AdminDashboard() {
     }
     setCreating(true);
     try {
-      const { data, error } = await supabase.auth.admin.createUser({
+      const { error } = await supabase.auth.admin.createUser({
         email: newUser.email,
         password: newUser.password,
         email_confirm: true,

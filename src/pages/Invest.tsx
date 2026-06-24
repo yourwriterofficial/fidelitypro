@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabaseClient';
 import { useAuthStore } from '../store/authStore';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { TrendingUp, Clock, Wallet, AlertCircle, Calculator, ArrowRight, ChevronDown, ChevronUp } from 'lucide-react';
+import { Wallet, AlertCircle, Calculator, ArrowRight, ChevronDown, ChevronUp } from 'lucide-react';
 import InvestmentModal from '../components/InvestmentModal';
 import { useDepositAddress } from '../hooks/useDepositAddress';
 
@@ -26,7 +26,6 @@ export default function Invest() {
   const [plans, setPlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null);
-  const [modalOpen, setModalOpen] = useState(false);
   const [calculatorAmount, setCalculatorAmount] = useState<number>(100);
   const [selectedCalcPlan, setSelectedCalcPlan] = useState<Plan | null>(null);
   const [showCalc, setShowCalc] = useState(false);
@@ -95,7 +94,6 @@ export default function Invest() {
       return;
     }
     setSelectedPlan(plan);
-    setModalOpen(true);
   };
 
   const handleInvestmentSuccess = () => {
@@ -103,6 +101,10 @@ export default function Invest() {
     refreshProfile();
     fetchPlans();
     checkWalletBalance();
+  };
+
+  const closeModal = () => {
+    setSelectedPlan(null);
   };
 
   const formatCurrency = (amount: number) => {
@@ -264,7 +266,7 @@ export default function Invest() {
       {selectedPlan && (
         <InvestmentModal
           plan={selectedPlan}
-          onClose={() => setModalOpen(false)}
+          onClose={closeModal}
           onSuccess={handleInvestmentSuccess}
           depositAddress={address}
           depositNetwork={network}

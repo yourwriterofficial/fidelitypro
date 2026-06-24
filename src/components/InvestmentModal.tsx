@@ -35,9 +35,7 @@ export default function InvestmentModal({
   const [amount, setAmount] = useState('');
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState<'form' | 'deposit'>('form');
-  const [orderId, setOrderId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-  const [walletUsed, setWalletUsed] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,19 +59,14 @@ export default function InvestmentModal({
     }
     setLoading(true);
     try {
-      // Determine if wallet has enough balance
       let orderStatus = 'pending';
-      let useWallet = false;
       if (profile.wallet_balance >= numAmount) {
-        useWallet = true;
         orderStatus = 'active';
         // Deduct wallet
-        const { error: deductError } = await supabase
-          .from('profiles')
-          .update({ wallet_balance: profile.wallet_balance - numAmount })
-          .eq('id', profile.id);
-        if (deductError) throw deductError;
-        // Record transaction
+        await supabase.rpc('deduct_wallet_balance', {
+          user_id: profile.id,
+          amount: numAmount,
+        });
         await supabase.from('transactions').insert({
           user_id: profile.id,
           type: 'investment',
@@ -83,15 +76,12 @@ export default function InvestmentModal({
         });
         await refreshProfile();
         toast.success(`$${numAmount} deducted from wallet. Investment activated!`);
-        setWalletUsed(true);
-      } else {
-        setWalletUsed(false);
       }
 
       // Create order
       const startDate = new Date().toISOString();
       const endDate = new Date(Date.now() + plan.duration_days * 24 * 60 * 60 * 1000).toISOString();
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('orders')
         .insert({
           user_id: user.id,
@@ -103,19 +93,14 @@ export default function InvestmentModal({
           status: orderStatus,
           start_date: startDate,
           end_date: endDate,
-        })
-        .select()
-        .single();
+        });
       if (error) throw error;
-      setOrderId(data.id);
 
-      if (useWallet) {
-        // Already active, close modal and refresh
+      if (orderStatus === 'active') {
         toast.success('Investment active!');
         onSuccess();
-        onClose(); // ✅ Close modal after success
+        onClose();
       } else {
-        // Show deposit instructions
         setStep('deposit');
         toast.success('Investment order created! Please deposit to activate.');
       }
@@ -139,7 +124,6 @@ export default function InvestmentModal({
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-3xl max-w-md w-full p-6 relative max-h-[90vh] overflow-y-auto">
-        {/* ✅ Close button now calls onClose */}
         <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600">
           <X size={24} />
         </button>
@@ -212,7 +196,7 @@ export default function InvestmentModal({
             <button
               onClick={() => {
                 onSuccess();
-                onClose(); // ✅ Close after user says they sent
+                onClose();
               }}
               className="mt-4 w-full bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-2 rounded-xl transition"
             >

@@ -1,19 +1,19 @@
 import { useEffect, useState } from 'react';
 import { useAuthStore } from '../store/authStore';
 import { supabase } from '../lib/supabaseClient';
-import { Clock, TrendingUp, Wallet, Lock, Building } from 'lucide-react';
+import { Clock, TrendingUp, Wallet, Lock } from 'lucide-react';
 
 interface Order {
   id: string;
   type: 'investment' | 'staking' | 'property';
   product_name: string;
   amount: number;
-  daily_return?: number; // for investments
-  apy?: number; // for staking
+  daily_return?: number;
+  apy?: number;
   duration_days?: number;
   lock_days?: number;
   start_date: string;
-  end_date: string;
+  end_date?: string;
   status: string;
   maturityAmount?: number;
   timeLeft: string;
@@ -55,7 +55,7 @@ export default function MyPortfolio() {
     if (!profile) return;
     setLoading(true);
     try {
-      // Fetch investments (orders)
+      // Investments
       let query = supabase
         .from('orders')
         .select('*')
@@ -63,10 +63,9 @@ export default function MyPortfolio() {
       if (filter !== 'all') {
         query = query.eq('status', filter);
       }
-      const { data: orders, error: ordersErr } = await query.order('created_at', { ascending: false });
-      if (ordersErr) console.error(ordersErr);
+      const { data: orders } = await query.order('created_at', { ascending: false });
 
-      // Fetch staking orders
+      // Staking
       let stakingQuery = supabase
         .from('staking_orders')
         .select('*')
@@ -74,10 +73,9 @@ export default function MyPortfolio() {
       if (filter !== 'all') {
         stakingQuery = stakingQuery.eq('status', filter);
       }
-      const { data: staking, error: stakingErr } = await stakingQuery.order('created_at', { ascending: false });
-      if (stakingErr) console.error(stakingErr);
+      const { data: staking } = await stakingQuery.order('created_at', { ascending: false });
 
-      // Fetch property investments
+      // Properties
       let propQuery = supabase
         .from('property_investments')
         .select('*, property:property_id(title)')
@@ -85,8 +83,7 @@ export default function MyPortfolio() {
       if (filter !== 'all') {
         propQuery = propQuery.eq('status', filter);
       }
-      const { data: properties, error: propErr } = await propQuery.order('created_at', { ascending: false });
-      if (propErr) console.error(propErr);
+      const { data: properties } = await propQuery.order('created_at', { ascending: false });
 
       // Combine
       const allItems: Order[] = [];
@@ -132,7 +129,7 @@ export default function MyPortfolio() {
           product_name: p.property?.title || 'Property',
           amount: p.amount_paid,
           start_date: p.created_at,
-          end_date: null, // no end date for property
+          end_date: '', // ✅ fixed from null to empty string
           status: p.status,
           timeLeft: '--',
           nextPayout: '--',
@@ -164,7 +161,6 @@ export default function MyPortfolio() {
       const seconds = Math.floor((diffExpiry % (60 * 1000)) / 1000);
       const expiryStr = days > 0 ? `${days}d ${hours}h ${minutes}m ${seconds}s` : `${hours}h ${minutes}m ${seconds}s`;
 
-      // Next payout (only for active investments and staking)
       let payoutStr = '—';
       if (item.type === 'investment' && item.status === 'active') {
         const [payoutHour, payoutMinute] = payoutTime.split(':').map(Number);
@@ -180,7 +176,6 @@ export default function MyPortfolio() {
         const pSeconds = Math.floor((diffPayout % (60 * 1000)) / 1000);
         payoutStr = `${pHours}h ${pMinutes}m ${pSeconds}s`;
       } else if (item.type === 'staking' && item.status === 'active') {
-        // For staking, show countdown to maturity
         payoutStr = expiryStr;
       }
 

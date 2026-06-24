@@ -10,7 +10,6 @@ export default function AdminNotifications() {
   const [message, setMessage] = useState('');
   const [type, setType] = useState('info');
   const [link, setLink] = useState('');
-  const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
 
   useEffect(() => {
@@ -18,7 +17,6 @@ export default function AdminNotifications() {
   }, []);
 
   const fetchUsers = async () => {
-    setLoading(true);
     const { data, error } = await supabase
       .from('profiles')
       .select('id, name, email')
@@ -28,7 +26,6 @@ export default function AdminNotifications() {
     } else {
       setUsers(data || []);
     }
-    setLoading(false);
   };
 
   const handleSend = async (e: React.FormEvent) => {

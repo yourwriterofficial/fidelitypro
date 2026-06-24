@@ -4,8 +4,7 @@ import { useAuthStore } from '../../store/authStore';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { 
-  Ban, UserCheck, Eye, Edit, Plus, Minus, RefreshCw, Save, X, 
-  ChevronDown, ChevronUp, Mail, Lock, AlertCircle, DollarSign 
+  Ban, UserCheck, Eye, Edit, Plus, Minus, Save, X, Mail, Lock
 } from 'lucide-react';
 
 interface User {
@@ -254,9 +253,10 @@ export default function AdminUsers() {
   const resetPassword = async () => {
     if (!selectedUser) return;
     try {
-      const { error } = await supabase.auth.admin.resetPasswordForEmail(selectedUser.email);
-      if (error) throw error;
-      toast.success('Password reset email sent');
+      // This requires service role; we'll show a message for now.
+      toast.info('Password reset must be done via Supabase Dashboard.');
+      // const { error } = await supabase.auth.admin.resetPasswordForEmail(selectedUser.email);
+      // if (error) throw error;
     } catch (err: any) {
       toast.error(err.message);
     }
@@ -310,6 +310,7 @@ export default function AdminUsers() {
       can_property: user.can_property,
       restriction_reason: user.restriction_reason,
       fee_required: user.fee_required,
+      created_at: user.created_at,
     };
     impersonateUser(profile);
     navigate('/app');
@@ -605,11 +606,7 @@ export default function AdminUsers() {
                             <td className="p-2">{formatCurrency(inv.amount)}</td>
                             <td className="p-2">{inv.daily_return}%</td>
                             <td className="p-2">
-                              <span className={`px-2 py-1 rounded-full text-xs ${
-                                inv.status === 'active' ? 'bg-green-100 text-green-700' :
-                                inv.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
-                                'bg-gray-100 text-gray-700'
-                              }`}>{inv.status}</span>
+                              <span className={`px-2 py-1 rounded-full text-xs ${inv.status === 'active' ? 'bg-green-100 text-green-700' : inv.status === 'pending' ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-700'}`}>{inv.status}</span>
                             </td>
                             <td className="p-2">
                               <select
@@ -655,10 +652,7 @@ export default function AdminUsers() {
                             <td className="p-2">{s.apy}%</td>
                             <td className="p-2">{s.lock_days}d</td>
                             <td className="p-2">
-                              <span className={`px-2 py-1 rounded-full text-xs ${
-                                s.status === 'active' ? 'bg-green-100 text-green-700' :
-                                'bg-gray-100 text-gray-700'
-                              }`}>{s.status}</span>
+                              <span className={`px-2 py-1 rounded-full text-xs ${s.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}`}>{s.status}</span>
                             </td>
                             <td className="p-2">
                               <select
@@ -699,15 +693,11 @@ export default function AdminUsers() {
                       <tbody>
                         {propertyInvestments.map((p) => (
                           <tr key={p.id} className="border-t">
-                            <td className="p-2">{p.property?.title || 'N/A'}</td>
+                            <td className="p-2">{(p as any).property?.title || 'N/A'}</td>
                             <td className="p-2">{formatCurrency(p.amount_paid)}</td>
                             <td className="p-2">{formatCurrency(p.remaining_balance)}</td>
                             <td className="p-2">
-                              <span className={`px-2 py-1 rounded-full text-xs ${
-                                p.status === 'active' ? 'bg-green-100 text-green-700' :
-                                p.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
-                                'bg-gray-100 text-gray-700'
-                              }`}>{p.status}</span>
+                              <span className={`px-2 py-1 rounded-full text-xs ${p.status === 'active' ? 'bg-green-100 text-green-700' : p.status === 'pending' ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-700'}`}>{p.status}</span>
                             </td>
                             <td className="p-2">
                               <select
@@ -770,7 +760,6 @@ export default function AdminUsers() {
                     <button
                       onClick={() => {
                         if (confirm(`Are you sure you want to delete user ${selectedUser.name || selectedUser.email}?`)) {
-                          // Delete user (admin only)
                           supabase.auth.admin.deleteUser(selectedUser.id).then(({ error }) => {
                             if (error) toast.error(error.message);
                             else {

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { toast } from 'sonner';
-import { RefreshCw, Filter } from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
 
 interface LogEntry {
   id: string;
@@ -74,8 +74,8 @@ export default function AdminActivityLogs() {
           id: w.id,
           type: 'withdrawal',
           user_id: w.user_id,
-          user_name: w.profiles?.name,
-          user_email: w.profiles?.email,
+          user_name: (w.profiles as any)?.name,
+          user_email: (w.profiles as any)?.email,
           action: 'Withdrawal',
           details: `Withdrawal of $${w.amount} to ${w.address}`,
           amount: w.amount,
@@ -89,8 +89,8 @@ export default function AdminActivityLogs() {
           id: d.id,
           type: 'deposit',
           user_id: d.user_id,
-          user_name: d.profiles?.name,
-          user_email: d.profiles?.email,
+          user_name: (d.profiles as any)?.name,
+          user_email: (d.profiles as any)?.email,
           action: 'Deposit',
           details: `Deposit of $${d.amount}`,
           amount: d.amount,
@@ -104,8 +104,8 @@ export default function AdminActivityLogs() {
           id: o.id,
           type: 'investment',
           user_id: o.user_id,
-          user_name: o.profiles?.name,
-          user_email: o.profiles?.email,
+          user_name: (o.profiles as any)?.name,
+          user_email: (o.profiles as any)?.email,
           action: 'Investment',
           details: `Investment in ${o.product_name} of $${o.amount}`,
           amount: o.amount,
@@ -119,8 +119,8 @@ export default function AdminActivityLogs() {
           id: s.id,
           type: 'staking',
           user_id: s.user_id,
-          user_name: s.profiles?.name,
-          user_email: s.profiles?.email,
+          user_name: (s.profiles as any)?.name,
+          user_email: (s.profiles as any)?.email,
           action: 'Staking',
           details: `Staking of $${s.amount}`,
           amount: s.amount,
@@ -134,10 +134,10 @@ export default function AdminActivityLogs() {
           id: p.id,
           type: 'property',
           user_id: p.user_id,
-          user_name: p.profiles?.name,
-          user_email: p.profiles?.email,
+          user_name: (p.profiles as any)?.name,
+          user_email: (p.profiles as any)?.email,
           action: 'Property Investment',
-          details: `Paid $${p.amount_paid} for ${p.property?.title || 'property'}`,
+          details: `Paid $${p.amount_paid} for ${(p.property as any)?.title || 'property'}`,
           amount: p.amount_paid,
           status: p.status,
           created_at: p.created_at,
@@ -149,8 +149,8 @@ export default function AdminActivityLogs() {
           id: t.id,
           type: t.type,
           user_id: t.user_id,
-          user_name: t.profiles?.name,
-          user_email: t.profiles?.email,
+          user_name: (t.profiles as any)?.name,
+          user_email: (t.profiles as any)?.email,
           action: t.type === 'admin' ? 'Admin Action' : t.type,
           details: t.description || t.type,
           amount: t.amount,

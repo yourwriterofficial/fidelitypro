@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { useAuthStore } from '../store/authStore';
 import { toast } from 'sonner';
-import { Copy, Users, TrendingUp, Gift, User, ArrowUp, ArrowDown } from 'lucide-react';
+import { Copy, Users, TrendingUp, Gift, ArrowUp, ArrowDown, Check } from 'lucide-react';
+// remove User
 
 export default function Referral() {
   const { profile } = useAuthStore();
