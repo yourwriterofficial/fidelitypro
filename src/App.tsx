@@ -20,6 +20,15 @@ import Staking from './pages/Staking';
 import Properties from './pages/Properties';
 import Referral from './pages/Referral';
 import Settings from './pages/Settings';
+import Plans from './pages/Plans';
+import HowItWorks from './pages/HowItWorks';
+import About from './pages/About';
+import Contact from './pages/Contact';
+import Careers from './pages/Careers';
+import Security from './pages/Security';
+import FAQ from './pages/FAQ';
+import Terms from './pages/Terms';
+import Privacy from './pages/Privacy';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminOrders from './pages/admin/AdminOrders';
 import AdminDeposits from './pages/admin/AdminDeposits';
@@ -57,6 +66,15 @@ function App() {
           <Route path="/signup" element={<Signup />} />
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/banned" element={<BannedPage />} />
+          <Route path="/plans" element={<Plans />} />
+          <Route path="/how-it-works" element={<HowItWorks />} />
+          <Route path="/about" element={<About />} />
+          <Route path="/contact" element={<Contact />} />
+          <Route path="/careers" element={<Careers />} />
+          <Route path="/security" element={<Security />} />
+          <Route path="/faq" element={<FAQ />} />
+          <Route path="/terms" element={<Terms />} />
+          <Route path="/privacy" element={<Privacy />} />
 
           {/* Protected User Routes */}
           <Route element={<ProtectedRoute />}>
