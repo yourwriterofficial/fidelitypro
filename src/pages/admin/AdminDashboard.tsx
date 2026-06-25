@@ -4,6 +4,9 @@ import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
 import { Users, Package, DollarSign, ShoppingCart, Lock, Building, Gift, Bell, UserPlus, Activity } from 'lucide-react';
 
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
 export default function AdminDashboard() {
   const [stats, setStats] = useState({
     totalUsers: 0,
@@ -94,6 +97,9 @@ export default function AdminDashboard() {
     }
   };
 
+  // FIX: Replaced supabase.auth.admin.createUser() (requires service role key, cannot
+  // be called from the browser) with a fetch to the create-user Edge Function which
+  // runs server-side with the service role key.
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newUser.email || !newUser.password || !newUser.name) {
@@ -102,13 +108,26 @@ export default function AdminDashboard() {
     }
     setCreating(true);
     try {
-      const { error } = await supabase.auth.admin.createUser({
-        email: newUser.email,
-        password: newUser.password,
-        email_confirm: true,
-        user_metadata: { name: newUser.name },
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Not authenticated');
+
+      const response = await fetch(`${SUPABASE_URL}/functions/v1/create-user`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          email: newUser.email,
+          password: newUser.password,
+          name: newUser.name,
+        }),
       });
-      if (error) throw error;
+
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Failed to create user');
+
       toast.success('User created successfully');
       setShowCreateUser(false);
       setNewUser({ email: '', password: '', name: '' });
@@ -188,9 +207,17 @@ export default function AdminDashboard() {
                 <div>
                   <p className="text-sm font-medium">{item.profiles?.name || item.user_id}</p>
                   <p className="text-xs text-gray-500">
-                    {item.status && <span className={`px-2 py-0.5 rounded-full text-xs ${item.status === 'pending' ? 'bg-yellow-100 text-yellow-700' : item.status === 'active' || item.status === 'confirmed' || item.status === 'approved' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}`}>{item.status}</span>}
-                    {item.product_name && ` – ${item.product_name}`}
-                    {item.amount && ` – ${formatCurrency(item.amount)}`}
+                    {item.status && (
+                      <span className={`px-2 py-0.5 rounded-full text-xs ${
+                        item.status === 'pending'
+                          ? 'bg-yellow-100 text-yellow-700'
+                          : item.status === 'active' || item.status === 'confirmed' || item.status === 'approved'
+                          ? 'bg-green-100 text-green-700'
+                          : 'bg-gray-100 text-gray-700'
+                      }`}>{item.status}</span>
+                    )}
+                    {item.product_name && ` — ${item.product_name}`}
+                    {item.amount && ` — ${formatCurrency(item.amount)}`}
                   </p>
                 </div>
                 <span className="text-xs text-gray-400">{new Date(item.created_at).toLocaleString()}</span>

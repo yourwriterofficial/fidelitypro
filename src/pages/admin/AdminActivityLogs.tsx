@@ -1,174 +1,87 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { toast } from 'sonner';
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, Activity, Filter } from 'lucide-react';
 
 interface LogEntry {
-  id: string;
-  type: string;
-  user_id: string;
-  user_name?: string;
-  user_email?: string;
-  action: string;
-  details: string;
-  amount?: number;
-  status?: string;
-  created_at: string;
+  id: string; type: string; user_id: string; user_name: string;
+  user_email: string; action: string; details: string;
+  amount?: number; status: string; created_at: string;
 }
+
+const STATUS_BADGE: Record<string, string> = {
+  pending:   'bg-amber-50 text-amber-700 border-amber-100',
+  active:    'bg-emerald-50 text-emerald-700 border-emerald-100',
+  confirmed: 'bg-emerald-50 text-emerald-700 border-emerald-100',
+  approved:  'bg-emerald-50 text-emerald-700 border-emerald-100',
+  completed: 'bg-blue-50 text-blue-700 border-blue-100',
+  rejected:  'bg-red-50 text-red-700 border-red-100',
+  failed:    'bg-red-50 text-red-700 border-red-100',
+  cancelled: 'bg-gray-50 text-gray-600 border-gray-100',
+};
+
+const TYPE_COLOR: Record<string, string> = {
+  withdrawal: 'bg-red-50 text-red-600 border-red-100',
+  deposit:    'bg-emerald-50 text-emerald-600 border-emerald-100',
+  order:      'bg-blue-50 text-blue-600 border-blue-100',
+  staking:    'bg-indigo-50 text-indigo-600 border-indigo-100',
+  property:   'bg-orange-50 text-orange-600 border-orange-100',
+  transaction:'bg-purple-50 text-purple-600 border-purple-100',
+};
+
+const getStatusBadge = (status: string) =>
+  STATUS_BADGE[status] || 'bg-gray-50 text-gray-600 border-gray-100';
 
 export default function AdminActivityLogs() {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState('all');
+  const [typeFilter, setTypeFilter] = useState('all');
+
+  useEffect(() => { fetchLogs(); }, []);
 
   const fetchLogs = async () => {
     setLoading(true);
     try {
-      // Fetch withdrawals
-      const { data: withdrawals } = await supabase
-        .from('withdrawals')
-        .select('id, user_id, amount, address, status, created_at, profiles(name, email)')
-        .order('created_at', { ascending: false })
-        .limit(50);
+      const [
+        { data: withdrawals },
+        { data: deposits },
+        { data: orders },
+        { data: stakingOrders },
+        { data: propertyInvestments },
+        { data: transactions },
+      ] = await Promise.all([
+        supabase.from('withdrawals').select('id,user_id,amount,status,created_at,profiles(name,email)').order('created_at', { ascending: false }).limit(50),
+        supabase.from('deposits').select('id,user_id,amount,status,created_at,profiles(name,email)').order('created_at', { ascending: false }).limit(50),
+        supabase.from('orders').select('id,user_id,product_name,amount,status,created_at,profiles(name,email)').order('created_at', { ascending: false }).limit(50),
+        supabase.from('staking_orders').select('id,user_id,amount,status,created_at,profiles(name,email)').order('created_at', { ascending: false }).limit(50),
+        supabase.from('property_investments').select('id,user_id,amount,status,created_at,profiles(name,email)').order('created_at', { ascending: false }).limit(50),
+        supabase.from('transactions').select('id,user_id,amount,type,description,status,created_at,profiles(name,email)').order('created_at', { ascending: false }).limit(50),
+      ]);
 
-      // Fetch deposits
-      const { data: deposits } = await supabase
-        .from('deposits')
-        .select('id, user_id, amount, status, created_at, profiles(name, email)')
-        .order('created_at', { ascending: false })
-        .limit(50);
-
-      // Fetch orders (investments)
-      const { data: orders } = await supabase
-        .from('orders')
-        .select('id, user_id, product_name, amount, status, created_at, profiles(name, email)')
-        .order('created_at', { ascending: false })
-        .limit(50);
-
-      // Fetch staking orders
-      const { data: staking } = await supabase
-        .from('staking_orders')
-        .select('id, user_id, amount, status, created_at, profiles(name, email)')
-        .order('created_at', { ascending: false })
-        .limit(50);
-
-      // Fetch property investments
-      const { data: properties } = await supabase
-        .from('property_investments')
-        .select('id, user_id, amount_paid, status, created_at, property:property_id(title), profiles(name, email)')
-        .order('created_at', { ascending: false })
-        .limit(50);
-
-      // Fetch transactions
-      const { data: transactions } = await supabase
-        .from('transactions')
-        .select('id, user_id, type, amount, description, status, created_at, profiles(name, email)')
-        .order('created_at', { ascending: false })
-        .limit(50);
-
-      // Build unified log entries
-      const allLogs: LogEntry[] = [];
-
-      withdrawals?.forEach((w) => {
-        allLogs.push({
-          id: w.id,
-          type: 'withdrawal',
-          user_id: w.user_id,
-          user_name: (w.profiles as any)?.name,
-          user_email: (w.profiles as any)?.email,
-          action: 'Withdrawal',
-          details: `Withdrawal of $${w.amount} to ${w.address}`,
-          amount: w.amount,
-          status: w.status,
-          created_at: w.created_at,
-        });
+      const toEntry = (item: any, type: string, action: string, details: string): LogEntry => ({
+        id: `${type}-${item.id}`,
+        type,
+        user_id: item.user_id,
+        user_name: item.profiles?.name || item.user_id || 'Unknown',
+        user_email: item.profiles?.email || '',
+        action,
+        details,
+        amount: item.amount,
+        status: item.status || '',
+        created_at: item.created_at,
       });
 
-      deposits?.forEach((d) => {
-        allLogs.push({
-          id: d.id,
-          type: 'deposit',
-          user_id: d.user_id,
-          user_name: (d.profiles as any)?.name,
-          user_email: (d.profiles as any)?.email,
-          action: 'Deposit',
-          details: `Deposit of $${d.amount}`,
-          amount: d.amount,
-          status: d.status,
-          created_at: d.created_at,
-        });
-      });
+      const merged: LogEntry[] = [
+        ...(withdrawals || []).map((w: any) => toEntry(w, 'withdrawal', 'Withdrawal Request', `Amount: $${w.amount}`)),
+        ...(deposits || []).map((d: any) => toEntry(d, 'deposit', 'Deposit', `Amount: $${d.amount}`)),
+        ...(orders || []).map((o: any) => toEntry(o, 'order', 'Investment Order', `${o.product_name} · $${o.amount}`)),
+        ...(stakingOrders || []).map((s: any) => toEntry(s, 'staking', 'Staking Order', `Amount: $${s.amount}`)),
+        ...(propertyInvestments || []).map((p: any) => toEntry(p, 'property', 'Property Investment', `Amount: $${p.amount}`)),
+        ...(transactions || []).map((t: any) => toEntry(t, 'transaction', t.description || 'Transaction', `Type: ${t.type}`)),
+      ];
 
-      orders?.forEach((o) => {
-        allLogs.push({
-          id: o.id,
-          type: 'investment',
-          user_id: o.user_id,
-          user_name: (o.profiles as any)?.name,
-          user_email: (o.profiles as any)?.email,
-          action: 'Investment',
-          details: `Investment in ${o.product_name} of $${o.amount}`,
-          amount: o.amount,
-          status: o.status,
-          created_at: o.created_at,
-        });
-      });
-
-      staking?.forEach((s) => {
-        allLogs.push({
-          id: s.id,
-          type: 'staking',
-          user_id: s.user_id,
-          user_name: (s.profiles as any)?.name,
-          user_email: (s.profiles as any)?.email,
-          action: 'Staking',
-          details: `Staking of $${s.amount}`,
-          amount: s.amount,
-          status: s.status,
-          created_at: s.created_at,
-        });
-      });
-
-      properties?.forEach((p) => {
-        allLogs.push({
-          id: p.id,
-          type: 'property',
-          user_id: p.user_id,
-          user_name: (p.profiles as any)?.name,
-          user_email: (p.profiles as any)?.email,
-          action: 'Property Investment',
-          details: `Paid $${p.amount_paid} for ${(p.property as any)?.title || 'property'}`,
-          amount: p.amount_paid,
-          status: p.status,
-          created_at: p.created_at,
-        });
-      });
-
-      transactions?.forEach((t) => {
-        allLogs.push({
-          id: t.id,
-          type: t.type,
-          user_id: t.user_id,
-          user_name: (t.profiles as any)?.name,
-          user_email: (t.profiles as any)?.email,
-          action: t.type === 'admin' ? 'Admin Action' : t.type,
-          details: t.description || t.type,
-          amount: t.amount,
-          status: t.status,
-          created_at: t.created_at,
-        });
-      });
-
-      // Sort by most recent
-      allLogs.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-
-      // Apply filter
-      let filtered = allLogs;
-      if (filter !== 'all') {
-        filtered = allLogs.filter(log => log.type === filter);
-      }
-
-      setLogs(filtered);
+      merged.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      setLogs(merged);
     } catch (err) {
       console.error(err);
       toast.error('Failed to load activity logs');
@@ -177,100 +90,70 @@ export default function AdminActivityLogs() {
     }
   };
 
-  useEffect(() => {
-    fetchLogs();
-  }, [filter]);
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(Math.abs(amount));
-  };
-
-  const getStatusBadge = (status: string) => {
-    const map: Record<string, string> = {
-      pending: 'bg-yellow-100 text-yellow-700',
-      active: 'bg-green-100 text-green-700',
-      completed: 'bg-blue-100 text-blue-700',
-      approved: 'bg-green-100 text-green-700',
-      confirmed: 'bg-green-100 text-green-700',
-      rejected: 'bg-red-100 text-red-700',
-      failed: 'bg-red-100 text-red-700',
-      cancelled: 'bg-gray-100 text-gray-700',
-      withdrawn_early: 'bg-orange-100 text-orange-700',
-      defaulted: 'bg-red-100 text-red-700',
-    };
-    return map[status] || 'bg-gray-100 text-gray-700';
-  };
-
-  if (loading) return <div>Loading logs...</div>;
+  const filtered = typeFilter === 'all' ? logs : logs.filter(l => l.type === typeFilter);
+  const fmt = (n?: number) => n != null ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n) : '';
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">Activity Logs</h1>
-        <div className="flex items-center gap-3">
-          <select
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-            className="border border-gray-300 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-brand"
-          >
-            <option value="all">All</option>
-            <option value="withdrawal">Withdrawals</option>
-            <option value="deposit">Deposits</option>
-            <option value="investment">Investments</option>
-            <option value="staking">Staking</option>
-            <option value="property">Property</option>
-            <option value="admin">Admin</option>
-            <option value="return">Returns</option>
-          </select>
-          <button
-            onClick={fetchLogs}
-            className="bg-gray-200 hover:bg-gray-300 px-4 py-2 rounded-xl flex items-center gap-2"
-          >
-            <RefreshCw size={18} /> Refresh
-          </button>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Activity Logs</h1>
+          <p className="text-sm text-gray-500 mt-0.5">{filtered.length} entries across all activity types</p>
         </div>
+        <button onClick={fetchLogs} className="bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 px-4 py-2.5 rounded-xl flex items-center gap-2 text-sm font-medium transition">
+          <RefreshCw size={15} className={loading ? 'animate-spin' : ''} /> Refresh
+        </button>
       </div>
 
-      <div className="bg-white rounded-2xl shadow-sm border overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="text-left p-4">Date</th>
-                <th className="text-left p-4">User</th>
-                <th className="text-left p-4">Action</th>
-                <th className="text-left p-4">Details</th>
-                <th className="text-left p-4">Amount</th>
-                <th className="text-left p-4">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {logs.length === 0 ? (
-                <tr><td colSpan={6} className="p-8 text-center text-gray-500">No logs found.</td></tr>
-              ) : (
-                logs.map((log) => (
-                  <tr key={log.id} className="border-t hover:bg-gray-50">
-                    <td className="p-4">{new Date(log.created_at).toLocaleString()}</td>
-                    <td className="p-4">{log.user_name || log.user_email || log.user_id}</td>
-                    <td className="p-4">
-                      <span className="font-medium">{log.action}</span>
-                      <span className="text-xs text-gray-400 ml-1">({log.type})</span>
-                    </td>
-                    <td className="p-4 max-w-xs truncate">{log.details}</td>
-                    <td className="p-4">{log.amount ? formatCurrency(log.amount) : '—'}</td>
-                    <td className="p-4">
-                      {log.status && (
-                        <span className={`px-2 py-1 rounded-full text-xs ${getStatusBadge(log.status)}`}>
-                          {log.status.charAt(0).toUpperCase() + log.status.slice(1)}
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+      <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-1.5 text-sm text-gray-500 mr-1"><Filter size={14} /> Filter:</div>
+        {['all','withdrawal','deposit','order','staking','property','transaction'].map(t => (
+          <button key={t} onClick={() => setTypeFilter(t)}
+            className={`px-3.5 py-1.5 rounded-full text-xs font-medium transition border ${typeFilter === t ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'}`}>
+            {t.charAt(0).toUpperCase() + t.slice(1)}
+          </button>
+        ))}
+      </div>
+
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        {loading ? (
+          <div className="space-y-0 divide-y divide-gray-50">
+            {[...Array(8)].map((_, i) => <div key={i} className="animate-pulse h-16 bg-gray-50/50 m-0" />)}
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="py-14 text-center">
+            <Activity size={32} className="text-gray-200 mx-auto mb-2" />
+            <p className="text-gray-400 text-sm">No activity logs found.</p>
+          </div>
+        ) : (
+          <div className="divide-y divide-gray-50">
+            {filtered.map(log => (
+              <div key={log.id} className="flex items-center gap-4 px-5 py-3.5 hover:bg-gray-50/50 transition-colors">
+                <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center text-xs font-bold text-gray-600 shrink-0">
+                  {log.user_name.charAt(0).toUpperCase()}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-sm font-medium text-gray-900 truncate">{log.user_name}</span>
+                    {log.user_email && <span className="text-xs text-gray-400">{log.user_email}</span>}
+                  </div>
+                  <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                    <span className={`px-2 py-0.5 rounded-full text-xs border font-medium ${TYPE_COLOR[log.type] || 'bg-gray-50 text-gray-600 border-gray-100'}`}>{log.type}</span>
+                    <span className="text-xs text-gray-500">{log.action}</span>
+                    {log.details && <span className="text-xs text-gray-400">· {log.details}</span>}
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 shrink-0">
+                  {log.amount != null && <span className="text-sm font-semibold text-gray-700 tabular-nums">{fmt(log.amount)}</span>}
+                  {log.status && (
+                    <span className={`px-2 py-0.5 rounded-full text-xs border font-medium ${getStatusBadge(log.status)}`}>{log.status}</span>
+                  )}
+                  <span className="text-xs text-gray-400 whitespace-nowrap">{new Date(log.created_at).toLocaleString()}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

@@ -1,4 +1,5 @@
 // deno-lint-ignore-file
+import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const supabase = createClient(
@@ -6,10 +7,10 @@ const supabase = createClient(
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 );
 
-export default async (req: Request) => {
+// FIX: replaced `export default async (req) =>` with serve() so Supabase
+// Deno runtime can bind this function to an HTTP endpoint.
+serve(async (_req: Request) => {
   try {
-    const now = new Date().toISOString();
-
     // Get all active orders
     const { data: orders, error: ordersError } = await supabase
       .from('orders')
@@ -19,7 +20,7 @@ export default async (req: Request) => {
     if (ordersError) throw ordersError;
 
     let processed = 0;
-    for (const order of orders || []) {
+    for (const order of orders ?? []) {
       const dailyReturn = order.amount * (order.daily_return / 100);
 
       // Credit wallet
@@ -37,17 +38,16 @@ export default async (req: Request) => {
         status: 'completed',
       });
 
-      // If compounding, we would create a new order here (you can add logic later)
       processed++;
     }
 
     return new Response(JSON.stringify({ success: true, processed }), {
       headers: { 'Content-Type': 'application/json' },
     });
-  } catch (err) {
+  } catch (err: any) {
     return new Response(JSON.stringify({ error: err.message }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' },
     });
   }
-};
+});

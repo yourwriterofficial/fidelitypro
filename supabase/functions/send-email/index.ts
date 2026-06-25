@@ -31,10 +31,11 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from: from || 'FidelityPro <noreply@yourdomain.com>',
-        to: to,
-        subject: subject,
-        html: html,
+        // FIX: replaced placeholder yourdomain.com with the real verified domain
+        from: from || 'FidelityPro <noreply@fidelitypro.org>',
+        to,
+        subject,
+        html,
       }),
     });
 
@@ -48,7 +49,7 @@ serve(async (req) => {
       JSON.stringify({ success: true, data }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
-  } catch (err) {
+  } catch (err: any) {
     console.error('Error:', err.message);
     return new Response(
       JSON.stringify({ error: err.message }),

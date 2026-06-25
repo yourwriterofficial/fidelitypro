@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useAuthStore } from '../store/authStore';
-import { supabase } from '../lib/supabaseClient';
 import { Mail, Lock, User, UserPlus } from 'lucide-react';
 import { toast } from 'sonner';
 
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
 export default function Signup() {
   const navigate = useNavigate();
-  const { signUp } = useAuthStore();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -25,6 +25,12 @@ export default function Signup() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+
+    if (!name.trim()) {
+      setError('Full name is required');
+      toast.error('Full name is required');
+      return;
+    }
     if (password !== confirmPassword) {
       setError('Passwords do not match');
       toast.error('Passwords do not match');
@@ -35,44 +41,52 @@ export default function Signup() {
       toast.error('Password too short');
       return;
     }
+
     setLoading(true);
     try {
-      const result = await signUp(email, password, name);
-      
-      // After signup, handle referral if user is logged in (email confirmation not required)
-      if (!result.needsEmailConfirm) {
-        const { user } = useAuthStore.getState();
-        if (user && refCode) {
-          // Find referrer by referral_code
-          const { data: referrer } = await supabase
-            .from('profiles')
-            .select('id')
-            .eq('referral_code', refCode)
-            .single();
-          if (referrer) {
-            // Update profile with referred_by
-            await supabase
-              .from('profiles')
-              .update({ referred_by: referrer.id })
-              .eq('id', user.id);
-            // Create referral record
-            await supabase.from('referrals').insert({
-              referrer_id: referrer.id,
-              referee_id: user.id,
-              level: 1,
-              status: 'pending',
-            });
-          }
-        }
-        toast.success('Account created! Redirecting...');
-        navigate('/app');
-      } else {
-        toast.success('Account created! Check your email to confirm.');
-        navigate('/login');
+      const response = await fetch(`${SUPABASE_URL}/functions/v1/signup`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+        },
+        body: JSON.stringify({
+          email,
+          password,
+          full_name: name,
+          ref_code: refCode || null,
+        }),
+      });
+
+      // Parse response — handle non-JSON bodies gracefully
+      let result: Record<string, unknown> = {};
+      try {
+        result = await response.json();
+      } catch {
+        // body wasn't JSON
       }
-    } catch (err: any) {
-      setError(err.message || 'Signup failed');
-      toast.error(err.message);
+
+      if (!response.ok) {
+        // FIX: extract error whether it's a string, object, or missing entirely
+        const errMsg =
+          (typeof result.error === 'string' && result.error) ||
+          (typeof result.message === 'string' && result.message) ||
+          (result.error && typeof result.error === 'object'
+            ? JSON.stringify(result.error)
+            : null) ||
+          `Signup failed (${response.status})`;
+        throw new Error(errMsg);
+      }
+
+      toast.success('Account created! Please check your email to confirm.');
+      navigate('/login');
+    } catch (err: unknown) {
+      const msg =
+        err instanceof Error ? err.message : 'Signup failed. Please try again.';
+      setError(msg);
+      toast.error(msg);
+      console.error('Signup error:', err);
     } finally {
       setLoading(false);
     }

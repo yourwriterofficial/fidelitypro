@@ -1,12 +1,11 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useAuthStore } from '../store/authStore';
+import { supabase } from '../lib/supabaseClient';
 import { Mail, Lock, LogIn } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function Login() {
   const navigate = useNavigate();
-  const { signIn } = useAuthStore();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -16,18 +15,31 @@ export default function Login() {
     e.preventDefault();
     setError('');
     setLoading(true);
+
     try {
-      await signIn(email, password);
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (signInError) {
+        console.error('Supabase signIn error:', signInError);
+        throw new Error(signInError.message);
+      }
+
+      if (!data.user) throw new Error('No user returned');
+
       toast.success('Welcome back!');
       navigate('/app');
     } catch (err: any) {
       let msg = err.message || 'Invalid credentials';
       // Network errors
-      if (msg.includes('fetch') || msg.includes('ERR_NAME_NOT_RESOLVED')) {
+      if (msg.includes('fetch') || msg.includes('ERR_NAME_NOT_RESOLVED') || msg.includes('NetworkError')) {
         msg = 'Network error – please check your internet connection and Supabase URL.';
       }
       setError(msg);
       toast.error(msg);
+      console.error('Login error:', err);
     } finally {
       setLoading(false);
     }

@@ -15,11 +15,15 @@ export function useDepositAddress() {
       return;
     }
     const fetchAddress = async () => {
+      // FIX: changed .single() to .maybeSingle() — .single() throws error code
+      // PGRST116 when no row exists (e.g. address not yet assigned to this user),
+      // crashing the hook. .maybeSingle() returns null cleanly instead.
       const { data, error } = await supabase
         .from('user_deposit_addresses')
         .select('address, network, currency')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
+
       if (error) {
         console.error('Failed to fetch deposit address:', error);
         setLoading(false);
