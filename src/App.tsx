@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'sonner';
 import { QueryProvider } from './providers/QueryProvider';
 import { useAuthStore } from './store/authStore';
+import ErrorBoundary from './components/ErrorBoundary';
 import AuthGuard from './components/AuthGuard';
 import ProtectedRoute from './components/ProtectedRoute';
 import Layout from './components/Layout';
@@ -57,6 +58,7 @@ function App() {
 
   return (
     <QueryProvider>
+      <ErrorBoundary>
       <BrowserRouter>
         <Toaster position="top-center" richColors theme="light" />
         <Routes>
@@ -118,6 +120,7 @@ function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>
+      </ErrorBoundary>
     </QueryProvider>
   );
 }

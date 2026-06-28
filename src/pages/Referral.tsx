@@ -5,7 +5,7 @@ import { toast } from 'sonner';
 import { Copy, Users, TrendingUp, Gift, ArrowUp, Check, Share2, LinkIcon } from 'lucide-react';
 
 export default function Referral() {
-  const { profile } = useAuthStore();
+  const { profile, refreshProfile } = useAuthStore();
   const [referralLink, setReferralLink] = useState('');
   const [downlines, setDownlines] = useState<any[]>([]);
   const [upline, setUpline] = useState<any>(null);
@@ -15,10 +15,34 @@ export default function Referral() {
 
   useEffect(() => {
     if (profile) {
-      setReferralLink(`${window.location.origin}/signup?ref=${profile.referral_code}`);
+      ensureReferralCode();
       fetchReferralData();
     }
   }, [profile]);
+
+  // The referral link was rendering as ".../signup?ref=null" for any profile
+  // whose referral_code was never set (e.g. older accounts). A null code also
+  // breaks the signup lookup, so the link wouldn't work. Here we guarantee a
+  // permanent, working permalink: if the code is missing we generate one and
+  // persist it to the profile so it stays stable across sessions.
+  const ensureReferralCode = async () => {
+    if (!profile) return;
+    let code = profile.referral_code;
+    if (!code) {
+      code = Math.random().toString(36).substring(2, 10);
+      const { error } = await supabase
+        .from('profiles')
+        .update({ referral_code: code })
+        .eq('id', profile.id);
+      if (error) {
+        console.error('Failed to persist referral code:', error);
+      } else {
+        // Keep the in-memory profile in sync so other pages see the new code.
+        await refreshProfile();
+      }
+    }
+    setReferralLink(`${window.location.origin}/signup?ref=${code}`);
+  };
 
   const fetchReferralData = async () => {
     if (!profile) return;
@@ -31,7 +55,7 @@ export default function Referral() {
       .eq('referrer_id', profile.id).order('created_at', { ascending: false });
     if (!refsErr) setDownlines(refs || []);
     const { data: commissions, error: commErr } = await supabase
-      .from('referral_commissions').select('amount').eq('user_id', profile.id).eq('paid_at', 'null');
+      .from('referral_commissions').select('amount').eq('user_id', profile.id).is('paid_at', null);
     if (!commErr) setTotalCommission(commissions?.reduce((s, c) => s + c.amount, 0) || 0);
     setLoading(false);
   };

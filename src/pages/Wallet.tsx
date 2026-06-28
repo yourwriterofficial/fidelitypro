@@ -134,7 +134,7 @@ export default function WalletPage() {
         user_id: profile.id, amount, transaction_hash: selectedCurrency, status: 'pending',
       });
       if (error) throw error;
-      toast.success('Deposit recorded. Waiting for admin confirmation.');
+      toast.success('Deposit submitted! Your wallet will be credited once your deposit is confirmed.');
       setDepositAmount('');
       await fetchTransactionHistory();
       await refreshProfile();
@@ -173,6 +173,7 @@ export default function WalletPage() {
 
   const fmt = (n: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(Math.abs(n));
   const selectedMethod = depositMethods.find(m => m.currency === selectedCurrency);
+  const pendingDeposits = transactions.filter(t => t.type === 'deposit' && t.status === 'pending');
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-6 pb-10">
@@ -264,10 +265,16 @@ export default function WalletPage() {
                   {/* Step 2 – Address */}
                   {selectedMethod && (
                     <div>
-                      <div className="flex items-center gap-2 mb-2">
+                      <div className="flex items-center gap-2 mb-1">
                         <span className="w-5 h-5 bg-brand text-white text-xs font-bold rounded-full flex items-center justify-center">2</span>
-                        <label className="text-sm font-semibold text-gray-700">Send to This Address</label>
+                        <label className="text-sm font-semibold text-gray-700">
+                          Your Personal {selectedMethod.currency} Deposit Address
+                        </label>
                       </div>
+                      <p className="text-xs text-gray-500 mb-2">
+                        {profile?.name ? `${profile.name.split(' ')[0]}, this` : 'This'} is your personal{' '}
+                        {selectedMethod.currency} wallet address — send funds here any time to top up your account balance.
+                      </p>
                       <div className="bg-gray-50 rounded-xl border border-gray-200 p-4">
                         <div className="flex items-center justify-between gap-2">
                           <code className="text-xs sm:text-sm break-all font-mono text-gray-800 flex-1">{selectedMethod.address}</code>
@@ -312,8 +319,27 @@ export default function WalletPage() {
                         Confirm
                       </button>
                     </form>
-                    <p className="text-xs text-gray-400 mt-2">Funds are credited after admin review (usually &lt; 30 min).</p>
                   </div>
+
+                  {/* Pending deposit — spinning bar until the deposit is confirmed */}
+                  {pendingDeposits.map(d => (
+                    <div key={d.id} className="rounded-xl border border-brand/20 bg-brand/5 p-4">
+                      <div className="flex items-center gap-3">
+                        <RefreshCw size={18} className="text-brand animate-spin shrink-0" />
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-gray-800">
+                            Deposit of {fmt(d.amount)} pending confirmation
+                          </p>
+                          <p className="text-xs text-gray-500 mt-0.5">
+                            Your wallet will be credited once your deposit is confirmed.
+                          </p>
+                        </div>
+                      </div>
+                      <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-brand/10">
+                        <div className="h-full w-1/3 animate-indeterminate rounded-full bg-brand" />
+                      </div>
+                    </div>
+                  ))}
                 </>
               )}
             </div>

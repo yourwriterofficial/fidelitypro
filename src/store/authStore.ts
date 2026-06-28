@@ -129,7 +129,15 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       }
 
       supabase.auth.onAuthStateChange(async (event, session) => {
-        if (event === 'SIGNED_IN' && session?.user) {
+        // A failed token refresh (invalid/expired refresh token) is what caused
+        // the random "403" dead-ends: the client kept a stale user in memory so
+        // the app stayed on protected routes while every request was rejected.
+        // Treat any event without a valid session as a clean sign-out.
+        if (event === 'SIGNED_OUT' || (!session?.user && event !== 'INITIAL_SESSION')) {
+          set({ user: null, profile: null, isAdmin: false, loading: false });
+          return;
+        }
+        if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') && session?.user) {
           const profile = await fetchProfile(session.user.id);
           set({
             user: session.user,
@@ -137,8 +145,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             isAdmin: profile?.is_admin || false,
             loading: false,
           });
-        } else if (event === 'SIGNED_OUT') {
-          set({ user: null, profile: null, isAdmin: false, loading: false });
         }
       });
     } catch (error) {

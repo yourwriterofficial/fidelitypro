@@ -2,10 +2,11 @@ import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import {
   LogOut, Home, Wallet, Briefcase, Settings, Shield, Lock, Gift,
-  Building, LayoutDashboard, Menu, X, MoreHorizontal, ChevronRight,
+  Building, LayoutDashboard, Menu, X, MoreHorizontal, ChevronRight, AlertCircle,
 } from 'lucide-react';
 import NotificationBell from './NotificationBell';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useAccountRestriction } from '../hooks/useAccountRestriction';
 
 const navItems = [
   { path: '/app',             icon: Home,          label: 'Dashboard' },
@@ -25,6 +26,21 @@ export default function Layout() {
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { restricted } = useAccountRestriction();
+
+  const onWallet = location.pathname.startsWith('/app/wallet');
+
+  // Restricted (never-invested past the grace window) accounts may stay logged
+  // in, but their view is limited to the Wallet page so they can top up.
+  useEffect(() => {
+    if (restricted && !onWallet) {
+      navigate('/app/wallet', { replace: true });
+    }
+  }, [restricted, onWallet, navigate]);
+
+  // When restricted, only the Wallet entry is shown in navigation.
+  const visibleNavItems = restricted ? navItems.filter(n => n.path === '/app/wallet') : navItems;
+  const visibleBottomNavItems = restricted ? visibleNavItems : bottomNavItems;
 
   const handleSignOut = async () => {
     await signOut();
@@ -65,7 +81,7 @@ export default function Layout() {
 
         {/* Nav */}
         <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
-          {navItems.map(({ path, icon: Icon, label }) => {
+          {visibleNavItems.map(({ path, icon: Icon, label }) => {
             const active = isActive(path);
             return (
               <Link key={path} to={path}
@@ -130,7 +146,7 @@ export default function Layout() {
                 </div>
               </div>
             )}
-            {navItems.map(({ path, icon: Icon, label }) => {
+            {visibleNavItems.map(({ path, icon: Icon, label }) => {
               const active = isActive(path);
               return (
                 <Link key={path} to={path} onClick={() => setMobileMenuOpen(false)}
@@ -156,12 +172,26 @@ export default function Layout() {
 
         {/* Page content */}
         <div className="flex-1 p-4 md:p-6 pb-24 md:pb-6">
+          {restricted && (
+            <div className="mb-5 rounded-2xl border border-amber-200 bg-amber-50 flex items-start gap-3 px-4 py-3.5">
+              <div className="p-1.5 rounded-lg bg-amber-100 shrink-0 mt-0.5">
+                <AlertCircle size={15} className="text-amber-600" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-amber-800">Account access limited</p>
+                <p className="text-xs mt-0.5 leading-relaxed text-amber-700">
+                  You didn’t invest within the allowed time, so your account is limited to the Wallet
+                  page. <span className="font-semibold">Top up your wallet below to regain full access.</span>
+                </p>
+              </div>
+            </div>
+          )}
           <Outlet />
         </div>
 
         {/* Mobile Bottom Navigation */}
         <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 flex items-center justify-around px-2 py-2 z-30 shadow-[0_-1px_12px_rgba(0,0,0,0.06)]">
-          {bottomNavItems.map(({ path, icon: Icon, label }) => {
+          {visibleBottomNavItems.map(({ path, icon: Icon, label }) => {
             const active = isActive(path);
             return (
               <Link key={path} to={path}
