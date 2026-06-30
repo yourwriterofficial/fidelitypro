@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { supabase } from '../lib/supabaseClient';
 import { useAccountRestriction } from '../hooks/useAccountRestriction';
@@ -102,30 +101,6 @@ export default function WalletPage() {
     fetchSettings();
     fetchTransactionHistory();
   }, [profile?.id]);
-
-  // Restriction check
-  if (profile && (!profile.can_withdraw || withdrawRestricted)) {
-    return (
-      <div className="max-w-lg mx-auto mt-16 p-8 text-center bg-white rounded-3xl border border-gray-100 shadow-sm">
-        <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4">
-          <AlertCircle size={32} className="text-red-500" />
-        </div>
-        <h2 className="text-xl font-bold text-gray-900">Withdrawals Suspended</h2>
-        <p className="text-gray-500 text-sm mt-2">
-          {withdrawRestricted
-            ? 'Withdrawals are suspended due to account inactivity. Please top up your wallet or make an investment to restore access.'
-            : (profile.restriction_reason || 'Contact support to unlock withdrawals.')
-          }
-        </p>
-        {profile.fee_required > 0 && (
-          <p className="mt-3 text-sm text-gray-600 bg-gray-50 p-3 rounded-xl">
-            A deposit of <strong>${profile.fee_required}</strong> is required to unlock.
-          </p>
-        )}
-        <Link to="/app" className="mt-5 inline-block text-brand text-sm font-medium hover:underline">← Back to Dashboard</Link>
-      </div>
-    );
-  }
 
   const handleDepositConfirm = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -354,53 +329,73 @@ export default function WalletPage() {
 
           {/* ── WITHDRAW ── */}
           {tab === 'withdraw' && (
-            <form onSubmit={handleWithdraw} className="space-y-5">
-              <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-xl border border-gray-200 text-sm">
-                <Wallet size={18} className="text-brand shrink-0" />
-                <div>
-                  <p className="text-xs text-gray-500">Available to withdraw</p>
-                  <p className="font-bold text-gray-900 text-base tabular-nums">{fmt(profile?.wallet_balance || 0)}</p>
+            profile && (!profile.can_withdraw || withdrawRestricted) ? (
+              <div className="py-8 px-4 text-center max-w-md mx-auto">
+                <div className="w-12 h-12 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-3">
+                  <AlertCircle size={24} className="text-red-500" />
                 </div>
+                <h3 className="text-lg font-bold text-gray-900">Withdrawals Suspended</h3>
+                <p className="text-gray-500 text-sm mt-2">
+                  {withdrawRestricted
+                    ? 'Withdrawals are suspended due to account inactivity. Please top up your wallet or make an investment to restore access.'
+                    : (profile.restriction_reason || 'Contact support to unlock withdrawals.')
+                  }
+                </p>
+                {profile.fee_required > 0 && (
+                  <p className="mt-3 text-sm text-gray-600 bg-gray-50 p-3 rounded-xl">
+                    A deposit of <strong>${profile.fee_required}</strong> is required to unlock.
+                  </p>
+                )}
               </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Amount (USD)</label>
-                <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-medium">$</span>
+            ) : (
+              <form onSubmit={handleWithdraw} className="space-y-5">
+                <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-xl border border-gray-200 text-sm">
+                  <Wallet size={18} className="text-brand shrink-0" />
+                  <div>
+                    <p className="text-xs text-gray-500">Available to withdraw</p>
+                    <p className="font-bold text-gray-900 text-base tabular-nums">{fmt(profile?.wallet_balance || 0)}</p>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Amount (USD)</label>
+                  <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-medium">$</span>
+                    <input
+                      type="number" step="0.01" min="0.01"
+                      value={withdrawAmount} onChange={e => setWithdrawAmount(e.target.value)}
+                      className="w-full pl-8 pr-4 py-3 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-brand focus:border-transparent"
+                      placeholder="100.00" required
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setWithdrawAmount(String(profile?.wallet_balance || ''))}
+                    className="mt-1.5 text-xs text-brand font-medium hover:underline"
+                  >
+                    Use max
+                  </button>
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Wallet Address</label>
                   <input
-                    type="number" step="0.01" min="0.01"
-                    value={withdrawAmount} onChange={e => setWithdrawAmount(e.target.value)}
-                    className="w-full pl-8 pr-4 py-3 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-brand focus:border-transparent"
-                    placeholder="100.00" required
+                    type="text" value={withdrawAddress} onChange={e => setWithdrawAddress(e.target.value)}
+                    className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brand focus:border-transparent"
+                    placeholder="Your crypto address (e.g. USDT TRC20)" required
                   />
                 </div>
+                <div className="flex items-start gap-2 text-xs text-red-700 bg-red-50 border border-red-100 p-3 rounded-xl">
+                  <AlertCircle size={14} className="shrink-0 mt-0.5" />
+                  Double-check your address. Incorrect addresses result in permanent loss of funds.
+                </div>
                 <button
-                  type="button"
-                  onClick={() => setWithdrawAmount(String(profile?.wallet_balance || ''))}
-                  className="mt-1.5 text-xs text-brand font-medium hover:underline"
+                  type="submit" disabled={loading}
+                  className="w-full bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white font-semibold py-3.5 rounded-xl transition shadow-md hover:shadow-lg disabled:opacity-60 flex items-center justify-center gap-2"
                 >
-                  Use max
+                  {loading ? <RefreshCw size={16} className="animate-spin" /> : <ArrowUp size={16} />}
+                  Request Withdrawal
                 </button>
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Wallet Address</label>
-                <input
-                  type="text" value={withdrawAddress} onChange={e => setWithdrawAddress(e.target.value)}
-                  className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brand focus:border-transparent"
-                  placeholder="Your crypto address (e.g. USDT TRC20)" required
-                />
-              </div>
-              <div className="flex items-start gap-2 text-xs text-red-700 bg-red-50 border border-red-100 p-3 rounded-xl">
-                <AlertCircle size={14} className="shrink-0 mt-0.5" />
-                Double-check your address. Incorrect addresses result in permanent loss of funds.
-              </div>
-              <button
-                type="submit" disabled={loading}
-                className="w-full bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white font-semibold py-3.5 rounded-xl transition shadow-md hover:shadow-lg disabled:opacity-60 flex items-center justify-center gap-2"
-              >
-                {loading ? <RefreshCw size={16} className="animate-spin" /> : <ArrowUp size={16} />}
-                Request Withdrawal
-              </button>
-            </form>
+              </form>
+            )
           )}
         </div>
       </div>

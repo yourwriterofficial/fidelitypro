@@ -611,6 +611,12 @@ export default function AdminUsers() {
 
             {activeTab === 'restrictions' && (
               <div className="space-y-4">
+                <div className="bg-blue-50 border border-blue-100 text-blue-850 p-3.5 rounded-xl text-xs space-y-1">
+                  <p className="font-semibold">Note on Wallet Accessibility</p>
+                  <p className="leading-relaxed">
+                    Users can always visit the Wallet page to view balances and make deposits (needed to pay required fees). Unchecking <strong>Allow Withdrawals</strong> will only suspend withdrawal actions for this user, keeping deposit functions accessible.
+                  </p>
+                </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <label className="flex items-center gap-2 text-sm">
                     <input
