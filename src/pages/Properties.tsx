@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabaseClient';
 import { useAuthStore } from '../store/authStore';
 import { toast } from 'sonner';
 import { Users, AlertCircle, Building2, X, DollarSign, Calendar, Percent, CheckCircle } from 'lucide-react';
+import { useAccountRestriction } from '../hooks/useAccountRestriction';
 
 interface Property {
   id: string; title: string; description: string; price: number;
@@ -13,6 +14,7 @@ interface Property {
 
 export default function Properties() {
   const { profile } = useAuthStore();
+  const { propertyRestricted } = useAccountRestriction();
   const [properties, setProperties] = useState<Property[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
@@ -20,24 +22,6 @@ export default function Properties() {
   const [paymentAmount, setPaymentAmount] = useState('');
   const [myInvestments, setMyInvestments] = useState<any[]>([]);
   const [submitting, setSubmitting] = useState(false);
-
-  if (profile && !profile.can_property) {
-    return (
-      <div className="max-w-lg mx-auto mt-16 p-8 text-center bg-white rounded-3xl border border-gray-100 shadow-sm">
-        <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4">
-          <AlertCircle size={32} className="text-red-500" />
-        </div>
-        <h2 className="text-xl font-bold text-gray-900">Property Investments Disabled</h2>
-        <p className="text-gray-500 text-sm mt-2">{profile.restriction_reason || 'Contact support to unlock property investments.'}</p>
-        {profile.fee_required > 0 && (
-          <p className="mt-3 text-sm text-gray-600 bg-gray-50 p-3 rounded-xl">A deposit of <strong>${profile.fee_required}</strong> is required to unlock.</p>
-        )}
-        <Link to="/app" className="mt-5 inline-block text-brand text-sm font-medium hover:underline">← Back to Dashboard</Link>
-      </div>
-    );
-  }
-
-  useEffect(() => { fetchProperties(); fetchMyInvestments(); }, []);
 
   const fetchProperties = async () => {
     const { data, error } = await supabase.from('properties').select('*').eq('status', 'active');
@@ -52,10 +36,33 @@ export default function Properties() {
     if (!error) setMyInvestments(data || []);
   };
 
+  useEffect(() => { fetchProperties(); fetchMyInvestments(); }, []);
+
+  if (profile && (!profile.can_property || propertyRestricted)) {
+    return (
+      <div className="max-w-lg mx-auto mt-16 p-8 text-center bg-white rounded-3xl border border-gray-100 shadow-sm">
+        <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4">
+          <AlertCircle size={32} className="text-red-500" />
+        </div>
+        <h2 className="text-xl font-bold text-gray-900">Property Investments Suspended</h2>
+        <p className="text-gray-500 text-sm mt-2">
+          {propertyRestricted
+            ? 'Property investment features are suspended due to account inactivity. Please top up your wallet to restore access.'
+            : (profile.restriction_reason || 'Contact support to unlock property investments.')
+          }
+        </p>
+        {profile.fee_required > 0 && (
+          <p className="mt-3 text-sm text-gray-600 bg-gray-50 p-3 rounded-xl">A deposit of <strong>${profile.fee_required}</strong> is required to unlock.</p>
+        )}
+        <Link to="/app" className="mt-5 inline-block text-brand text-sm font-medium hover:underline">← Back to Dashboard</Link>
+      </div>
+    );
+  }
+
   const handleInvest = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!profile || !selectedProperty) return;
-    if (!profile.can_property) { toast.error('Property investments are disabled for your account'); return; }
+    if (!profile.can_property || propertyRestricted) { toast.error('Property investments are disabled for your account'); return; }
     const amount = parseFloat(paymentAmount);
     if (isNaN(amount) || amount <= 0) { toast.error('Enter a valid amount'); return; }
     if (amount > profile.wallet_balance) { toast.error('Insufficient balance'); return; }
@@ -155,42 +162,91 @@ export default function Properties() {
       {/* Investment Modal */}
       {modalOpen && selectedProperty && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-3xl max-w-md w-full shadow-2xl">
-            <div className="flex items-start justify-between p-6 border-b border-gray-100">
+          <div className="bg-white rounded-3xl max-w-lg w-full shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="flex items-center justify-between p-5 border-b border-gray-100 shrink-0">
               <div>
-                <h2 className="text-xl font-bold text-gray-900">Invest in Property</h2>
-                <p className="text-sm text-gray-500 mt-0.5">{selectedProperty.title}</p>
+                <h2 className="text-lg font-bold text-gray-900">Property Details & Investment</h2>
+                <p className="text-xs text-gray-500 mt-0.5">{selectedProperty.title}</p>
               </div>
               <button onClick={() => setModalOpen(false)} className="p-2 hover:bg-gray-100 rounded-xl transition">
                 <X size={18} className="text-gray-400" />
               </button>
             </div>
-            <div className="p-6">
-              <div className="bg-gray-50 rounded-xl p-4 mb-5 grid grid-cols-2 gap-3 text-sm">
-                <div><p className="text-gray-400 text-xs">Full Price</p><p className="font-bold text-gray-900">{fmt(selectedProperty.price)}</p></div>
-                <div><p className="text-gray-400 text-xs">Down Payment</p><p className="font-bold text-gray-900">{fmt(selectedProperty.price * selectedProperty.down_payment_percent / 100)}</p></div>
-                <div><p className="text-gray-400 text-xs">Your Balance</p><p className="font-bold text-emerald-600">{fmt(profile?.wallet_balance || 0)}</p></div>
-                <div><p className="text-gray-400 text-xs">Monthly</p><p className="font-bold text-gray-900">{fmt(selectedProperty.monthly_payment)}</p></div>
+
+            {/* Scrolling gallery of property images */}
+            {selectedProperty.image_urls && selectedProperty.image_urls.length > 0 ? (
+              <div className="relative h-60 w-full bg-gray-100 shrink-0">
+                <div 
+                  className="w-full h-full flex overflow-x-auto snap-x snap-mandatory scroll-smooth"
+                  style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+                >
+                  {selectedProperty.image_urls.map((url, i) => (
+                    <div key={i} className="w-full h-full shrink-0 snap-start relative">
+                      <img src={url} alt={`${selectedProperty.title} ${i + 1}`} className="w-full h-full object-cover" />
+                      <span className="absolute bottom-3 right-3 bg-black/60 backdrop-blur-sm text-[10px] text-white px-2 py-0.5 rounded-full font-semibold">
+                        {i + 1} / {selectedProperty.image_urls.length}
+                      </span>
+                    </div>
+                  ))}
+                </div>
               </div>
+            ) : (
+              <div className="h-48 w-full bg-gray-50 flex items-center justify-center shrink-0 border-b">
+                <Building2 size={40} className="text-gray-300" />
+              </div>
+            )}
+
+            <div className="p-6 overflow-y-auto space-y-5 flex-1">
+              {/* Detailed Description */}
+              <div>
+                <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Description</h3>
+                <p className="text-sm text-gray-600 mt-1.5 leading-relaxed whitespace-pre-line">
+                  {selectedProperty.description || 'No description provided.'}
+                </p>
+              </div>
+
+              {/* Financial Stats */}
+              <div className="bg-gray-50 rounded-2xl p-4 grid grid-cols-2 gap-4 text-sm border">
+                <div>
+                  <p className="text-gray-400 text-xs font-medium">Full Valuation</p>
+                  <p className="font-bold text-gray-900 text-base">{fmt(selectedProperty.price)}</p>
+                </div>
+                <div>
+                  <p className="text-gray-400 text-xs font-medium">Down Payment</p>
+                  <p className="font-bold text-gray-900 text-base">{fmt(selectedProperty.price * selectedProperty.down_payment_percent / 100)} ({selectedProperty.down_payment_percent}%)</p>
+                </div>
+                <div>
+                  <p className="text-gray-400 text-xs font-medium">Your Wallet Balance</p>
+                  <p className="font-bold text-emerald-600 text-base">{fmt(profile?.wallet_balance || 0)}</p>
+                </div>
+                <div>
+                  <p className="text-gray-400 text-xs font-medium">Monthly Installment</p>
+                  <p className="font-bold text-gray-900 text-base">{fmt(selectedProperty.monthly_payment)}</p>
+                </div>
+              </div>
+
+              {/* Investment Payment Form */}
               <form onSubmit={handleInvest} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">Amount to Pay (USD)</label>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">Amount to Invest (USD)</label>
                   <div className="relative">
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-medium">$</span>
                     <input
-                      type="number" step="0.01" min="1"
+                      type="number" step="0.01" min={selectedProperty.price * selectedProperty.down_payment_percent / 100}
                       value={paymentAmount} onChange={e => setPaymentAmount(e.target.value)}
-                      className="w-full pl-8 pr-4 py-3 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-brand focus:border-transparent"
-                      placeholder="Enter amount" required
+                      className="w-full pl-8 pr-4 py-3 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-brand focus:border-transparent font-medium"
+                      placeholder={`Min payment is ${fmt(selectedProperty.price * selectedProperty.down_payment_percent / 100)}`} required
                     />
                   </div>
                 </div>
-                <button type="submit" disabled={submitting}
-                  className="w-full bg-brand hover:bg-brand-dark text-white font-semibold py-3 rounded-xl transition disabled:opacity-60 flex items-center justify-center gap-2">
-                  {submitting ? 'Processing...' : 'Pay Now'}
-                </button>
-                <button type="button" onClick={() => setModalOpen(false)}
-                  className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 py-2.5 rounded-xl text-sm transition">Cancel</button>
+                <div className="flex gap-3">
+                  <button type="submit" disabled={submitting}
+                    className="flex-1 bg-brand hover:bg-brand-dark text-white font-semibold py-3 rounded-xl transition disabled:opacity-60 flex items-center justify-center gap-2 text-sm shadow-sm">
+                    {submitting ? 'Processing...' : 'Submit Payment'}
+                  </button>
+                  <button type="button" onClick={() => setModalOpen(false)}
+                    className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 py-3 rounded-xl text-sm transition font-semibold">Cancel</button>
+                </div>
               </form>
             </div>
           </div>

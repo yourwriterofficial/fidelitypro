@@ -13,13 +13,6 @@ export default function Referral() {
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
 
-  useEffect(() => {
-    if (profile) {
-      ensureReferralCode();
-      fetchReferralData();
-    }
-  }, [profile]);
-
   // The referral link was rendering as ".../signup?ref=null" for any profile
   // whose referral_code was never set (e.g. older accounts). A null code also
   // breaks the signup lookup, so the link wouldn't work. Here we guarantee a
@@ -59,6 +52,13 @@ export default function Referral() {
     if (!commErr) setTotalCommission(commissions?.reduce((s, c) => s + c.amount, 0) || 0);
     setLoading(false);
   };
+
+  useEffect(() => {
+    if (profile) {
+      ensureReferralCode();
+      fetchReferralData();
+    }
+  }, [profile]);
 
   const copyLink = () => {
     navigator.clipboard.writeText(referralLink);

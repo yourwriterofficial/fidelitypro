@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 import { useAuthStore } from '../store/authStore';
 import { toast } from 'sonner';
+import { useAccountRestriction } from '../hooks/useAccountRestriction';
 import {
   AlertCircle, Calculator, ChevronDown, ChevronUp, Wallet,
   Lock, Clock, X, TrendingUp, Zap, ShieldCheck,
@@ -27,6 +28,7 @@ const APY_COLORS = ['from-blue-500 to-indigo-600', 'from-brand to-emerald-600', 
 
 export default function Staking() {
   const { profile, refreshProfile } = useAuthStore();
+  const { stakeRestricted } = useAccountRestriction();
   const [products, setProducts] = useState<StakingProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedProduct, setSelectedProduct] = useState<StakingProduct | null>(null);
@@ -38,28 +40,6 @@ export default function Staking() {
   const [calcProduct, setCalcProduct] = useState<StakingProduct | null>(null);
   const [confirmModal, setConfirmModal] = useState<{ open: boolean; orderId: string | null; action: 'claim' | 'withdraw_early' | null }>({ open: false, orderId: null, action: null });
   const [processing, setProcessing] = useState(false);
-
-  if (profile && !profile.can_stake) {
-    return (
-      <div className="max-w-lg mx-auto mt-16 p-8 text-center bg-white rounded-3xl border border-gray-100 shadow-sm">
-        <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4">
-          <AlertCircle size={32} className="text-red-500" />
-        </div>
-        <h2 className="text-xl font-bold text-gray-900">Staking Disabled</h2>
-        <p className="text-gray-500 text-sm mt-2">{profile.restriction_reason || 'Contact support to unlock staking.'}</p>
-        {profile.fee_required > 0 && (
-          <p className="mt-3 text-sm text-gray-600 bg-gray-50 p-3 rounded-xl">A deposit of <strong>${profile.fee_required}</strong> is required to unlock.</p>
-        )}
-        <Link to="/app" className="mt-5 inline-block text-brand text-sm font-medium hover:underline">← Back to Dashboard</Link>
-      </div>
-    );
-  }
-
-  useEffect(() => {
-    fetchProducts(); fetchOrders();
-    const interval = setInterval(updateCountdowns, 1000);
-    return () => clearInterval(interval);
-  }, []);
 
   const fetchProducts = async () => {
     const { data, error } = await supabase.from('staking_products').select('*').eq('status', 'active');
@@ -80,7 +60,7 @@ export default function Staking() {
       const returnAmt = amt - penaltyAmt;
       const now = new Date(), end = new Date(order.end_date);
       const isMatured = end <= now;
-      let timeLeft = '';
+      let timeLeft: string;
       if (order.status === 'active') {
         if (!isMatured) {
           const diff = end.getTime() - now.getTime();
@@ -99,7 +79,7 @@ export default function Staking() {
       if (order.status !== 'active') return order;
       const now = new Date(), end = new Date(order.end_date);
       const isMatured = end <= now;
-      let timeLeft = '';
+      let timeLeft: string;
       if (!isMatured) {
         const diff = end.getTime() - now.getTime();
         const d = Math.floor(diff / 864e5), h = Math.floor((diff % 864e5) / 36e5);
@@ -110,9 +90,46 @@ export default function Staking() {
     }));
   };
 
+  useEffect(() => {
+    fetchProducts(); fetchOrders();
+    const interval = setInterval(updateCountdowns, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const fmt = (n: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n);
+
+  const calcResult = useMemo(() => {
+    if (!calcProduct || !calcAmount) return null;
+    const apy = calcProduct.apy / 100, days = calcProduct.lock_days;
+    const interest = calcAmount * (apy / 365) * days;
+    return { interest, total: calcAmount + interest, dailyInterest: interest / days };
+  }, [calcProduct, calcAmount]);
+
+  if (profile && (!profile.can_stake || stakeRestricted)) {
+    return (
+      <div className="max-w-lg mx-auto mt-16 p-8 text-center bg-white rounded-3xl border border-gray-100 shadow-sm">
+        <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4">
+          <AlertCircle size={32} className="text-red-500" />
+        </div>
+        <h2 className="text-xl font-bold text-gray-900">Staking Suspended</h2>
+        <p className="text-gray-500 text-sm mt-2">
+          {stakeRestricted
+            ? 'Staking features are suspended due to account inactivity. Please top up your wallet to restore access.'
+            : (profile.restriction_reason || 'Contact support to unlock staking.')
+          }
+        </p>
+        {profile.fee_required > 0 && (
+          <p className="mt-3 text-sm text-gray-600 bg-gray-50 p-3 rounded-xl">A deposit of <strong>${profile.fee_required}</strong> is required to unlock.</p>
+        )}
+        <Link to="/app" className="mt-5 inline-block text-brand text-sm font-medium hover:underline">← Back to Dashboard</Link>
+      </div>
+    );
+  }
+
   const handleStake = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!profile || !selectedProduct) return;
+    if (!profile.can_stake || stakeRestricted) { toast.error('Staking is disabled for your account'); return; }
     const numAmount = parseFloat(amount);
     if (isNaN(numAmount) || numAmount < selectedProduct.min_amount || (selectedProduct.max_amount && numAmount > selectedProduct.max_amount)) {
       toast.error(`Amount must be between $${selectedProduct.min_amount} and $${selectedProduct.max_amount || '∞'}`); return;
@@ -161,15 +178,6 @@ export default function Staking() {
     } catch (err: any) { toast.error(err.message); }
     finally { setProcessing(false); setConfirmModal({ open: false, orderId: null, action: null }); }
   };
-
-  const fmt = (n: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n);
-
-  const calcResult = useMemo(() => {
-    if (!calcProduct || !calcAmount) return null;
-    const apy = calcProduct.apy / 100, days = calcProduct.lock_days;
-    const interest = calcAmount * (apy / 365) * days;
-    return { interest, total: calcAmount + interest, dailyInterest: interest / days };
-  }, [calcProduct, calcAmount]);
 
   if (loading) return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
@@ -417,7 +425,7 @@ export default function Staking() {
               )}
               <div className="flex gap-3">
                 <button
-                  onClick={() => { isClaim ? handleClaim(confirmModal.orderId!) : handleWithdrawEarly(confirmModal.orderId!); }}
+                  onClick={() => { if (isClaim) { handleClaim(confirmModal.orderId!); } else { handleWithdrawEarly(confirmModal.orderId!); } }}
                   disabled={processing}
                   className="flex-1 bg-brand hover:bg-brand-dark text-white font-semibold py-3 rounded-xl transition disabled:opacity-60">
                   {processing ? 'Processing...' : 'Confirm'}

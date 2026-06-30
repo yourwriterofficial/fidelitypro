@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { supabase } from '../lib/supabaseClient';
+import { useAccountRestriction } from '../hooks/useAccountRestriction';
 import { toast } from 'sonner';
 import {
   Wallet, ArrowDown, ArrowUp, Copy, Check, Send, RefreshCw,
@@ -34,6 +35,7 @@ const STATUS_STYLES: Record<string, string> = {
 
 export default function WalletPage() {
   const { profile, refreshProfile } = useAuthStore();
+  const { withdrawRestricted } = useAccountRestriction();
   const [depositMethods, setDepositMethods] = useState<DepositMethod[]>([]);
   const [selectedCurrency, setSelectedCurrency] = useState('');
   const [depositAmount, setDepositAmount] = useState('');
@@ -44,30 +46,6 @@ export default function WalletPage() {
   const [copied, setCopied] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(true);
   const [tab, setTab] = useState<'deposit' | 'withdraw'>('deposit');
-
-  // Restriction check
-  if (profile && !profile.can_withdraw) {
-    return (
-      <div className="max-w-lg mx-auto mt-16 p-8 text-center bg-white rounded-3xl border border-gray-100 shadow-sm">
-        <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4">
-          <AlertCircle size={32} className="text-red-500" />
-        </div>
-        <h2 className="text-xl font-bold text-gray-900">Withdrawals Disabled</h2>
-        <p className="text-gray-500 text-sm mt-2">{profile.restriction_reason || 'Contact support to unlock withdrawals.'}</p>
-        {profile.fee_required > 0 && (
-          <p className="mt-3 text-sm text-gray-600 bg-gray-50 p-3 rounded-xl">
-            A deposit of <strong>${profile.fee_required}</strong> is required to unlock.
-          </p>
-        )}
-        <Link to="/app" className="mt-5 inline-block text-brand text-sm font-medium hover:underline">← Back to Dashboard</Link>
-      </div>
-    );
-  }
-
-  useEffect(() => {
-    fetchSettings();
-    fetchTransactionHistory();
-  }, [profile?.id]);
 
   const fetchSettings = async () => {
     const { data, error } = await supabase.from('settings').select('value').eq('key', 'deposit_methods').single();
@@ -120,6 +98,35 @@ export default function WalletPage() {
     } finally { setHistoryLoading(false); }
   };
 
+  useEffect(() => {
+    fetchSettings();
+    fetchTransactionHistory();
+  }, [profile?.id]);
+
+  // Restriction check
+  if (profile && (!profile.can_withdraw || withdrawRestricted)) {
+    return (
+      <div className="max-w-lg mx-auto mt-16 p-8 text-center bg-white rounded-3xl border border-gray-100 shadow-sm">
+        <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4">
+          <AlertCircle size={32} className="text-red-500" />
+        </div>
+        <h2 className="text-xl font-bold text-gray-900">Withdrawals Suspended</h2>
+        <p className="text-gray-500 text-sm mt-2">
+          {withdrawRestricted
+            ? 'Withdrawals are suspended due to account inactivity. Please top up your wallet or make an investment to restore access.'
+            : (profile.restriction_reason || 'Contact support to unlock withdrawals.')
+          }
+        </p>
+        {profile.fee_required > 0 && (
+          <p className="mt-3 text-sm text-gray-600 bg-gray-50 p-3 rounded-xl">
+            A deposit of <strong>${profile.fee_required}</strong> is required to unlock.
+          </p>
+        )}
+        <Link to="/app" className="mt-5 inline-block text-brand text-sm font-medium hover:underline">← Back to Dashboard</Link>
+      </div>
+    );
+  }
+
   const handleDepositConfirm = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!profile) return;
@@ -145,7 +152,7 @@ export default function WalletPage() {
   const handleWithdraw = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!profile) return;
-    if (!profile.can_withdraw) { toast.error('Withdrawals are disabled for your account'); return; }
+    if (!profile.can_withdraw || withdrawRestricted) { toast.error('Withdrawals are disabled for your account'); return; }
     const amount = parseFloat(withdrawAmount);
     if (isNaN(amount) || amount <= 0) { toast.error('Enter a valid amount'); return; }
     if (amount > (profile.wallet_balance || 0)) { toast.error('Insufficient balance'); return; }

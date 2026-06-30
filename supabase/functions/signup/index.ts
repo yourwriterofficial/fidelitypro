@@ -4,8 +4,6 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") || "";
-
 const supabaseAdmin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
   auth: { autoRefreshToken: false, persistSession: false },
 });
@@ -17,44 +15,45 @@ const corsHeaders = {
 };
 
 async function sendWelcomeEmail(to: string, name: string) {
-  if (!RESEND_API_KEY) {
-    console.warn("RESEND_API_KEY not set — skipping welcome email");
-    return;
-  }
   try {
-    const res = await fetch("https://api.resend.com/emails", {
+    const emailBody = `
+      <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px">
+        <h1 style="color:#22c55e">Welcome to FidelityPro, ${name}!</h1>
+        <p>Your account has been created successfully. You can now log in and start investing.</p>
+        <a href="https://fidelitypro.org/login"
+           style="display:inline-block;background:#22c55e;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;margin-top:16px">
+          Log In Now
+        </a>
+        <p style="margin-top:24px;color:#6b7280;font-size:14px">
+          If you did not create this account, please ignore this email.
+        </p>
+      </div>
+    `;
+
+    // Fetch local send-email function
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/send-email`, {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${RESEND_API_KEY}`,
         "Content-Type": "application/json",
+        "apikey": SERVICE_ROLE_KEY,
+        "Authorization": `Bearer ${SERVICE_ROLE_KEY}`,
       },
       body: JSON.stringify({
-        from: "FidelityPro <noreply@fidelitypro.org>",
         to,
         subject: "Welcome to FidelityPro!",
-        html: `
-          <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px">
-            <h1 style="color:#22c55e">Welcome to FidelityPro, ${name}!</h1>
-            <p>Your account has been created successfully. You can now log in and start investing.</p>
-            <a href="https://fidelitypro.org/login"
-               style="display:inline-block;background:#22c55e;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;margin-top:16px">
-              Log In Now
-            </a>
-            <p style="margin-top:24px;color:#6b7280;font-size:14px">
-              If you did not create this account, please ignore this email.
-            </p>
-          </div>
-        `,
+        html: emailBody,
       }),
     });
+
     if (!res.ok) {
-      const err = await res.json();
-      console.error("Welcome email failed:", JSON.stringify(err));
+      const errText = await res.text();
+      console.error("Welcome email failed:", errText);
     } else {
-      console.log("Welcome email sent to", to);
+      const data = await res.json();
+      console.log(`Welcome email sent to ${to} (via ${data.via})`);
     }
-  } catch (e) {
-    console.error("Welcome email error:", e);
+  } catch (err: any) {
+    console.error("Welcome email sending error:", err.message);
   }
 }
 

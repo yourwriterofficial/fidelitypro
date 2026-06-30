@@ -37,8 +37,6 @@ export default function AdminActivityLogs() {
   const [loading, setLoading] = useState(true);
   const [typeFilter, setTypeFilter] = useState('all');
 
-  useEffect(() => { fetchLogs(); }, []);
-
   const fetchLogs = async () => {
     setLoading(true);
     try {
@@ -89,6 +87,8 @@ export default function AdminActivityLogs() {
       setLoading(false);
     }
   };
+
+  useEffect(() => { fetchLogs(); }, []);
 
   const filtered = typeFilter === 'all' ? logs : logs.filter(l => l.type === typeFilter);
   const fmt = (n?: number) => n != null ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n) : '';

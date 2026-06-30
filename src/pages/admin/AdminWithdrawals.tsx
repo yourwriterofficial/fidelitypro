@@ -20,10 +20,6 @@ export default function AdminWithdrawals() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
 
-  useEffect(() => {
-    fetchWithdrawals();
-  }, [filter]);
-
   const fetchWithdrawals = async () => {
     setLoading(true);
     let query = supabase
@@ -42,6 +38,11 @@ export default function AdminWithdrawals() {
     }
     setLoading(false);
   };
+
+  useEffect(() => {
+    fetchWithdrawals();
+  }, [filter]);
+
 
   const logAdminAction = async (action: string, details: string, targetId: string) => {
     if (!user) return;

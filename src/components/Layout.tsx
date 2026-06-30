@@ -26,7 +26,7 @@ export default function Layout() {
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const { restricted } = useAccountRestriction();
+  const { restricted, withdrawRestricted, investRestricted, stakeRestricted, propertyRestricted } = useAccountRestriction();
 
   const onWallet = location.pathname.startsWith('/app/wallet');
 
@@ -172,16 +172,18 @@ export default function Layout() {
 
         {/* Page content */}
         <div className="flex-1 p-4 md:p-6 pb-24 md:pb-6">
-          {restricted && (
-            <div className="mb-5 rounded-2xl border border-amber-200 bg-amber-50 flex items-start gap-3 px-4 py-3.5">
+          {(restricted || withdrawRestricted || investRestricted || stakeRestricted || propertyRestricted) && (
+            <div className="mb-5 rounded-2xl border border-amber-200 bg-amber-50 flex items-start gap-3 px-4 py-3.5 shadow-sm">
               <div className="p-1.5 rounded-lg bg-amber-100 shrink-0 mt-0.5">
                 <AlertCircle size={15} className="text-amber-600" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-amber-800">Account access limited</p>
+                <p className="text-sm font-semibold text-amber-800">Account Status: Limited Access</p>
                 <p className="text-xs mt-0.5 leading-relaxed text-amber-700">
-                  You didn’t invest within the allowed time, so your account is limited to the Wallet
-                  page. <span className="font-semibold">Top up your wallet below to regain full access.</span>
+                  {restricted && <>Your account is restricted to the Wallet page because you did not invest within the required grace period. <span className="font-semibold">Please top up your wallet to restore full access.</span></>}
+                  {withdrawRestricted && !restricted && <>Your withdrawal features have been suspended due to account inactivity. <span className="font-semibold">Please make an investment or top up to restore access.</span></>}
+                  {investRestricted && !restricted && <>Your investment features have been suspended due to account inactivity. <span className="font-semibold">Please top up your wallet to restore access.</span></>}
+                  {propertyRestricted && !investRestricted && !restricted && <>Your property investment features have been suspended due to account inactivity. <span className="font-semibold">Please top up your wallet to restore access.</span></>}
                 </p>
               </div>
             </div>

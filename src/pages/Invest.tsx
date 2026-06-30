@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabaseClient';
 import { useAuthStore } from '../store/authStore';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
+import { useAccountRestriction } from '../hooks/useAccountRestriction';
 import {
   Wallet, AlertCircle, Calculator, ArrowRight, ChevronDown, ChevronUp,
   TrendingUp, Clock, Shield, Zap,
@@ -21,6 +22,7 @@ const PLAN_ACCENT = ['from-blue-500 to-indigo-600', 'from-brand to-emerald-600',
 
 export default function Invest() {
   const { user, profile, refreshProfile } = useAuthStore();
+  const { investRestricted } = useAccountRestriction();
   const navigate = useNavigate();
   const { address, network, currency } = useDepositAddress();
   const [plans, setPlans] = useState<Plan[]>([]);
@@ -30,31 +32,6 @@ export default function Invest() {
   const [selectedCalcPlan, setSelectedCalcPlan] = useState<Plan | null>(null);
   const [showCalc, setShowCalc] = useState(false);
   const [walletWarning, setWalletWarning] = useState(false);
-
-  if (profile && !profile.can_invest) {
-    return (
-      <div className="max-w-lg mx-auto mt-16 p-8 text-center bg-white rounded-3xl border border-gray-100 shadow-sm">
-        <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4">
-          <AlertCircle size={32} className="text-red-500" />
-        </div>
-        <h2 className="text-xl font-bold text-gray-900">Investing Disabled</h2>
-        <p className="text-gray-500 text-sm mt-2">{profile.restriction_reason || 'Contact support to unlock investing.'}</p>
-        {profile.fee_required > 0 && (
-          <p className="mt-3 text-sm text-gray-600 bg-gray-50 p-3 rounded-xl">
-            A deposit of <strong>${profile.fee_required}</strong> is required to unlock.
-          </p>
-        )}
-        <Link to="/app" className="mt-5 inline-block text-brand text-sm font-medium hover:underline">← Back to Dashboard</Link>
-      </div>
-    );
-  }
-
-  const uniquePlans = useMemo(() => {
-    const seen = new Set();
-    return plans.filter(p => { if (seen.has(p.id)) return false; seen.add(p.id); return true; });
-  }, [plans]);
-
-  useEffect(() => { fetchPlans(); checkWalletBalance(); }, []);
 
   const fetchPlans = async () => {
     const { data, error } = await supabase.from('products').select('*').eq('status', 'active');
@@ -71,16 +48,12 @@ export default function Invest() {
     setWalletWarning(profile.wallet_balance < 100);
   };
 
-  const handleInvest = (plan: Plan) => {
-    if (!user) { toast.error('Please login to invest'); navigate('/login'); return; }
-    if (profile && !profile.can_invest) { toast.error('Investing is disabled for your account'); return; }
-    setSelectedPlan(plan);
-  };
+  useEffect(() => { fetchPlans(); checkWalletBalance(); }, []);
 
-  const handleInvestmentSuccess = () => {
-    toast.success('Investment created!');
-    refreshProfile(); fetchPlans(); checkWalletBalance();
-  };
+  const uniquePlans = useMemo(() => {
+    const seen = new Set();
+    return plans.filter(p => { if (seen.has(p.id)) return false; seen.add(p.id); return true; });
+  }, [plans]);
 
   const fmt = (n: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n);
 
@@ -92,6 +65,40 @@ export default function Invest() {
     const profit = totalReturn - calculatorAmount;
     return { totalReturn, profit, dailyProfit: calculatorAmount * daily };
   }, [selectedCalcPlan, calculatorAmount]);
+
+  if (profile && (!profile.can_invest || investRestricted)) {
+    return (
+      <div className="max-w-lg mx-auto mt-16 p-8 text-center bg-white rounded-3xl border border-gray-100 shadow-sm">
+        <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4">
+          <AlertCircle size={32} className="text-red-500" />
+        </div>
+        <h2 className="text-xl font-bold text-gray-900">Investing Suspended</h2>
+        <p className="text-gray-500 text-sm mt-2">
+          {investRestricted
+            ? 'Investment features are suspended due to account inactivity. Please top up your wallet to restore access.'
+            : (profile.restriction_reason || 'Contact support to unlock investing.')
+          }
+        </p>
+        {profile.fee_required > 0 && (
+          <p className="mt-3 text-sm text-gray-600 bg-gray-50 p-3 rounded-xl">
+            A deposit of <strong>${profile.fee_required}</strong> is required to unlock.
+          </p>
+        )}
+        <Link to="/app" className="mt-5 inline-block text-brand text-sm font-medium hover:underline">← Back to Dashboard</Link>
+      </div>
+    );
+  }
+
+  const handleInvest = (plan: Plan) => {
+    if (!user) { toast.error('Please login to invest'); navigate('/login'); return; }
+    if (profile && (!profile.can_invest || investRestricted)) { toast.error('Investing is disabled for your account'); return; }
+    setSelectedPlan(plan);
+  };
+
+  const handleInvestmentSuccess = () => {
+    toast.success('Investment created!');
+    refreshProfile(); fetchPlans(); checkWalletBalance();
+  };
 
   if (loading) {
     return (

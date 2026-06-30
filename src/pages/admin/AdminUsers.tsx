@@ -71,9 +71,117 @@ export default function AdminUsers() {
   const [sendingEmail, setSendingEmail] = useState(false);
   const navigate = useNavigate();
 
+  // Email templates state
+  const [emailTemplates, setEmailTemplates] = useState<any[]>([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState('');
+
+  // Create new user states
+  const [newUserModalOpen, setNewUserModalOpen] = useState(false);
+  const [newUserName, setNewUserName] = useState('');
+  const [newUserEmail, setNewUserEmail] = useState('');
+  const [newUserPassword, setNewUserPassword] = useState('');
+  const [newUserBalance, setNewUserBalance] = useState('');
+  const [creatingUser, setCreatingUser] = useState(false);
+
   useEffect(() => {
     fetchUsers();
+    fetchTemplates();
   }, []);
+
+  const fetchTemplates = async () => {
+    const { data } = await supabase.from('email_templates').select('*');
+    setEmailTemplates(data || []);
+  };
+
+  const handleSelectTemplate = (templateId: string) => {
+    setSelectedTemplateId(templateId);
+    if (!templateId) {
+      setEmailSubject('');
+      setEmailMessage('');
+      return;
+    }
+    const template = emailTemplates.find(t => t.id === templateId);
+    if (template) {
+      setEmailSubject(template.subject || '');
+      let body = template.body_html || template.body_text || '';
+      // Replace template variables
+      body = body
+        .replace(/{{name}}/g, selectedUser?.name || 'User')
+        .replace(/{{site_url}}/g, window.location.origin)
+        .replace(/{{amount}}/g, '$100.00')
+        .replace(/{{plan_name}}/g, 'Premium Plan')
+        .replace(/{{daily_return}}/g, '2.5')
+        .replace(/{{duration_days}}/g, '30')
+        .replace(/{{address}}/g, '0x1234567890abcdef...');
+      setEmailMessage(body);
+    }
+  };
+
+  const handleCreateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newUserName.trim() || !newUserEmail.trim() || !newUserPassword.trim()) {
+      toast.error('Name, email and password are required');
+      return;
+    }
+    setCreatingUser(true);
+    try {
+      const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+      const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      
+      const response = await fetch(`${SUPABASE_URL}/functions/v1/signup`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+        },
+        body: JSON.stringify({
+          email: newUserEmail,
+          password: newUserPassword,
+          full_name: newUserName,
+          ref_code: null,
+        }),
+      });
+
+      let result: any = {};
+      try {
+        result = await response.json();
+      } catch (err) {
+        console.warn('Response was not JSON:', err);
+      }
+
+      if (!response.ok) {
+        throw new Error(result.error || result.message || `Signup failed (${response.status})`);
+      }
+
+      const newUserId = result.user?.id;
+      if (newUserId && newUserBalance) {
+        const balanceVal = parseFloat(newUserBalance);
+        if (!isNaN(balanceVal) && balanceVal > 0) {
+          await supabase.rpc('add_wallet_balance', { user_id: newUserId, amount: balanceVal });
+          await supabase.from('transactions').insert({
+            user_id: newUserId,
+            type: 'admin',
+            amount: balanceVal,
+            description: 'Initial wallet balance credit',
+            status: 'completed',
+          });
+        }
+      }
+
+      toast.success('User created successfully');
+      setNewUserName('');
+      setNewUserEmail('');
+      setNewUserPassword('');
+      setNewUserBalance('');
+      setNewUserModalOpen(false);
+      fetchUsers();
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to create user');
+    } finally {
+      setCreatingUser(false);
+    }
+  };
 
   const fetchUsers = async () => {
     const { data, error } = await supabase
@@ -186,6 +294,22 @@ export default function AdminUsers() {
       });
       toast.success(`Added $${amount} to wallet`);
       setTopupAmount('');
+
+      // Automatically clear restrictions if top-up amount satisfies fee_required
+      const fee = selectedUser.fee_required || 0;
+      if (fee > 0 && amount >= fee) {
+        const { error: profileErr } = await supabase.from('profiles').update({
+          fee_required: 0,
+          can_invest: true,
+          can_withdraw: true,
+          can_stake: true,
+          can_property: true,
+          restriction_reason: '',
+        }).eq('id', selectedUser.id);
+        if (profileErr) console.error('Error clearing profile restrictions:', profileErr);
+        else toast.success('Account restrictions cleared successfully');
+      }
+
       await fetchUsers();
       const updated = users.find(u => u.id === selectedUser.id);
       if (updated) setSelectedUser(updated);
@@ -342,7 +466,15 @@ export default function AdminUsers() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold">Users</h1>
+      <div className="flex justify-between items-center">
+        <h1 className="text-3xl font-bold">Users</h1>
+        <button
+          onClick={() => setNewUserModalOpen(true)}
+          className="bg-brand text-white px-4 py-2 rounded-xl flex items-center gap-2 hover:bg-brand-dark transition-all"
+        >
+          <Plus size={20} /> Create User
+        </button>
+      </div>
       <div className="bg-white rounded-2xl shadow-sm border overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -468,9 +600,12 @@ export default function AdminUsers() {
                     />
                   </div>
                 )}
-                <button onClick={saveProfile} className="bg-brand hover:bg-brand-dark text-white px-6 py-2 rounded-xl flex items-center gap-2">
-                  <Save size={18} /> Save Profile
-                </button>
+                <div className="space-y-2">
+                  <button onClick={saveProfile} className="bg-brand hover:bg-brand-dark text-white px-6 py-2 rounded-xl flex items-center gap-2">
+                    <Save size={18} /> Save Profile
+                  </button>
+                  <p className="text-xs text-gray-400 font-medium">Updates user identity information, administrator roles, and general status variables.</p>
+                </div>
               </div>
             )}
 
@@ -532,9 +667,12 @@ export default function AdminUsers() {
                   />
                   <p className="text-xs text-gray-400 mt-1">User must deposit this amount before restrictions are lifted.</p>
                 </div>
-                <button onClick={saveProfile} className="bg-brand hover:bg-brand-dark text-white px-6 py-2 rounded-xl flex items-center gap-2">
-                  <Save size={18} /> Save Restrictions
-                </button>
+                <div className="space-y-2">
+                  <button onClick={saveProfile} className="bg-brand hover:bg-brand-dark text-white px-6 py-2 rounded-xl flex items-center gap-2">
+                    <Save size={18} /> Save Restrictions
+                  </button>
+                  <p className="text-xs text-gray-400 font-medium">Saves permission locks for the selected user. If 'Fee Required' is set and greater than 0, user will need to top up or deposit this amount to regain full access.</p>
+                </div>
               </div>
             )}
 
@@ -561,6 +699,7 @@ export default function AdminUsers() {
                         <Plus size={18} /> Add
                       </button>
                     </div>
+                    <p className="text-[10px] text-gray-400 mt-1 font-medium">Adds funds to the user's active wallet balance instantly. Resets active restrictions if this amount satisfies the required fee.</p>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700">Deduct Amount</label>
@@ -578,6 +717,7 @@ export default function AdminUsers() {
                         <Minus size={18} /> Deduct
                       </button>
                     </div>
+                    <p className="text-[10px] text-gray-400 mt-1 font-medium">Removes funds from the user's active wallet balance. Minimum balance constraints apply.</p>
                   </div>
                 </div>
               </div>
@@ -725,6 +865,19 @@ export default function AdminUsers() {
                 <div>
                   <h3 className="text-lg font-semibold mb-2">Send Email</h3>
                   <div className="space-y-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-500 mb-1">Preset Template</label>
+                      <select
+                        value={selectedTemplateId}
+                        onChange={(e) => handleSelectTemplate(e.target.value)}
+                        className="w-full border border-gray-300 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-brand"
+                      >
+                        <option value="">-- Manual (No Template) --</option>
+                        {emailTemplates.map(t => (
+                          <option key={t.id} value={t.id}>{t.name} (Preset)</option>
+                        ))}
+                      </select>
+                    </div>
                     <input
                       type="text"
                       value={emailSubject}
@@ -736,48 +889,134 @@ export default function AdminUsers() {
                       value={emailMessage}
                       onChange={(e) => setEmailMessage(e.target.value)}
                       rows={4}
-                      className="w-full border border-gray-300 rounded-xl px-4 py-2 focus:ring-2 focus:ring-brand"
-                      placeholder="Message..."
+                      className="w-full border border-gray-300 rounded-xl px-4 py-2 focus:ring-2 focus:ring-brand font-mono text-xs"
+                      placeholder="Message content (supports raw HTML templates)..."
                     />
-                    <button
-                      onClick={sendEmail}
-                      disabled={sendingEmail}
-                      className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl flex items-center gap-2 disabled:opacity-70"
-                    >
-                      <Mail size={18} /> {sendingEmail ? 'Sending...' : 'Send Email'}
-                    </button>
+                    <div>
+                      <button
+                        onClick={sendEmail}
+                        disabled={sendingEmail}
+                        className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl flex items-center gap-2 disabled:opacity-70"
+                      >
+                        <Mail size={18} /> {sendingEmail ? 'Sending...' : 'Send Email'}
+                      </button>
+                      <p className="text-[10px] text-gray-400 mt-1 font-medium">Sends email notification directly to this user's registered address, using preset HTML formatting.</p>
+                    </div>
                   </div>
                 </div>
                 <div>
                   <h3 className="text-lg font-semibold mb-2">Account Actions</h3>
-                  <div className="flex flex-wrap gap-3">
-                    <button
-                      onClick={resetPassword}
-                      className="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-xl flex items-center gap-2"
-                    >
-                      <Lock size={18} /> Reset Password
-                    </button>
-                    <button
-                      onClick={() => {
-                        if (confirm(`Are you sure you want to delete user ${selectedUser.name || selectedUser.email}?`)) {
-                          supabase.auth.admin.deleteUser(selectedUser.id).then(({ error }) => {
-                            if (error) toast.error(error.message);
-                            else {
-                              toast.success('User deleted');
-                              setModalOpen(false);
-                              fetchUsers();
-                            }
-                          });
-                        }
-                      }}
-                      className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-xl flex items-center gap-2"
-                    >
-                      <Ban size={18} /> Delete Account
-                    </button>
+                  <div className="flex flex-col gap-3">
+                    <div className="flex flex-wrap gap-3">
+                      <button
+                        onClick={resetPassword}
+                        className="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-xl flex items-center gap-2"
+                      >
+                        <Lock size={18} /> Reset Password
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (confirm(`Are you sure you want to delete user ${selectedUser.name || selectedUser.email}?`)) {
+                            supabase.auth.admin.deleteUser(selectedUser.id).then(({ error }) => {
+                              if (error) toast.error(error.message);
+                              else {
+                                toast.success('User deleted');
+                                setModalOpen(false);
+                                fetchUsers();
+                              }
+                            });
+                          }
+                        }}
+                        className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-xl flex items-center gap-2"
+                      >
+                        <Ban size={18} /> Delete Account
+                      </button>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-[10px] text-gray-400 font-medium"><strong className="text-amber-600">Reset Password:</strong> Sends automated password reset instructions through Supabase Auth.</p>
+                      <p className="text-[10px] text-gray-400 font-medium"><strong className="text-red-600">Delete Account:</strong> Permanently and irreversibly removes the user and profile database records.</p>
+                    </div>
                   </div>
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Create User Modal */}
+      {newUserModalOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full shadow-2xl overflow-hidden">
+            <div className="flex justify-between items-center p-6 border-b border-gray-100">
+              <h2 className="text-xl font-bold text-gray-900">Create New User</h2>
+              <button onClick={() => setNewUserModalOpen(false)} className="p-2 hover:bg-gray-100 rounded-xl transition">
+                <X size={18} className="text-gray-400" />
+              </button>
+            </div>
+            <form onSubmit={handleCreateUser} className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700">Full Name</label>
+                <input
+                  type="text"
+                  value={newUserName}
+                  onChange={(e) => setNewUserName(e.target.value)}
+                  placeholder="e.g. Jane Doe"
+                  className="w-full border rounded-xl px-4 py-2.5 mt-1 focus:ring-2 focus:ring-brand text-sm"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700">Email Address</label>
+                <input
+                  type="email"
+                  value={newUserEmail}
+                  onChange={(e) => setNewUserEmail(e.target.value)}
+                  placeholder="jane@example.com"
+                  className="w-full border rounded-xl px-4 py-2.5 mt-1 focus:ring-2 focus:ring-brand text-sm"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700">Password</label>
+                <input
+                  type="password"
+                  value={newUserPassword}
+                  onChange={(e) => setNewUserPassword(e.target.value)}
+                  placeholder="•••••••• (min 6 characters)"
+                  className="w-full border rounded-xl px-4 py-2.5 mt-1 focus:ring-2 focus:ring-brand text-sm"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700">Initial Wallet Balance (USD, optional)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={newUserBalance}
+                  onChange={(e) => setNewUserBalance(e.target.value)}
+                  placeholder="0.00"
+                  className="w-full border rounded-xl px-4 py-2.5 mt-1 focus:ring-2 focus:ring-brand text-sm"
+                />
+              </div>
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="submit"
+                  disabled={creatingUser}
+                  className="flex-1 bg-brand hover:bg-brand-dark text-white font-semibold py-3 rounded-xl transition disabled:opacity-60 text-sm"
+                >
+                  {creatingUser ? 'Creating User...' : 'Create User'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setNewUserModalOpen(false)}
+                  className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-3 rounded-xl transition text-sm"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

@@ -76,6 +76,25 @@ export default function AdminDeposits() {
           status: 'completed',
         });
         toast.success(`$${deposit.amount} added to wallet`);
+
+        // Check and lift restrictions if deposit satisfies the fee requirement
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('fee_required')
+          .eq('id', deposit.user_id)
+          .single();
+        if (profile && profile.fee_required > 0 && deposit.amount >= profile.fee_required) {
+          const { error: profileErr } = await supabase.from('profiles').update({
+            fee_required: 0,
+            can_invest: true,
+            can_withdraw: true,
+            can_stake: true,
+            can_property: true,
+            restriction_reason: '',
+          }).eq('id', deposit.user_id);
+          if (profileErr) console.error('Error lifting deposit restriction:', profileErr);
+          else toast.success('Account restrictions successfully cleared!');
+        }
       }
 
       await logAdminAction(

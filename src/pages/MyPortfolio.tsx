@@ -36,18 +36,33 @@ export default function MyPortfolio() {
   const [payoutTime, setPayoutTime] = useState('12:00:00');
   const [countdowns, setCountdowns] = useState<{ [key: string]: { expiry: string; nextPayout: string } }>({});
 
-  useEffect(() => {
-    if (profile) { fetchPayoutTime(); fetchAll(); }
-  }, [profile, filter]);
-
-  useEffect(() => {
-    const interval = setInterval(updateCountdowns, 1000);
-    return () => clearInterval(interval);
-  }, [items]);
-
   const fetchPayoutTime = async () => {
     const { data } = await supabase.from('settings').select('value').eq('key', 'payout_time').single();
     if (data) setPayoutTime(data.value);
+  };
+
+  const updateCountdowns = (itemsData = items) => {
+    const now = Date.now();
+    const newCD: { [key: string]: { expiry: string; nextPayout: string } } = {};
+    itemsData.forEach(item => {
+      if (!item.end_date) { newCD[item.id] = { expiry: '—', nextPayout: '—' }; return; }
+      const end = new Date(item.end_date).getTime();
+      const diff = Math.max(0, end - now);
+      const d = Math.floor(diff / 864e5), h = Math.floor((diff % 864e5) / 36e5);
+      const m = Math.floor((diff % 36e5) / 6e4), s = Math.floor((diff % 6e4) / 1e3);
+      const expiryStr = d > 0 ? `${d}d ${h}h ${m}m ${s}s` : `${h}h ${m}m ${s}s`;
+      let payoutStr = '—';
+      if (item.type === 'investment' && item.status === 'active') {
+        const [ph, pm] = payoutTime.split(':').map(Number);
+        const next = new Date(); next.setHours(ph, pm, 0, 0);
+        if (next <= new Date()) next.setDate(next.getDate() + 1);
+        const dp = Math.max(0, next.getTime() - now);
+        const ppH = Math.floor(dp / 36e5), ppM = Math.floor((dp % 36e5) / 6e4), ppS = Math.floor((dp % 6e4) / 1e3);
+        payoutStr = `${ppH}h ${ppM}m ${ppS}s`;
+      } else if (item.type === 'staking' && item.status === 'active') { payoutStr = expiryStr; }
+      newCD[item.id] = { expiry: expiryStr, nextPayout: payoutStr };
+    });
+    setCountdowns(newCD);
   };
 
   const fetchAll = async () => {
@@ -80,29 +95,14 @@ export default function MyPortfolio() {
     finally { setLoading(false); }
   };
 
-  const updateCountdowns = (itemsData = items) => {
-    const now = Date.now();
-    const newCD: { [key: string]: { expiry: string; nextPayout: string } } = {};
-    itemsData.forEach(item => {
-      if (!item.end_date) { newCD[item.id] = { expiry: '—', nextPayout: '—' }; return; }
-      const end = new Date(item.end_date).getTime();
-      const diff = Math.max(0, end - now);
-      const d = Math.floor(diff / 864e5), h = Math.floor((diff % 864e5) / 36e5);
-      const m = Math.floor((diff % 36e5) / 6e4), s = Math.floor((diff % 6e4) / 1e3);
-      const expiryStr = d > 0 ? `${d}d ${h}h ${m}m ${s}s` : `${h}h ${m}m ${s}s`;
-      let payoutStr = '—';
-      if (item.type === 'investment' && item.status === 'active') {
-        const [ph, pm] = payoutTime.split(':').map(Number);
-        const next = new Date(); next.setHours(ph, pm, 0, 0);
-        if (next <= new Date()) next.setDate(next.getDate() + 1);
-        const dp = Math.max(0, next.getTime() - now);
-        const ppH = Math.floor(dp / 36e5), ppM = Math.floor((dp % 36e5) / 6e4), ppS = Math.floor((dp % 6e4) / 1e3);
-        payoutStr = `${ppH}h ${ppM}m ${ppS}s`;
-      } else if (item.type === 'staking' && item.status === 'active') { payoutStr = expiryStr; }
-      newCD[item.id] = { expiry: expiryStr, nextPayout: payoutStr };
-    });
-    setCountdowns(newCD);
-  };
+  useEffect(() => {
+    if (profile) { fetchPayoutTime(); fetchAll(); }
+  }, [profile, filter]);
+
+  useEffect(() => {
+    const interval = setInterval(updateCountdowns, 1000);
+    return () => clearInterval(interval);
+  }, [items]);
 
   const fmt = (n: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n);
   const totalInvested = items.reduce((s, o) => s + o.amount, 0);

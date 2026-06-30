@@ -16,13 +16,14 @@ export default function AdminAnnouncements() {
   const [editing, setEditing] = useState<Announcement | null>(null);
   const [form, setForm] = useState(emptyForm);
 
-  useEffect(() => { fetchAnnouncements(); }, []);
-
   const fetchAnnouncements = async () => {
     const { data, error } = await supabase.from('announcements').select('*').order('is_pinned', { ascending: false }).order('created_at', { ascending: false });
     if (error) toast.error('Failed to load announcements'); else setAnnouncements(data || []);
     setLoading(false);
   };
+
+  useEffect(() => { fetchAnnouncements(); }, []);
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

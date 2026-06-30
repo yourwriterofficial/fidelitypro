@@ -27,8 +27,9 @@ export default function AdminSettings() {
   const [lowBalanceThreshold, setLowBalanceThreshold] = useState('10');
   const [lowBalanceEnabled, setLowBalanceEnabled] = useState('true');
 
-  // Inactivity hours
+  // Inactivity settings
   const [inactivityHours, setInactivityHours] = useState('24');
+  const [inactivityRestrictionType, setInactivityRestrictionType] = useState('wallet_only');
 
   // Notification defaults
   const [emailNotif, setEmailNotif] = useState({ deposit: true, withdrawal: true, payout: true, promo: true, low_balance: true });
@@ -47,18 +48,19 @@ export default function AdminSettings() {
     } else {
       data?.forEach((s: any) => {
         if (s.key === 'deposit_methods') {
-          try { setDepositMethods(JSON.parse(s.value)); } catch {}
+          try { setDepositMethods(JSON.parse(s.value)); } catch (err) { console.warn('Failed parsing deposit methods', err); }
         }
         if (s.key === 'first_deposit_bonus_percent') setBonusPercent(s.value);
         if (s.key === 'first_deposit_bonus_enabled') setBonusEnabled(s.value);
         if (s.key === 'low_balance_threshold') setLowBalanceThreshold(s.value);
         if (s.key === 'low_balance_enabled') setLowBalanceEnabled(s.value);
         if (s.key === 'inactivity_hours') setInactivityHours(s.value);
+        if (s.key === 'inactivity_restriction_type') setInactivityRestrictionType(s.value);
         if (s.key === 'email_notifications') {
-          try { setEmailNotif(JSON.parse(s.value)); } catch {}
+          try { setEmailNotif(JSON.parse(s.value)); } catch (err) { console.warn('Failed parsing email notif settings', err); }
         }
         if (s.key === 'push_notifications') {
-          try { setPushNotif(JSON.parse(s.value)); } catch {}
+          try { setPushNotif(JSON.parse(s.value)); } catch (err) { console.warn('Failed parsing push notif settings', err); }
         }
       });
     }
@@ -76,14 +78,14 @@ export default function AdminSettings() {
         { key: 'low_balance_threshold', value: lowBalanceThreshold },
         { key: 'low_balance_enabled', value: lowBalanceEnabled },
         { key: 'inactivity_hours', value: inactivityHours },
+        { key: 'inactivity_restriction_type', value: inactivityRestrictionType },
         { key: 'email_notifications', value: JSON.stringify(emailNotif) },
         { key: 'push_notifications', value: JSON.stringify(pushNotif) },
       ];
       for (const u of updates) {
         const { error } = await supabase
           .from('settings')
-          .update({ value: u.value, updated_at: new Date().toISOString() })
-          .eq('key', u.key);
+          .upsert({ key: u.key, value: u.value, updated_at: new Date().toISOString() }, { onConflict: 'key' });
         if (error) throw error;
       }
       toast.success('Settings updated');
@@ -158,7 +160,34 @@ export default function AdminSettings() {
         {/* Inactivity */}
         <div className="bg-white rounded-2xl shadow-sm border p-6">
           <h2 className="text-xl font-semibold flex items-center gap-2"><SettingsIcon size={20} className="text-brand" /> Inactivity Settings</h2>
-          <div className="mt-4"><label className="block text-sm font-medium text-gray-700">Inactivity Hours</label><input type="number" min="1" value={inactivityHours} onChange={(e) => setInactivityHours(e.target.value)} className="w-full border rounded-xl px-4 py-2" /></div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Inactivity Period (Days)</label>
+              <input
+                type="number"
+                min="1"
+                value={Math.round(parseInt(inactivityHours) / 24) || 1}
+                onChange={(e) => setInactivityHours(String((parseInt(e.target.value) || 1) * 24))}
+                className="w-full border rounded-xl px-4 py-2 mt-1 focus:ring-2 focus:ring-brand"
+                required
+              />
+              <p className="text-xs text-gray-400 mt-1">Number of days a user has to make their first investment before restrictions apply.</p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Restriction Action</label>
+              <select
+                value={inactivityRestrictionType}
+                onChange={(e) => setInactivityRestrictionType(e.target.value)}
+                className="w-full border rounded-xl px-4 py-2 mt-1 focus:ring-2 focus:ring-brand"
+              >
+                <option value="wallet_only">Wallet Only (Redirect to Wallet Page)</option>
+                <option value="suspend_withdraw">Suspend Withdrawals</option>
+                <option value="suspend_invest">Suspend Investing & Staking</option>
+                <option value="suspend_all">Suspend All Actions (Withdrawals, Investing, Staking, Properties)</option>
+              </select>
+              <p className="text-xs text-gray-400 mt-1 font-medium text-amber-700">Decide which operations are blocked when a user exceeds the inactivity period.</p>
+            </div>
+          </div>
         </div>
 
         {/* Notification Defaults */}

@@ -116,8 +116,8 @@ export default function AdminProperties() {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700">Image URLs</label>
-              <input type="text" placeholder="https://example.com/img1.jpg, https://..." value={form.image_urls} onChange={(e) => setForm({ ...form, image_urls: e.target.value })} className="border rounded-xl px-4 py-2 w-full" />
-              <p className="text-xs text-gray-400 mt-1">Comma separated image URLs.</p>
+              <input type="text" placeholder="https://example.com/img1.jpg, https://example.com/img2.jpg" value={form.image_urls} onChange={(e) => setForm({ ...form, image_urls: e.target.value })} className="border rounded-xl px-4 py-2 w-full" />
+              <p className="text-xs text-gray-400 mt-1">Comma-separated list of image URLs. Add multiple URLs to enable the automatic scrolling gallery on the user's property portal.</p>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700">Status</label>
@@ -127,9 +127,12 @@ export default function AdminProperties() {
               </select>
               <p className="text-xs text-gray-400 mt-1">Active properties appear on the user page.</p>
             </div>
-            <div className="col-span-2 flex gap-2">
-              <button type="submit" className="bg-brand text-white px-6 py-2 rounded-xl">Save</button>
-              <button type="button" onClick={() => setShowForm(false)} className="bg-gray-200 px-6 py-2 rounded-xl">Cancel</button>
+            <div className="col-span-2 space-y-2">
+              <div className="flex gap-2">
+                <button type="submit" className="bg-brand text-white px-6 py-2 rounded-xl">Save Property</button>
+                <button type="button" onClick={() => setShowForm(false)} className="bg-gray-200 px-6 py-2 rounded-xl">Cancel</button>
+              </div>
+              <p className="text-xs text-gray-400 font-medium">Saves property listing details. Active properties are instantly viewable on the user portfolio platform.</p>
             </div>
           </form>
         </div>

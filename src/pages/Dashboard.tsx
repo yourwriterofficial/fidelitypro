@@ -62,11 +62,6 @@ export default function Dashboard() {
   const [propertyTotal, setPropertyTotal] = useState(0);
   const [totalPortfolio, setTotalPortfolio] = useState(0);
 
-  useEffect(() => {
-    refreshProfile();
-    fetchData();
-  }, [profile?.id]);
-
   const fetchData = async () => {
     if (!profile) return;
     setLoading(true);
@@ -124,6 +119,11 @@ export default function Dashboard() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    refreshProfile();
+    fetchData();
+  }, [profile?.id]);
 
   const fmt = (n: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n);
 
