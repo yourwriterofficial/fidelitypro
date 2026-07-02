@@ -16,3 +16,19 @@
 .animate-indeterminate {
   animation: indeterminate-bar 1.2s ease-in-out infinite;
 }
+
+/* Mobile navigation bottom-sheet */
+@keyframes sheet-up {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+.animate-sheet-up {
+  animation: sheet-up 0.22s cubic-bezier(0.32, 0.72, 0, 1);
+}
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.animate-fade-in {
+  animation: fade-in 0.2s ease-out;
+}

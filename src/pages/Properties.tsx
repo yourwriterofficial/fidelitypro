@@ -9,7 +9,7 @@ import { useAccountRestriction } from '../hooks/useAccountRestriction';
 interface Property {
   id: string; title: string; description: string; price: number;
   down_payment_percent: number; monthly_payment: number; term_months: number;
-  image_urls: string[]; interested_count: number; status: string;
+  image_urls: string[]; interested_count: number; status: string; category?: string;
 }
 
 export default function Properties() {
@@ -130,6 +130,9 @@ export default function Properties() {
               )}
 
               <div className="p-5 flex flex-col flex-1">
+                {p.category && (
+                  <span className="self-start mb-1.5 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-brand/10 text-brand">{p.category}</span>
+                )}
                 <h3 className="text-lg font-bold text-gray-900 group-hover:text-brand transition-colors">{p.title}</h3>
                 <p className="text-gray-500 text-sm mt-1 mb-4 line-clamp-2">{p.description}</p>
 

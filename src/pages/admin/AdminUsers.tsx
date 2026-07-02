@@ -466,11 +466,11 @@ export default function AdminUsers() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">Users</h1>
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+        <h1 className="text-2xl md:text-3xl font-bold">Users</h1>
         <button
           onClick={() => setNewUserModalOpen(true)}
-          className="bg-brand text-white px-4 py-2 rounded-xl flex items-center gap-2 hover:bg-brand-dark transition-all"
+          className="bg-brand text-white px-4 py-2 rounded-xl flex items-center gap-2 hover:bg-brand-dark transition-all shrink-0"
         >
           <Plus size={20} /> Create User
         </button>

@@ -100,9 +100,9 @@ export default function AdminWithdrawals() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">Withdrawals</h1>
-        <div className="flex gap-2">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+        <h1 className="text-2xl md:text-3xl font-bold">Withdrawals</h1>
+        <div className="flex gap-2 flex-wrap">
           {['all', 'pending', 'approved', 'rejected'].map((s) => (
             <button
               key={s}

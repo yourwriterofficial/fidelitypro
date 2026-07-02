@@ -73,7 +73,7 @@ export default function AdminNotifications() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold">Notifications</h1>
+      <h1 className="text-2xl md:text-3xl font-bold">Notifications</h1>
 
       <div className="bg-white rounded-2xl shadow-sm border p-6">
         <h2 className="text-xl font-semibold mb-4">Send Notification</h2>

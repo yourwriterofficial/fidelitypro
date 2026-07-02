@@ -60,7 +60,7 @@ export default function AdminReferrals() {
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
-      <h1 className="text-3xl font-bold">Referral Program</h1>
+      <h1 className="text-2xl md:text-3xl font-bold">Referral Program</h1>
       <div className="bg-white rounded-2xl shadow-sm border p-6">
         <form onSubmit={handleSave} className="space-y-4">
           <div>

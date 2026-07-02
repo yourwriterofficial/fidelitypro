@@ -115,7 +115,7 @@ export default function AdminSettings() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 px-4 py-8">
-      <h1 className="text-3xl font-bold">Settings</h1>
+      <h1 className="text-2xl md:text-3xl font-bold">Settings</h1>
       <form onSubmit={handleSave} className="space-y-6">
 
         {/* Deposit Methods */}

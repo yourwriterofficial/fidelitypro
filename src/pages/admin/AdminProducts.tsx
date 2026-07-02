@@ -108,8 +108,8 @@ export default function AdminProducts() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">Products</h1>
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+        <h1 className="text-2xl md:text-3xl font-bold">Products</h1>
         <button
           onClick={() => { setShowForm(true); setEditing(null); setForm({ name: '', description: '', min_invest: '', max_invest: '', daily_return: '', duration_days: '', status: 'active' }); }}
           className="bg-brand text-white px-4 py-2 rounded-xl flex items-center gap-2"
@@ -121,7 +121,7 @@ export default function AdminProducts() {
       {showForm && (
         <div className="bg-white rounded-2xl shadow-sm border p-6">
           <h2 className="text-xl font-semibold mb-4">{editing ? 'Edit' : 'New'} Product</h2>
-          <form onSubmit={handleSubmit} className="grid grid-cols-2 gap-4">
+          <form onSubmit={handleSubmit} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <input
               type="text"
               placeholder="Name"
@@ -186,8 +186,8 @@ export default function AdminProducts() {
         </div>
       )}
 
-      <div className="bg-white rounded-2xl shadow-sm border overflow-hidden">
-        <table className="w-full text-sm">
+      <div className="bg-white rounded-2xl shadow-sm border overflow-x-auto">
+        <table className="w-full text-sm min-w-[720px]">
           <thead className="bg-gray-50">
             <tr>
               <th className="text-left p-4">Name</th>

@@ -4,8 +4,9 @@ import {
   LogOut, LayoutDashboard, Package, Users, DollarSign, ShoppingCart,
   Eye, Mail, CreditCard, Settings, Lock, Building, Gift, Bell,
   Menu, X, MoreHorizontal, Activity, Megaphone, ChevronRight, ArrowLeftRight,
+  ChevronsLeft, ChevronsRight,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 const NAV_SECTIONS = [
   {
@@ -28,7 +29,7 @@ const NAV_SECTIONS = [
     items: [
       { path: '/admin/products',     icon: Package,         label: 'Products'       },
       { path: '/admin/staking',      icon: Lock,            label: 'Staking'        },
-      { path: '/admin/properties',   icon: Building,        label: 'Properties'     },
+      { path: '/admin/properties',   icon: Building,        label: 'Listings'       },
       { path: '/admin/referrals',    icon: Gift,            label: 'Referrals'      },
     ],
   },
@@ -57,6 +58,19 @@ export default function AdminLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(
+    () => typeof localStorage !== 'undefined' && localStorage.getItem('admin-sidebar-collapsed') === '1'
+  );
+
+  useEffect(() => {
+    localStorage.setItem('admin-sidebar-collapsed', collapsed ? '1' : '0');
+  }, [collapsed]);
+
+  // Lock body scroll while the mobile sheet is open.
+  useEffect(() => {
+    document.body.style.overflow = mobileMenuOpen ? 'hidden' : '';
+    return () => { document.body.style.overflow = ''; };
+  }, [mobileMenuOpen]);
 
   const handleSignOut = async () => {
     await signOut();
@@ -74,23 +88,32 @@ export default function AdminLayout() {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row">
 
-      {/* ===== DESKTOP SIDEBAR ===== */}
-      <aside className="w-64 bg-white border-r border-gray-100 hidden md:flex md:flex-col md:fixed md:inset-y-0 md:left-0 md:z-30">
-        {/* Logo */}
-        <div className="px-5 py-5 border-b border-gray-100">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 bg-gray-900 rounded-xl flex items-center justify-center shrink-0">
-              <span className="text-white font-extrabold text-sm">F</span>
+      {/* ===== DESKTOP SIDEBAR (collapsible) ===== */}
+      <aside className={`bg-white border-r border-gray-100 hidden md:flex md:flex-col md:fixed md:inset-y-0 md:left-0 md:z-30 transition-[width] duration-200 ${collapsed ? 'md:w-20' : 'md:w-64'}`}>
+        {/* Logo + collapse toggle */}
+        <div className={`px-3 py-5 border-b border-gray-100 flex items-center ${collapsed ? 'justify-center' : 'justify-between px-5'}`}>
+          {!collapsed && (
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 bg-gray-900 rounded-xl flex items-center justify-center shrink-0">
+                <span className="text-white font-extrabold text-sm">F</span>
+              </div>
+              <div>
+                <p className="text-sm font-extrabold text-gray-900 leading-none">FidelityPro</p>
+                <p className="text-[10px] text-gray-400 font-medium uppercase tracking-widest mt-0.5">Admin Panel</p>
+              </div>
             </div>
-            <div>
-              <p className="text-sm font-extrabold text-gray-900 leading-none">FidelityPro</p>
-              <p className="text-[10px] text-gray-400 font-medium uppercase tracking-widest mt-0.5">Admin Panel</p>
-            </div>
-          </div>
+          )}
+          <button
+            onClick={() => setCollapsed(c => !c)}
+            className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition"
+            title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          >
+            {collapsed ? <ChevronsRight size={18} /> : <ChevronsLeft size={18} />}
+          </button>
         </div>
 
         {/* Impersonation banner */}
-        {isImpersonating && (
+        {isImpersonating && !collapsed && (
           <div className="mx-3 mt-3 px-3 py-2 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-700 font-medium flex items-center gap-1.5">
             <Eye size={12} className="shrink-0" /> Viewing as client
           </div>
@@ -100,18 +123,20 @@ export default function AdminLayout() {
         <nav className="flex-1 px-3 py-3 overflow-y-auto space-y-4">
           {NAV_SECTIONS.map(section => (
             <div key={section.label}>
-              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest px-3.5 mb-1">{section.label}</p>
+              {!collapsed && (
+                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest px-3.5 mb-1">{section.label}</p>
+              )}
               <div className="space-y-0.5">
                 {section.items.map(({ path, icon: Icon, label }) => {
                   const active = isActive(path);
                   return (
-                    <Link key={path} to={path}
-                      className={`group flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 ${
+                    <Link key={path} to={path} title={collapsed ? label : undefined}
+                      className={`group flex items-center gap-3 rounded-xl text-sm font-medium transition-all duration-150 ${collapsed ? 'justify-center px-0 py-2.5' : 'px-3.5 py-2.5'} ${
                         active ? 'bg-gray-900 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
                       }`}>
                       <Icon size={16} className={active ? 'text-white' : 'text-gray-400 group-hover:text-gray-600'} />
-                      {label}
-                      {active && <ChevronRight size={12} className="ml-auto opacity-60" />}
+                      {!collapsed && label}
+                      {!collapsed && active && <ChevronRight size={12} className="ml-auto opacity-60" />}
                     </Link>
                   );
                 })}
@@ -122,20 +147,20 @@ export default function AdminLayout() {
 
         {/* Footer */}
         <div className="px-3 pb-4 pt-3 border-t border-gray-100 space-y-0.5">
-          <button onClick={switchToClient}
-            className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium text-brand hover:bg-brand/5 transition">
+          <button onClick={switchToClient} title={collapsed ? (isImpersonating ? 'Exit Impersonation' : 'Switch to Client') : undefined}
+            className={`w-full flex items-center gap-3 rounded-xl text-sm font-medium text-brand hover:bg-brand/5 transition ${collapsed ? 'justify-center py-2.5' : 'px-3.5 py-2.5'}`}>
             <ArrowLeftRight size={16} />
-            {isImpersonating ? 'Exit Impersonation' : 'Switch to Client'}
+            {!collapsed && (isImpersonating ? 'Exit Impersonation' : 'Switch to Client')}
           </button>
-          <button onClick={handleSignOut}
-            className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium text-red-600 hover:bg-red-50 transition">
-            <LogOut size={16} /> Sign Out
+          <button onClick={handleSignOut} title={collapsed ? 'Sign Out' : undefined}
+            className={`w-full flex items-center gap-3 rounded-xl text-sm font-medium text-red-600 hover:bg-red-50 transition ${collapsed ? 'justify-center py-2.5' : 'px-3.5 py-2.5'}`}>
+            <LogOut size={16} /> {!collapsed && 'Sign Out'}
           </button>
         </div>
       </aside>
 
       {/* ===== MAIN CONTENT ===== */}
-      <main className="flex-1 md:ml-64 min-h-screen flex flex-col">
+      <main className={`flex-1 min-h-screen flex flex-col transition-[margin] duration-200 ${collapsed ? 'md:ml-20' : 'md:ml-64'}`}>
 
         {/* Mobile Header */}
         <header className="md:hidden bg-white border-b border-gray-100 px-4 py-3 flex items-center justify-between sticky top-0 z-20 shadow-sm">
@@ -148,50 +173,11 @@ export default function AdminLayout() {
               <p className="text-[9px] text-gray-400 uppercase tracking-widest">Admin</p>
             </div>
           </div>
-          <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+          <button onClick={() => setMobileMenuOpen(true)}
             className="p-1.5 hover:bg-gray-100 rounded-xl transition">
-            {mobileMenuOpen ? <X size={20} className="text-gray-600" /> : <Menu size={20} className="text-gray-600" />}
+            <Menu size={20} className="text-gray-600" />
           </button>
         </header>
-
-        {/* Mobile slide-down menu */}
-        {mobileMenuOpen && (
-          <div className="md:hidden bg-white border-b border-gray-100 px-3 py-3 shadow-lg z-10 space-y-3 max-h-[75vh] overflow-y-auto">
-            {isImpersonating && (
-              <div className="px-3 py-2 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-700 font-medium flex items-center gap-1.5">
-                <Eye size={11} /> Viewing as client
-              </div>
-            )}
-            {NAV_SECTIONS.map(section => (
-              <div key={section.label}>
-                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest px-3 mb-1">{section.label}</p>
-                <div className="space-y-0.5">
-                  {section.items.map(({ path, icon: Icon, label }) => {
-                    const active = isActive(path);
-                    return (
-                      <Link key={path} to={path} onClick={() => setMobileMenuOpen(false)}
-                        className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition ${
-                          active ? 'bg-gray-900 text-white' : 'text-gray-600 hover:bg-gray-100'
-                        }`}>
-                        <Icon size={15} /> {label}
-                      </Link>
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
-            <div className="space-y-0.5 pt-1 border-t border-gray-100">
-              <button onClick={() => { switchToClient(); setMobileMenuOpen(false); }}
-                className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium text-brand hover:bg-brand/5 transition">
-                <ArrowLeftRight size={15} /> {isImpersonating ? 'Exit Impersonation' : 'Switch to Client'}
-              </button>
-              <button onClick={() => { handleSignOut(); setMobileMenuOpen(false); }}
-                className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium text-red-600 hover:bg-red-50 transition">
-                <LogOut size={15} /> Sign Out
-              </button>
-            </div>
-          </div>
-        )}
 
         {/* Page content */}
         <div className="flex-1 p-4 md:p-6 pb-24 md:pb-6">
@@ -223,6 +209,61 @@ export default function AdminLayout() {
           </button>
         </nav>
       </main>
+
+      {/* ===== MOBILE MENU — fixed bottom sheet (renders in viewport, no scroll needed) ===== */}
+      {mobileMenuOpen && (
+        <div className="md:hidden fixed inset-0 z-50">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-fade-in" onClick={() => setMobileMenuOpen(false)} />
+          <div className="absolute bottom-0 inset-x-0 bg-white rounded-t-3xl shadow-2xl max-h-[85vh] flex flex-col animate-sheet-up">
+            {/* Grabber + header */}
+            <div className="pt-2.5 pb-1 flex justify-center shrink-0">
+              <div className="w-10 h-1.5 bg-gray-200 rounded-full" />
+            </div>
+            <div className="px-5 pb-3 flex items-center justify-between shrink-0">
+              <p className="text-base font-bold text-gray-900">Admin Menu</p>
+              <button onClick={() => setMobileMenuOpen(false)} className="p-1.5 hover:bg-gray-100 rounded-xl transition">
+                <X size={20} className="text-gray-500" />
+              </button>
+            </div>
+
+            <div className="overflow-y-auto px-3 pb-6 space-y-3">
+              {isImpersonating && (
+                <div className="px-3 py-2 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-700 font-medium flex items-center gap-1.5">
+                  <Eye size={11} /> Viewing as client
+                </div>
+              )}
+              {NAV_SECTIONS.map(section => (
+                <div key={section.label}>
+                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest px-3 mb-1">{section.label}</p>
+                  <div className="space-y-0.5">
+                    {section.items.map(({ path, icon: Icon, label }) => {
+                      const active = isActive(path);
+                      return (
+                        <Link key={path} to={path} onClick={() => setMobileMenuOpen(false)}
+                          className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition ${
+                            active ? 'bg-gray-900 text-white' : 'text-gray-600 hover:bg-gray-100'
+                          }`}>
+                          <Icon size={15} /> {label}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+              <div className="space-y-0.5 pt-1 border-t border-gray-100">
+                <button onClick={() => { switchToClient(); setMobileMenuOpen(false); }}
+                  className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium text-brand hover:bg-brand/5 transition">
+                  <ArrowLeftRight size={15} /> {isImpersonating ? 'Exit Impersonation' : 'Switch to Client'}
+                </button>
+                <button onClick={() => { handleSignOut(); setMobileMenuOpen(false); }}
+                  className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium text-red-600 hover:bg-red-50 transition">
+                  <LogOut size={15} /> Sign Out
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -76,9 +76,9 @@ export default function AdminOrders() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">Orders</h1>
-        <div className="flex gap-2">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+        <h1 className="text-2xl md:text-3xl font-bold">Orders</h1>
+        <div className="flex gap-2 flex-wrap">
           {['all', 'pending', 'active', 'completed', 'cancelled'].map((s) => (
             <button
               key={s}
@@ -91,8 +91,8 @@ export default function AdminOrders() {
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl shadow-sm border overflow-hidden">
-        <table className="w-full text-sm">
+      <div className="bg-white rounded-2xl shadow-sm border overflow-x-auto">
+        <table className="w-full text-sm min-w-[720px]">
           <thead className="bg-gray-50">
             <tr>
               <th className="text-left p-4">User</th>

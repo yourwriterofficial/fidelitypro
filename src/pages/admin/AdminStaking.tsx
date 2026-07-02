@@ -87,8 +87,8 @@ export default function AdminStaking() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">Staking Products</h1>
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+        <h1 className="text-2xl md:text-3xl font-bold">Staking Products</h1>
         <button onClick={() => { setShowForm(true); setEditing(null); setForm({ name: '', description: '', min_amount: '', max_amount: '', apy: '', lock_days: '', early_withdrawal_penalty: '0', status: 'active' }); }} className="bg-brand text-white px-4 py-2 rounded-xl flex items-center gap-2"><Plus size={20} /> New</button>
       </div>
 
@@ -147,8 +147,8 @@ export default function AdminStaking() {
         </div>
       )}
 
-      <div className="bg-white rounded-2xl shadow-sm border overflow-hidden">
-        <table className="w-full text-sm">
+      <div className="bg-white rounded-2xl shadow-sm border overflow-x-auto">
+        <table className="w-full text-sm min-w-[720px]">
           <thead className="bg-gray-50"><tr><th className="p-4 text-left">Name</th><th className="p-4 text-left">APY</th><th className="p-4 text-left">Lock</th><th className="p-4 text-left">Min</th><th className="p-4 text-left">Penalty</th><th className="p-4 text-left">Status</th><th className="p-4 text-left">Actions</th></tr></thead>
           <tbody>
             {products.map((p) => (

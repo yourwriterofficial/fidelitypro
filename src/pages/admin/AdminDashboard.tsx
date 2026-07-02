@@ -147,11 +147,11 @@ export default function AdminDashboard() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">Admin Dashboard</h1>
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+        <h1 className="text-2xl md:text-3xl font-bold">Admin Dashboard</h1>
         <button
           onClick={() => setShowCreateUser(true)}
-          className="bg-brand hover:bg-brand-dark text-white px-4 py-2 rounded-xl flex items-center gap-2"
+          className="bg-brand hover:bg-brand-dark text-white px-4 py-2 rounded-xl flex items-center gap-2 shrink-0"
         >
           <UserPlus size={20} /> Create User
         </button>
