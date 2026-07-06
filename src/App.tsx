@@ -44,6 +44,8 @@ import EmailTemplates from './pages/admin/EmailTemplates';
 import AdminAnnouncements from './pages/admin/AdminAnnouncements';
 import AdminSettings from './pages/admin/AdminSettings';
 import AdminActivityLogs from './pages/admin/AdminActivityLogs';
+import PushAutoSubscriber from './components/PushAutoSubscriber';
+import PWAUpdater from './components/PWAUpdater';
 
 function App() {
   const { initAuth, setLoading } = useAuthStore();
@@ -61,6 +63,8 @@ function App() {
       <ErrorBoundary>
       <BrowserRouter>
         <Toaster position="top-center" richColors theme="light" />
+        <PushAutoSubscriber />
+        <PWAUpdater />
         <Routes>
           {/* Public Routes */}
           <Route path="/" element={<Landing />} />

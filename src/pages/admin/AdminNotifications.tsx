@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { toast } from 'sonner';
 import { Send, Trash, RefreshCw } from 'lucide-react';
+import { notifyUsers } from '../../lib/notify';
 
 export default function AdminNotifications() {
   const [users, setUsers] = useState<{ id: string; name: string; email: string }[]>([]);
@@ -41,17 +42,12 @@ export default function AdminNotifications() {
     }
     setSending(true);
     try {
-      const notifications = targetUsers.map(user_id => ({
-        user_id,
+      await notifyUsers(targetUsers, {
         title,
         message,
-        type,
-        link: link || null,
-        read: false,
-        created_at: new Date().toISOString(),
-      }));
-      const { error } = await supabase.from('notifications').insert(notifications);
-      if (error) throw error;
+        type: type as any,
+        link: link || undefined,
+      });
       toast.success(`Sent to ${targetUsers.length} users`);
       setTitle('');
       setMessage('');

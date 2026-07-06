@@ -157,6 +157,10 @@ export default function EmailTemplates() {
     if (!window.confirm('This will seed/overwrite the default templates. Proceed?')) return;
     setSeeding(true);
     try {
+      // Clean up old FidelityPro templates from the database
+      const oldTemplateNames = ['deposit_confirmation', 'investment_activated', 'withdrawal_approved', 'low_balance_warning'];
+      await supabase.from('email_templates').delete().in('name', oldTemplateNames);
+
       for (const t of DEFAULT_TEMPLATES) {
         const { data: existing } = await supabase
           .from('email_templates')
