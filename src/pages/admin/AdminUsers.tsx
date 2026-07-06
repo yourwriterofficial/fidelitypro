@@ -4,7 +4,7 @@ import { useAuthStore } from '../../store/authStore';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { 
-  Ban, UserCheck, Eye, Edit, Plus, Minus, Save, X, Mail, Lock
+  Ban, UserCheck, Eye, Edit, Plus, Minus, Save, X, Mail, Lock, Key
 } from 'lucide-react';
 
 interface User {
@@ -377,12 +377,46 @@ export default function AdminUsers() {
   const resetPassword = async () => {
     if (!selectedUser) return;
     try {
-      // This requires service role; we'll show a message for now.
-      toast.info('Password reset must be done via Supabase Dashboard.');
-      // const { error } = await supabase.auth.admin.resetPasswordForEmail(selectedUser.email);
-      // if (error) throw error;
+      toast.loading('Generating password reset link...', { id: 'reset-pwd' });
+      const { data, error } = await supabase.functions.invoke('admin-action', {
+        body: {
+          action: 'reset-password',
+          email: selectedUser.email,
+          redirectTo: `${window.location.origin}/reset-password`
+        }
+      });
+      if (error) throw error;
+      if (data?.link) {
+        await navigator.clipboard.writeText(data.link);
+        toast.success('Reset link copied to clipboard!', { id: 'reset-pwd' });
+      } else {
+        toast.success('Reset email instructions sent!', { id: 'reset-pwd' });
+      }
     } catch (err: any) {
-      toast.error(err.message);
+      toast.error('Failed to reset password: ' + err.message, { id: 'reset-pwd' });
+    }
+  };
+
+  const generateMagicLink = async () => {
+    if (!selectedUser) return;
+    try {
+      toast.loading('Generating magic link...', { id: 'magic-link' });
+      const { data, error } = await supabase.functions.invoke('admin-action', {
+        body: {
+          action: 'magic-link',
+          email: selectedUser.email,
+          redirectTo: `${window.location.origin}/app`
+        }
+      });
+      if (error) throw error;
+      if (data?.link) {
+        await navigator.clipboard.writeText(data.link);
+        toast.success('Magic link copied to clipboard!', { id: 'magic-link' });
+      } else {
+        toast.success('Magic link generated!', { id: 'magic-link' });
+      }
+    } catch (err: any) {
+      toast.error('Failed to generate magic link: ' + err.message, { id: 'magic-link' });
     }
   };
 
@@ -921,16 +955,29 @@ export default function AdminUsers() {
                         <Lock size={18} /> Reset Password
                       </button>
                       <button
-                        onClick={() => {
+                        onClick={generateMagicLink}
+                        className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl flex items-center gap-2"
+                      >
+                        <Key size={18} /> Magic Link
+                      </button>
+                      <button
+                        onClick={async () => {
                           if (confirm(`Are you sure you want to delete user ${selectedUser.name || selectedUser.email}?`)) {
-                            supabase.auth.admin.deleteUser(selectedUser.id).then(({ error }) => {
-                              if (error) toast.error(error.message);
-                              else {
-                                toast.success('User deleted');
-                                setModalOpen(false);
-                                fetchUsers();
-                              }
-                            });
+                            toast.loading('Deleting user...', { id: 'delete-user' });
+                            try {
+                              const { error } = await supabase.functions.invoke('admin-action', {
+                                body: {
+                                  action: 'delete-user',
+                                  userId: selectedUser.id
+                                }
+                              });
+                              if (error) throw error;
+                              toast.success('User deleted successfully', { id: 'delete-user' });
+                              setModalOpen(false);
+                              fetchUsers();
+                            } catch (err: any) {
+                              toast.error('Failed to delete user: ' + err.message, { id: 'delete-user' });
+                            }
                           }
                         }}
                         className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-xl flex items-center gap-2"
@@ -939,7 +986,8 @@ export default function AdminUsers() {
                       </button>
                     </div>
                     <div className="space-y-1">
-                      <p className="text-[10px] text-gray-400 font-medium"><strong className="text-amber-600">Reset Password:</strong> Sends automated password reset instructions through Supabase Auth.</p>
+                      <p className="text-[10px] text-gray-400 font-medium"><strong className="text-amber-600">Reset Password:</strong> Securely generates and copies a password recovery link to the clipboard.</p>
+                      <p className="text-[10px] text-gray-400 font-medium"><strong className="text-blue-600">Magic Link:</strong> Generates and copies a direct, passwordless login link to the clipboard.</p>
                       <p className="text-[10px] text-gray-400 font-medium"><strong className="text-red-600">Delete Account:</strong> Permanently and irreversibly removes the user and profile database records.</p>
                     </div>
                   </div>
