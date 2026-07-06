@@ -67,7 +67,7 @@ export default function Login() {
       <div className="max-w-md w-full bg-white rounded-3xl shadow-sm border p-8">
         <div className="text-center mb-6">
           <h2 className="text-3xl font-bold text-gray-900">Welcome Back</h2>
-          <p className="text-gray-600 mt-2">Sign in to your FidelityPro account</p>
+          <p className="text-gray-600 mt-2">Sign in to your RPM account</p>
         </div>
 
         {/* Tab Switcher */}

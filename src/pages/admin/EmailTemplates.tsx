@@ -13,15 +13,15 @@ const VARIABLES = ['{{name}}','{{amount}}','{{site_url}}','{{plan_name}}','{{dai
 const DEFAULT_TEMPLATES = [
   {
     name: 'Welcome Email',
-    subject: 'Welcome to FidelityPro!',
-    body_text: 'Hello {{name}},\n\nWelcome to FidelityPro! Your account has been successfully created. You can now log in and start your wealth-building journey at {{site_url}}.\n\nBest regards,\nFidelityPro Team',
+    subject: 'Welcome to RPM!',
+    body_text: 'Hello {{name}},\n\nWelcome to RPM (Rema Profit Machine)! Your account has been successfully created. You can now log in and start your wealth-building journey at {{site_url}}.\n\nBest regards,\nRPM Team',
     body_html: `<div style="font-family: 'Inter', Helvetica, Arial, sans-serif; background-color: #f9fafb; padding: 40px 20px; color: #1f2937;">
   <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); border: 1px solid #f3f4f6;">
     <div style="background-color: #0f172a; padding: 32px; text-align: center;">
-      <span style="color: #ffffff; font-size: 24px; font-weight: 800; letter-spacing: -0.5px; font-family: sans-serif;">FidelityPro</span>
+      <span style="color: #ffffff; font-size: 24px; font-weight: 800; letter-spacing: -0.5px; font-family: sans-serif;">RPM</span>
     </div>
     <div style="padding: 40px 32px;">
-      <h2 style="font-size: 20px; font-weight: 700; color: #111827; margin-top: 0; margin-bottom: 16px;">Welcome to FidelityPro, {{name}}!</h2>
+      <h2 style="font-size: 20px; font-weight: 700; color: #111827; margin-top: 0; margin-bottom: 16px;">Welcome to RPM (Rema Profit Machine), {{name}}!</h2>
       <p style="font-size: 15px; line-height: 1.6; color: #4b5563; margin-bottom: 24px;">We are thrilled to welcome you to our community. Your account has been created and verified. You are now ready to start your smart wealth-building journey.</p>
       <div style="text-align: center; margin-bottom: 32px;">
         <a href="{{site_url}}/login" style="display: inline-block; background-color: #10b981; color: #ffffff; padding: 14px 28px; font-weight: 600; font-size: 15px; border-radius: 12px; text-decoration: none; box-shadow: 0 4px 6px -1px rgba(16, 185, 129, 0.2);">Access Dashboard</a>
@@ -29,19 +29,19 @@ const DEFAULT_TEMPLATES = [
       <p style="font-size: 14px; line-height: 1.5; color: #6b7280; margin-bottom: 0;">If you have any questions or need assistance, please feel free to reply to this email. Our support team is here 24/7.</p>
     </div>
     <div style="background-color: #f3f4f6; padding: 24px; text-align: center; border-top: 1px solid #e5e7eb;">
-      <p style="font-size: 12px; color: #9ca3af; margin: 0;">&copy; 2026 FidelityPro. All rights reserved.</p>
+      <p style="font-size: 12px; color: #9ca3af; margin: 0;">&copy; 2026 RPM. All rights reserved.</p>
     </div>
   </div>
 </div>`
   },
   {
     name: 'Deposit Confirmed',
-    subject: 'Deposit Confirmed - FidelityPro',
-    body_text: 'Hello {{name}},\n\nYour deposit of {{amount}} has been successfully processed and credited to your wallet balance. You can view this in your dashboard at {{site_url}}.\n\nBest regards,\nFidelityPro Team',
+    subject: 'Deposit Confirmed - RPM',
+    body_text: 'Hello {{name}},\n\nYour deposit of {{amount}} has been successfully processed and credited to your wallet balance. You can view this in your dashboard at {{site_url}}.\n\nBest regards,\nRPM Team',
     body_html: `<div style="font-family: 'Inter', Helvetica, Arial, sans-serif; background-color: #f9fafb; padding: 40px 20px; color: #1f2937;">
   <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); border: 1px solid #f3f4f6;">
     <div style="background-color: #0f172a; padding: 32px; text-align: center;">
-      <span style="color: #ffffff; font-size: 24px; font-weight: 800; letter-spacing: -0.5px; font-family: sans-serif;">FidelityPro</span>
+      <span style="color: #ffffff; font-size: 24px; font-weight: 800; letter-spacing: -0.5px; font-family: sans-serif;">RPM</span>
     </div>
     <div style="padding: 40px 32px;">
       <h2 style="font-size: 20px; font-weight: 700; color: #111827; margin-top: 0; margin-bottom: 16px;">Deposit Successful!</h2>
@@ -55,19 +55,19 @@ const DEFAULT_TEMPLATES = [
       </div>
     </div>
     <div style="background-color: #f3f4f6; padding: 24px; text-align: center; border-top: 1px solid #e5e7eb;">
-      <p style="font-size: 12px; color: #9ca3af; margin: 0;">&copy; 2026 FidelityPro. All rights reserved.</p>
+      <p style="font-size: 12px; color: #9ca3af; margin: 0;">&copy; 2026 RPM. All rights reserved.</p>
     </div>
   </div>
 </div>`
   },
   {
     name: 'Withdrawal Approved',
-    subject: 'Withdrawal Request Approved - FidelityPro',
-    body_text: 'Hello {{name}},\n\nYour withdrawal request for {{amount}} has been approved. The funds have been sent to your address: {{address}}.\n\nBest regards,\nFidelityPro Team',
+    subject: 'Withdrawal Request Approved - RPM',
+    body_text: 'Hello {{name}},\n\nYour withdrawal request for {{amount}} has been approved. The funds have been sent to your address: {{address}}.\n\nBest regards,\nRPM Team',
     body_html: `<div style="font-family: 'Inter', Helvetica, Arial, sans-serif; background-color: #f9fafb; padding: 40px 20px; color: #1f2937;">
   <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); border: 1px solid #f3f4f6;">
     <div style="background-color: #0f172a; padding: 32px; text-align: center;">
-      <span style="color: #ffffff; font-size: 24px; font-weight: 800; letter-spacing: -0.5px; font-family: sans-serif;">FidelityPro</span>
+      <span style="color: #ffffff; font-size: 24px; font-weight: 800; letter-spacing: -0.5px; font-family: sans-serif;">RPM</span>
     </div>
     <div style="padding: 40px 32px;">
       <h2 style="font-size: 20px; font-weight: 700; color: #111827; margin-top: 0; margin-bottom: 16px;">Withdrawal Approved!</h2>
@@ -79,19 +79,19 @@ const DEFAULT_TEMPLATES = [
       <p style="font-size: 14px; color: #6b7280; line-height: 1.5;">Please allow a few minutes for the transaction to confirm on the blockchain network.</p>
     </div>
     <div style="background-color: #f3f4f6; padding: 24px; text-align: center; border-top: 1px solid #e5e7eb;">
-      <p style="font-size: 12px; color: #9ca3af; margin: 0;">&copy; 2026 FidelityPro. All rights reserved.</p>
+      <p style="font-size: 12px; color: #9ca3af; margin: 0;">&copy; 2026 RPM. All rights reserved.</p>
     </div>
   </div>
 </div>`
   },
   {
     name: 'Investment Activated',
-    subject: 'Investment Plan Activated - FidelityPro',
-    body_text: 'Hello {{name}},\n\nYour investment in the {{plan_name}} has been successfully activated. You will earn {{daily_return}}% daily for {{duration_days}} days on your principal of {{amount}}.\n\nBest regards,\nFidelityPro Team',
+    subject: 'Investment Plan Activated - RPM',
+    body_text: 'Hello {{name}},\n\nYour investment in the {{plan_name}} has been successfully activated. You will earn {{daily_return}}% daily for {{duration_days}} days on your principal of {{amount}}.\n\nBest regards,\nRPM Team',
     body_html: `<div style="font-family: 'Inter', Helvetica, Arial, sans-serif; background-color: #f9fafb; padding: 40px 20px; color: #1f2937;">
   <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); border: 1px solid #f3f4f6;">
     <div style="background-color: #0f172a; padding: 32px; text-align: center;">
-      <span style="color: #ffffff; font-size: 24px; font-weight: 800; letter-spacing: -0.5px; font-family: sans-serif;">FidelityPro</span>
+      <span style="color: #ffffff; font-size: 24px; font-weight: 800; letter-spacing: -0.5px; font-family: sans-serif;">RPM</span>
     </div>
     <div style="padding: 40px 32px;">
       <h2 style="font-size: 20px; font-weight: 700; color: #111827; margin-top: 0; margin-bottom: 16px;">Investment Activated!</h2>
@@ -107,7 +107,7 @@ const DEFAULT_TEMPLATES = [
       </div>
     </div>
     <div style="background-color: #f3f4f6; padding: 24px; text-align: center; border-top: 1px solid #e5e7eb;">
-      <p style="font-size: 12px; color: #9ca3af; margin: 0;">&copy; 2026 FidelityPro. All rights reserved.</p>
+      <p style="font-size: 12px; color: #9ca3af; margin: 0;">&copy; 2026 RPM. All rights reserved.</p>
     </div>
   </div>
 </div>`
@@ -115,11 +115,11 @@ const DEFAULT_TEMPLATES = [
   {
     name: 'Inactivity Warning',
     subject: 'Account Inactivity Warning - Action Required',
-    body_text: 'Hello {{name}},\n\nYour account has been flagged for inactivity as you have not made any investments yet. Please top up your wallet and start an investment within the allowed grace period to avoid account restrictions.\n\nBest regards,\nFidelityPro Team',
+    body_text: 'Hello {{name}},\n\nYour account has been flagged for inactivity as you have not made any investments yet. Please top up your wallet and start an investment within the allowed grace period to avoid account restrictions.\n\nBest regards,\nRPM Team',
     body_html: `<div style="font-family: 'Inter', Helvetica, Arial, sans-serif; background-color: #f9fafb; padding: 40px 20px; color: #1f2937;">
   <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); border: 1px solid #f3f4f6;">
     <div style="background-color: #0f172a; padding: 32px; text-align: center;">
-      <span style="color: #ffffff; font-size: 24px; font-weight: 800; letter-spacing: -0.5px; font-family: sans-serif;">FidelityPro</span>
+      <span style="color: #ffffff; font-size: 24px; font-weight: 800; letter-spacing: -0.5px; font-family: sans-serif;">RPM</span>
     </div>
     <div style="padding: 40px 32px;">
       <h2 style="font-size: 20px; font-weight: 700; color: #ef4444; margin-top: 0; margin-bottom: 16px;">Inactivity Warning</h2>
@@ -130,7 +130,7 @@ const DEFAULT_TEMPLATES = [
       </div>
     </div>
     <div style="background-color: #f3f4f6; padding: 24px; text-align: center; border-top: 1px solid #e5e7eb;">
-      <p style="font-size: 12px; color: #9ca3af; margin: 0;">&copy; 2026 FidelityPro. All rights reserved.</p>
+      <p style="font-size: 12px; color: #9ca3af; margin: 0;">&copy; 2026 RPM. All rights reserved.</p>
     </div>
   </div>
 </div>`

@@ -6,7 +6,7 @@ export default function HowItWorks() {
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         <h1 className="text-4xl font-bold text-center text-gray-900 mb-6">How It Works</h1>
         <p className="text-center text-gray-600 mb-12">
-          Getting started with FidelityPro is simple. Follow these three steps.
+          Getting started with RPM is simple. Follow these three steps.
         </p>
         <div className="space-y-8">
           <div className="bg-white rounded-2xl shadow-md p-6 border border-gray-100">

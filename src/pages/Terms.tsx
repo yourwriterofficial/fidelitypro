@@ -6,7 +6,7 @@ export default function Terms() {
         <div className="bg-white rounded-2xl shadow-md p-8 border border-gray-100 prose prose-sm max-w-none">
           <p><strong>Last updated:</strong> June 2026</p>
           <h2>1. Acceptance of Terms</h2>
-          <p>By using FidelityPro, you agree to these terms.</p>
+          <p>By using RPM (Rema Profit Machine), you agree to these terms.</p>
           <h2>2. Investment Risks</h2>
           <p>Investing involves risk. Past performance is not indicative of future results.</p>
           <h2>3. User Responsibilities</h2>

@@ -74,9 +74,9 @@ export default function Layout() {
           {!collapsed && (
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 bg-brand rounded-xl flex items-center justify-center">
-                <span className="text-white font-extrabold text-sm">F</span>
+                <span className="text-white font-extrabold text-sm">R</span>
               </div>
-              <span className="text-xl font-extrabold text-gray-900 tracking-tight">FidelityPro</span>
+              <span className="text-xl font-extrabold text-gray-900 tracking-tight">RPM</span>
             </div>
           )}
           <div className="flex items-center gap-1">
@@ -143,9 +143,9 @@ export default function Layout() {
         <header className="md:hidden bg-white border-b border-gray-100 px-4 py-3 flex items-center justify-between sticky top-0 z-20 shadow-sm">
           <div className="flex items-center gap-2">
             <div className="w-7 h-7 bg-brand rounded-lg flex items-center justify-center">
-              <span className="text-white font-extrabold text-xs">F</span>
+              <span className="text-white font-extrabold text-xs">R</span>
             </div>
-            <span className="text-lg font-extrabold text-gray-900">FidelityPro</span>
+            <span className="text-lg font-extrabold text-gray-900">RPM</span>
           </div>
           <div className="flex items-center gap-2">
             <NotificationBell />

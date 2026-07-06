@@ -254,7 +254,7 @@ const plans = [
 ];
 
 const testimonials = [
-  { name: 'James O.',    location: 'New York, USA',    text: 'FidelityPro completely changed how I invest. My portfolio has grown 34% in six months. The dashboard is clean and withdrawals are always on time.',    stars: 5 },
+  { name: 'James O.',    location: 'New York, USA',    text: 'RPM completely changed how I invest. My portfolio has grown 34% in six months. The dashboard is clean and withdrawals are always on time.',    stars: 5 },
   { name: 'Amara K.',   location: 'London, UK',        text: 'I was skeptical at first but the returns are real. Support team answered all my questions within minutes. Highly recommend the Growth plan.',            stars: 5 },
   { name: 'Carlos M.',  location: 'Toronto, Canada',   text: 'Transferred my retirement savings here and haven\'t looked back. Transparent fees, consistent daily payouts, and the referral program is generous.',  stars: 5 },
 ];
@@ -280,9 +280,9 @@ export default function Landing() {
             {/* Logo */}
             <div className="flex items-center gap-2.5">
               <div className="w-9 h-9 bg-brand rounded-lg flex items-center justify-center shadow-sm">
-                <span className="text-white font-bold text-lg tracking-tight">F</span>
+                <span className="text-white font-bold text-lg tracking-tight">R</span>
               </div>
-              <span className="text-xl font-bold text-gray-900 tracking-tight">FidelityPro</span>
+              <span className="text-xl font-bold text-gray-900 tracking-tight">RPM</span>
               <span className="hidden lg:inline-block text-[10px] font-semibold text-gray-400 uppercase tracking-wider bg-gray-100 px-2 py-0.5 rounded">
                 Invest
               </span>
@@ -556,8 +556,8 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* ── Why FidelityPro ── */}
-      <section id="why-fidelity" className="py-20">
+      {/* ── Why RPM ── */}
+      <section id="why-rpm" className="py-20">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <FadeIn className="text-center mb-14">
             <span className="text-brand font-semibold tracking-[0.2em] text-sm uppercase">Why Us</span>
@@ -649,13 +649,13 @@ export default function Landing() {
             <div>
               <div className="flex items-center gap-2.5 mb-4">
                 <div className="w-9 h-9 bg-brand rounded-lg flex items-center justify-center shadow-sm">
-                  <span className="text-white font-bold text-lg tracking-tight">F</span>
+                  <span className="text-white font-bold text-lg tracking-tight">R</span>
                 </div>
-                <span className="text-xl font-bold text-white tracking-tight">FidelityPro</span>
+                <span className="text-xl font-bold text-white tracking-tight">RPM</span>
               </div>
               <p className="text-sm text-gray-400 mb-3 leading-relaxed">A modern investment platform for long‑term growth and capital preservation.</p>
-              <a href="mailto:support@fidelitypro.org" className="inline-flex items-center gap-2 text-sm text-gray-400 hover:text-white transition">
-                <Mail size={14} /><span>support@fidelitypro.org</span>
+              <a href="mailto:support@remaprofitmachine.com" className="inline-flex items-center gap-2 text-sm text-gray-400 hover:text-white transition">
+                <Mail size={14} /><span>support@remaprofitmachine.com</span>
               </a>
               <div className="mt-2 flex items-center gap-2 text-sm text-gray-500">
                 <Phone size={13} /><span>+1 (800) 555‑0199</span>
@@ -691,7 +691,7 @@ export default function Landing() {
             </div>
           </div>
           <div className="border-t border-gray-800/60 mt-10 pt-6 flex flex-col sm:flex-row justify-between items-center gap-3 text-xs text-gray-600">
-            <span>&copy; {new Date().getFullYear()} FidelityPro. All rights reserved.</span>
+            <span>&copy; {new Date().getFullYear()} RPM (Rema Profit Machine). All rights reserved.</span>
             <div className="flex items-center gap-2 text-gray-600">
               <Lock size={11} />
               <span>256-bit SSL Secured</span>

@@ -1,6 +1,6 @@
 export default function FAQ() {
   const faqs = [
-    { q: 'What is FidelityPro?', a: 'FidelityPro is a secure investment platform offering daily returns on your investments with capital protection.' },
+    { q: 'What is RPM?', a: 'RPM is a secure investment platform offering daily returns on your investments with capital protection.' },
     { q: 'How do I start investing?', a: 'Sign up, make a deposit, and choose an investment plan. Your returns will be credited daily.' },
     { q: 'Is my money safe?', a: 'Yes, we use low-risk, audited investment strategies and keep your funds secure.' },
     { q: 'What are the minimum and maximum investments?', a: 'Minimum is $10, and maximum depends on the plan you choose.' },
@@ -12,7 +12,7 @@ export default function FAQ() {
     <div className="min-h-screen bg-gray-50 py-20">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         <h1 className="text-4xl font-bold text-center text-gray-900 mb-6">Frequently Asked Questions</h1>
-        <p className="text-center text-gray-600 mb-12">Find answers to common questions about FidelityPro.</p>
+        <p className="text-center text-gray-600 mb-12">Find answers to common questions about RPM.</p>
         <div className="space-y-4">
           {faqs.map((faq, idx) => (
             <div key={idx} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">

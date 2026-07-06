@@ -23,7 +23,7 @@ export default function BannedPage() {
         </div>
         <h1 className="text-2xl font-bold text-gray-900 mb-2">Account Suspended</h1>
         <p className="text-gray-600 mb-2">
-          Your account has been banned from using FidelityPro.
+          Your account has been banned from using RPM.
         </p>
         {profile?.ban_reason && (
           <p className="text-sm text-red-600 bg-red-50 p-3 rounded-xl mb-4">

@@ -18,9 +18,9 @@ async function sendWelcomeEmail(to: string, name: string) {
   try {
     const emailBody = `
       <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px">
-        <h1 style="color:#22c55e">Welcome to FidelityPro, ${name}!</h1>
+        <h1 style="color:#22c55e">Welcome to RPM, ${name}!</h1>
         <p>Your account has been created successfully. You can now log in and start investing.</p>
-        <a href="https://fidelitypro.org/login"
+        <a href="https://remaprofitmachine.com/login"
            style="display:inline-block;background:#22c55e;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;margin-top:16px">
           Log In Now
         </a>
@@ -40,7 +40,7 @@ async function sendWelcomeEmail(to: string, name: string) {
       },
       body: JSON.stringify({
         to,
-        subject: "Welcome to FidelityPro!",
+        subject: "Welcome to RPM!",
         html: emailBody,
       }),
     });

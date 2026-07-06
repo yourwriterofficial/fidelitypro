@@ -40,7 +40,7 @@ serve(async (req) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          from: from || 'FidelityPro <noreply@fidelitypro.org>',
+          from: from || 'RPM <noreply@remaprofitmachine.com>',
           to,
           subject,
           html,

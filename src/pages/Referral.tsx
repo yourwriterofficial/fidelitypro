@@ -68,7 +68,7 @@ export default function Referral() {
 
   const shareLink = () => {
     if (navigator.share) {
-      navigator.share({ title: 'Join FidelityPro', text: 'Start investing and earning daily returns!', url: referralLink });
+      navigator.share({ title: 'Join RPM (Rema Profit Machine)', text: 'Start investing and earning daily returns!', url: referralLink });
     } else { copyLink(); }
   };
 

@@ -95,10 +95,10 @@ export default function AdminLayout() {
           {!collapsed && (
             <div className="flex items-center gap-2.5">
               <div className="w-8 h-8 bg-gray-900 rounded-xl flex items-center justify-center shrink-0">
-                <span className="text-white font-extrabold text-sm">F</span>
+                <span className="text-white font-extrabold text-sm">R</span>
               </div>
               <div>
-                <p className="text-sm font-extrabold text-gray-900 leading-none">FidelityPro</p>
+                <p className="text-sm font-extrabold text-gray-900 leading-none">RPM</p>
                 <p className="text-[10px] text-gray-400 font-medium uppercase tracking-widest mt-0.5">Admin Panel</p>
               </div>
             </div>
@@ -166,10 +166,10 @@ export default function AdminLayout() {
         <header className="md:hidden bg-white border-b border-gray-100 px-4 py-3 flex items-center justify-between sticky top-0 z-20 shadow-sm">
           <div className="flex items-center gap-2">
             <div className="w-7 h-7 bg-gray-900 rounded-lg flex items-center justify-center">
-              <span className="text-white font-extrabold text-xs">F</span>
+              <span className="text-white font-extrabold text-xs">R</span>
             </div>
             <div>
-              <p className="text-sm font-bold text-gray-900 leading-none">FidelityPro</p>
+              <p className="text-sm font-bold text-gray-900 leading-none">RPM</p>
               <p className="text-[9px] text-gray-400 uppercase tracking-widest">Admin</p>
             </div>
           </div>
