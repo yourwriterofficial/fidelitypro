@@ -3,8 +3,9 @@ import { useAuthStore } from '../store/authStore';
 import {
   LogOut, Home, Wallet, Briefcase, Settings, Shield, Lock, Gift,
   Building, LayoutDashboard, Menu, X, MoreHorizontal, ChevronRight, AlertCircle,
-  ChevronsLeft, ChevronsRight,
+  ChevronsLeft, ChevronsRight, MessageSquare,
 } from 'lucide-react';
+import { supabase } from '../lib/supabaseClient';
 import NotificationBell from './NotificationBell';
 import { useState, useEffect } from 'react';
 import { useAccountRestriction } from '../hooks/useAccountRestriction';
@@ -17,6 +18,7 @@ const navItems = [
   { path: '/app/staking',     icon: Lock,          label: 'Staking'   },
   { path: '/app/properties',  icon: Building,      label: 'Properties'},
   { path: '/app/referral',    icon: Gift,          label: 'Referral'  },
+  { path: '/app/chat',        icon: MessageSquare, label: 'Support Inbox' },
   { path: '/app/settings',    icon: Settings,      label: 'Settings'  },
 ];
 
@@ -31,8 +33,102 @@ export default function Layout() {
     () => typeof localStorage !== 'undefined' && localStorage.getItem('app-sidebar-collapsed') === '1'
   );
   const { restricted, withdrawRestricted, investRestricted, stakeRestricted, propertyRestricted } = useAccountRestriction();
+  const [unreadChatCount, setUnreadChatCount] = useState(0);
 
   const onWallet = location.pathname.startsWith('/app/wallet');
+
+  useEffect(() => {
+    if (!profile?.id) return;
+    
+    const fetchUnreadCount = async () => {
+      let query = supabase
+        .from('messages')
+        .select('*', { count: 'exact', head: true })
+        .neq('sender_id', profile.id)
+        .eq('read', false);
+        
+      if (!profile.is_admin) {
+        query = query.eq('user_id', profile.id);
+      }
+
+      const { count, error } = await query;
+      if (!error && count !== null) {
+        setUnreadChatCount(count);
+      }
+    };
+
+    fetchUnreadCount();
+
+    const channel = supabase
+      .channel('chat_unread_count')
+      .on(
+        'postgres_changes',
+        profile.is_admin
+          ? { event: '*', schema: 'public', table: 'messages' }
+          : { event: '*', schema: 'public', table: 'messages', filter: `user_id=eq.${profile.id}` },
+        () => {
+          fetchUnreadCount();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [profile?.id, profile?.is_admin]);
+
+  // Real-time Presence, Page Route Logging and Last Seen updates
+  useEffect(() => {
+    if (!profile?.id) return;
+
+    // 1. Log page visit to user_page_visits table
+    const logPageVisit = async () => {
+      await supabase.from('user_page_visits').insert({
+        user_id: profile.id,
+        path: location.pathname
+      });
+    };
+    logPageVisit();
+
+    // 2. Track presence
+    const presenceChannel = supabase.channel('online_users', {
+      config: {
+        presence: {
+          key: profile.id,
+        },
+      },
+    });
+
+    presenceChannel.subscribe(async (status) => {
+      if (status === 'SUBSCRIBED') {
+        await presenceChannel.track({
+          user_id: profile.id,
+          name: profile.name || 'User',
+          email: profile.email,
+          current_page: location.pathname,
+          last_active: new Date().toISOString()
+        });
+      }
+    });
+
+    // 3. Throttle last_seen updates in profiles table (max once per 5 seconds)
+    const updateLastSeen = async () => {
+      const now = new Date().toISOString();
+      const lastUpdate = localStorage.getItem('last_seen_updated');
+      if (!lastUpdate || (new Date(now).getTime() - new Date(lastUpdate).getTime() > 5000)) {
+        await supabase
+          .from('profiles')
+          .update({ last_seen: now })
+          .eq('id', profile.id);
+        localStorage.setItem('last_seen_updated', now);
+      }
+    };
+    updateLastSeen();
+
+    return () => {
+      supabase.removeChannel(presenceChannel);
+    };
+  }, [location.pathname, profile?.id]);
 
   useEffect(() => {
     localStorage.setItem('app-sidebar-collapsed', collapsed ? '1' : '0');
@@ -110,12 +206,20 @@ export default function Layout() {
             const active = isActive(path);
             return (
               <Link key={path} to={path} title={collapsed ? label : undefined}
-                className={`group flex items-center gap-3 rounded-xl text-sm font-medium transition-all duration-150 ${collapsed ? 'justify-center py-2.5' : 'px-3.5 py-2.5'} ${
+                className={`group relative flex items-center gap-3 rounded-xl text-sm font-medium transition-all duration-150 ${collapsed ? 'justify-center py-2.5' : 'px-3.5 py-2.5'} ${
                   active ? 'bg-brand text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
                 }`}>
                 <Icon size={17} className={active ? 'text-white' : 'text-gray-400 group-hover:text-gray-600'} />
                 {!collapsed && label}
-                {!collapsed && active && <ChevronRight size={13} className="ml-auto opacity-70" />}
+                {!collapsed && label === 'Support Inbox' && unreadChatCount > 0 && (
+                  <span className="ml-auto w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center text-[10px] font-bold shadow-sm animate-pulse">
+                    {unreadChatCount}
+                  </span>
+                )}
+                {collapsed && label === 'Support Inbox' && unreadChatCount > 0 && (
+                  <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-red-500 rounded-full border border-white shadow-sm" />
+                )}
+                {!collapsed && active && label !== 'Support Inbox' && <ChevronRight size={13} className="ml-auto opacity-70" />}
               </Link>
             );
           })}
@@ -238,6 +342,11 @@ export default function Layout() {
                       active ? 'bg-brand text-white' : 'text-gray-600 hover:bg-gray-100'
                     }`}>
                     <Icon size={16} /> {label}
+                    {label === 'Support Inbox' && unreadChatCount > 0 && (
+                      <span className="absolute top-0.5 right-0.5 min-w-4 h-4 px-1 bg-red-500 text-white rounded-full flex items-center justify-center text-[9px] font-extrabold border border-white shadow-sm">
+                        {unreadChatCount}
+                      </span>
+                    )}
                   </Link>
                 );
               })}

@@ -55,13 +55,26 @@ export default function AdminWithdrawals() {
     });
   };
 
+  const [processingId, setProcessingId] = useState<string | null>(null);
+
   const updateWithdrawalStatus = async (withdrawalId: string, newStatus: string) => {
+    if (processingId) return;
+    setProcessingId(withdrawalId);
     try {
-      const { error } = await supabase
+      // Concurrency check: only update if status is 'pending'
+      const { data, error } = await supabase
         .from('withdrawals')
         .update({ status: newStatus, updated_at: new Date().toISOString() })
-        .eq('id', withdrawalId);
+        .eq('id', withdrawalId)
+        .eq('status', 'pending')
+        .select();
+
       if (error) throw error;
+      if (!data || data.length === 0) {
+        toast.error('This withdrawal request has already been processed.');
+        fetchWithdrawals();
+        return;
+      }
 
       const withdrawal = withdrawals.find(w => w.id === withdrawalId);
 
@@ -89,6 +102,8 @@ export default function AdminWithdrawals() {
       fetchWithdrawals();
     } catch (err: any) {
       toast.error(err.message);
+    } finally {
+      setProcessingId(null);
     }
   };
 
@@ -152,13 +167,15 @@ export default function AdminWithdrawals() {
                       <>
                         <button
                           onClick={() => updateWithdrawalStatus(w.id, 'approved')}
-                          className="text-green-600 hover:text-green-800"
+                          className="text-green-600 hover:text-green-800 disabled:opacity-40"
+                          disabled={processingId === w.id}
                         >
                           <CheckCircle size={20} />
                         </button>
                         <button
                           onClick={() => updateWithdrawalStatus(w.id, 'rejected')}
-                          className="text-red-600 hover:text-red-800"
+                          className="text-red-600 hover:text-red-800 disabled:opacity-40"
+                          disabled={processingId === w.id}
                         >
                           <XCircle size={20} />
                         </button>

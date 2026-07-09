@@ -1,11 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { useAuthStore } from '../../store/authStore';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { 
-  Ban, UserCheck, Eye, Edit, Plus, Minus, Save, X, Mail, Lock, Key
+  Ban, UserCheck, Eye, Edit, Plus, Minus, Save, X, Mail, Lock, Key, Check, CheckCheck, Trash2
 } from 'lucide-react';
+import { sendEmailAndLog } from '../../lib/notify';
 
 interface User {
   id: string;
@@ -22,6 +23,7 @@ interface User {
   restriction_reason: string;
   fee_required: number;
   created_at: string;
+  last_seen?: string;
 }
 
 interface Investment {
@@ -51,14 +53,30 @@ interface PropertyInvestment {
   amount_paid: number;
   remaining_balance: number;
   status: string;
+  term_months?: number;
+  monthly_payment?: number;
+  property?: {
+    title: string;
+    price: number;
+  };
 }
 
 export default function AdminUsers() {
+  const { user } = useAuthStore();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
+  const [onlineUserIds, setOnlineUserIds] = useState<string[]>([]);
+  const [pageVisitsToday, setPageVisitsToday] = useState<any[]>([]);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('profile');
+
+  // Real-time Chat Tab inside User Modal
+  const [chatMessages, setChatMessages] = useState<any[]>([]);
+  const [chatText, setChatText] = useState('');
+  const [sendingChat, setSendingChat] = useState(false);
+  const chatEndRef = useRef<HTMLDivElement>(null);
+  const chatChannelRef = useRef<any>(null);
   const [editData, setEditData] = useState<Partial<User>>({});
   const [topupAmount, setTopupAmount] = useState('');
   const [deductAmount, setDeductAmount] = useState('');
@@ -83,9 +101,93 @@ export default function AdminUsers() {
   const [newUserBalance, setNewUserBalance] = useState('');
   const [creatingUser, setCreatingUser] = useState(false);
 
+  const formatLastSeen = (dateStr?: string) => {
+    if (!dateStr) return 'Never active';
+    const date = new Date(dateStr);
+    const diffMs = new Date().getTime() - date.getTime();
+    if (diffMs <= 0) return 'Just now';
+    
+    let seconds = Math.floor(diffMs / 1000);
+    let minutes = Math.floor(seconds / 60);
+    let hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+    
+    seconds = seconds % 60;
+    minutes = minutes % 60;
+    hours = hours % 24;
+    
+    const parts = [];
+    if (days > 0) parts.push(`${days} day${days > 1 ? 's' : ''}`);
+    if (hours > 0) parts.push(`${hours} hour${hours > 1 ? 's' : ''}`);
+    if (minutes > 0) parts.push(`${minutes} minute${minutes > 1 ? 's' : ''}`);
+    if (seconds > 0 || parts.length === 0) parts.push(`${seconds} second${seconds > 1 ? 's' : ''}`);
+    
+    return parts.join(', ') + ' ago';
+  };
+
+  const fetchPageVisitsToday = async () => {
+    try {
+      const today = new Date();
+      today.setHours(0,0,0,0);
+      
+      const { data, error } = await supabase
+        .from('user_page_visits')
+        .select('path')
+        .gte('created_at', today.toISOString());
+         
+      if (error) throw error;
+      
+      const counts: Record<string, number> = {};
+      (data || []).forEach(v => {
+        counts[v.path] = (counts[v.path] || 0) + 1;
+      });
+      
+      const sorted = Object.entries(counts)
+        .map(([path, count]) => ({ path, count }))
+        .sort((a, b) => b.count - a.count);
+         
+      setPageVisitsToday(sorted);
+    } catch (err) {
+      console.error('Error fetching page visits:', err);
+    }
+  };
+
   useEffect(() => {
     fetchUsers();
     fetchTemplates();
+    fetchPageVisitsToday();
+
+    // 1. Subscribe to presence tracking channel
+    const presenceChannel = supabase.channel('online_users');
+    presenceChannel
+      .on('presence', { event: 'sync' }, () => {
+        const state = presenceChannel.presenceState();
+        setOnlineUserIds(Object.keys(state));
+      })
+      .subscribe();
+
+    // 2. Subscribe to page visit updates
+    const visitsChannel = supabase
+      .channel('realtime_page_visits')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'user_page_visits' }, () => {
+        fetchPageVisitsToday();
+      })
+      .subscribe();
+
+    // 3. Subscribe to profiles changes to track last_seen updates instantly
+    const profilesChannel = supabase
+      .channel('profiles_realtime_sync')
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles' }, (payload) => {
+        const updated = payload.new as User;
+        setUsers(prev => prev.map(u => u.id === updated.id ? { ...u, ...updated } : u));
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(presenceChannel);
+      supabase.removeChannel(visitsChannel);
+      supabase.removeChannel(profilesChannel);
+    };
   }, []);
 
   const fetchTemplates = async () => {
@@ -238,7 +340,7 @@ export default function AdminUsers() {
 
       const { data: propData } = await supabase
         .from('property_investments')
-        .select('*, property:property_id(title)')
+        .select('*, property:property_id(title, price)')
         .eq('user_id', userId)
         .order('created_at', { ascending: false });
       setPropertyInvestments(propData || []);
@@ -248,6 +350,194 @@ export default function AdminUsers() {
       setLoadingDetails(false);
     }
   };
+
+  const fetchChatMessages = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('messages')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+      setChatMessages(data || []);
+      
+      // Mark read
+      await supabase
+        .from('messages')
+        .update({ read: true })
+        .eq('user_id', userId)
+        .eq('sender_id', userId)
+        .eq('read', false);
+        
+      setTimeout(() => {
+        chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }, 100);
+    } catch (err) {
+      console.error('Error loading user chat:', err);
+    }
+  };
+
+  const handleDeleteMessage = async (messageId: string) => {
+    if (!confirm('Are you sure you want to permanently delete this message?')) return;
+    try {
+      const { error } = await supabase
+        .from('messages')
+        .delete()
+        .eq('id', messageId);
+      if (error) throw error;
+      toast.success('Message deleted');
+      setChatMessages(prev => prev.filter(m => m.id !== messageId));
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to delete message');
+    }
+  };
+
+  const sendModalChat = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedUser?.id || !chatText.trim() || !user?.id || sendingChat) return;
+    setSendingChat(true);
+    const textToSend = chatText.trim();
+    try {
+      const { data: newMsg, error } = await supabase
+        .from('messages')
+        .insert({
+          user_id: selectedUser.id,
+          sender_id: user.id,
+          body: textToSend,
+          read: false
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      setChatText('');
+      setChatMessages(prev => [...prev, newMsg]);
+      
+      setTimeout(() => {
+        chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }, 100);
+
+      // Trigger push notification to user
+      try {
+        await supabase.functions.invoke('send-push', {
+          body: {
+            user_ids: [selectedUser.id],
+            title: 'RPM Support Center',
+            body: textToSend,
+            url: '/app/chat',
+            tag: `chat-reply`,
+            notification_type: 'info'
+          }
+        });
+      } catch (pushErr) {
+        console.warn('Push notify to user failed:', pushErr);
+      }
+
+      // Insert in-app notification for user
+      try {
+        await supabase.from('notifications').insert({
+          user_id: selectedUser.id,
+          title: 'New Support Message',
+          message: `Support: "${textToSend.substring(0, 40)}${textToSend.length > 40 ? '...' : ''}"`,
+          type: 'info',
+          link: '/app/chat',
+          read: false
+        });
+      } catch (notifErr) {
+        console.warn('Failed to insert user notification:', notifErr);
+      }
+
+      // Send email alert to user
+      if (selectedUser.email) {
+        try {
+          await supabase.functions.invoke('send-email', {
+            body: {
+              to: selectedUser.email,
+              subject: 'New message from RPM Support',
+              html: `
+                <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #f0f0f0; border-radius: 8px;">
+                  <h2 style="color: #0f172a;">New Message from RPM Support</h2>
+                  <p>Our support team has sent you a new reply:</p>
+                  <blockquote style="background: #f8fafc; border-left: 4px solid #0f172a; padding: 12px; margin: 16px 0; font-style: italic;">
+                    "${textToSend}"
+                  </blockquote>
+                  <p style="margin-top: 24px;">
+                    <a href="${window.location.origin}/app/chat" 
+                       style="background: #0f172a; color: #ffffff; padding: 10px 16px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
+                       Open Support Chat
+                    </a>
+                  </p>
+                </div>
+              `
+            }
+          });
+        } catch (emailErr) {
+          console.warn('Email notify to user failed:', emailErr);
+        }
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to send message');
+    } finally {
+      setSendingChat(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'chat' && selectedUser?.id) {
+      fetchChatMessages(selectedUser.id);
+
+      if (chatChannelRef.current) {
+        supabase.removeChannel(chatChannelRef.current);
+      }
+
+      chatChannelRef.current = supabase
+        .channel(`admin_user_modal_chat:${selectedUser.id}`)
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'messages', filter: `user_id=eq.${selectedUser.id}` },
+          (payload) => {
+            if (payload.eventType === 'INSERT') {
+              const newMsg = payload.new;
+              setChatMessages(prev => {
+                if (prev.some(m => m.id === newMsg.id)) return prev;
+                return [...prev, newMsg];
+              });
+              
+              setTimeout(() => {
+                chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+              }, 100);
+
+              // Mark read if it came from the user
+              if (newMsg.sender_id === selectedUser.id) {
+                supabase
+                  .from('messages')
+                  .update({ read: true })
+                  .eq('user_id', selectedUser.id)
+                  .eq('sender_id', selectedUser.id)
+                  .eq('read', false)
+                  .then();
+              }
+            } else if (payload.eventType === 'UPDATE') {
+              const updatedMsg = payload.new;
+              setChatMessages(prev => prev.map(m => m.id === updatedMsg.id ? updatedMsg : m));
+            }
+          }
+        )
+        .subscribe();
+    } else {
+      if (chatChannelRef.current) {
+        supabase.removeChannel(chatChannelRef.current);
+        chatChannelRef.current = null;
+      }
+    }
+
+    return () => {
+      if (chatChannelRef.current) {
+        supabase.removeChannel(chatChannelRef.current);
+      }
+    };
+  }, [activeTab, selectedUser?.id]);
 
   const saveProfile = async () => {
     if (!selectedUser) return;
@@ -356,13 +646,11 @@ export default function AdminUsers() {
     }
     setSendingEmail(true);
     try {
-      const { error } = await supabase.functions.invoke('send-email', {
-        body: {
-          to: selectedUser.email,
-          subject: emailSubject,
-          html: `<p>${emailMessage.replace(/\n/g, '<br>')}</p>`,
-        },
-      });
+      const { error } = await sendEmailAndLog(
+        selectedUser.email,
+        emailSubject,
+        `<p>${emailMessage.replace(/\n/g, '<br>')}</p>`
+      );
       if (error) throw error;
       toast.success('Email sent');
       setEmailSubject('');
@@ -453,6 +741,70 @@ export default function AdminUsers() {
     }
   };
 
+  const [editingInvestment, setEditingInvestment] = useState<any>(null);
+  const [editInvestmentForm, setEditInvestmentForm] = useState({
+    price: '',
+    amount_paid: '',
+    term_months: '24',
+    remaining_balance: '',
+    monthly_payment: '',
+    status: '',
+  });
+
+  const openEditInvestment = (p: any) => {
+    setEditingInvestment(p);
+    setEditInvestmentForm({
+      price: (p.property?.price || p.price || 0).toString(),
+      amount_paid: p.amount_paid?.toString() || '0',
+      term_months: (p.term_months || 24).toString(),
+      remaining_balance: p.remaining_balance?.toString() || '0',
+      monthly_payment: p.monthly_payment?.toString() || '0',
+      status: p.status || 'pending',
+    });
+  };
+
+  const handleEditInvestmentFormChange = (field: string, value: string) => {
+    setEditInvestmentForm(prev => {
+      const updated = { ...prev, [field]: value };
+      const priceVal = parseFloat(updated.price) || 0;
+      const paidVal = parseFloat(updated.amount_paid) || 0;
+      const termVal = parseInt(updated.term_months) || 12;
+
+      const remainingVal = Math.max(0, priceVal - paidVal);
+      const monthlyVal = termVal > 0 ? parseFloat((remainingVal / termVal).toFixed(2)) : 0;
+
+      updated.remaining_balance = remainingVal.toString();
+      updated.monthly_payment = monthlyVal.toString();
+      return updated;
+    });
+  };
+
+  const handleSaveInvestment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingInvestment) return;
+    try {
+      const remaining = parseFloat(editInvestmentForm.remaining_balance) || 0;
+      const monthly = parseFloat(editInvestmentForm.monthly_payment) || 0;
+      const { error } = await supabase
+        .from('property_investments')
+        .update({
+          amount_paid: parseFloat(editInvestmentForm.amount_paid) || 0,
+          remaining_balance: remaining,
+          term_months: parseInt(editInvestmentForm.term_months) || 24,
+          monthly_payment: monthly,
+          status: editInvestmentForm.status,
+        })
+        .eq('id', editingInvestment.id);
+
+      if (error) throw error;
+      toast.success('Investment updated successfully!');
+      setEditingInvestment(null);
+      if (selectedUser) await fetchUserDetails(selectedUser.id);
+    } catch (err: any) {
+      toast.error(err.message);
+    }
+  };
+
   const impersonateUser = (user: User) => {
     const { impersonateUser } = useAuthStore.getState();
     const profile = {
@@ -509,6 +861,88 @@ export default function AdminUsers() {
           <Plus size={20} /> Create User
         </button>
       </div>
+
+      {/* Live Tracking & Route Frequency Analytics Hub */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 bg-slate-900 text-white p-6 rounded-3xl shadow-xl border border-slate-800">
+        
+        {/* Real-time Online Users Panel */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+            <h3 className="text-sm font-bold flex items-center gap-2 text-white">
+              <span className="w-2 h-2 bg-emerald-550 rounded-full animate-ping shrink-0" />
+              Live Online Users ({onlineUserIds.length})
+            </h3>
+            <span className="text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">Real-time Presence</span>
+          </div>
+          
+          <div className="space-y-3 max-h-[220px] overflow-y-auto overscroll-contain pr-1">
+            {onlineUserIds.length === 0 ? (
+              <p className="text-slate-500 text-xs py-8 text-center font-medium">No users currently active online.</p>
+            ) : (
+              onlineUserIds.map(userId => {
+                const matchedUser = users.find(u => u.id === userId);
+                const name = matchedUser?.name || 'Active User';
+                const email = matchedUser?.email || 'Monitoring page...';
+                return (
+                  <div key={userId} className="flex items-center justify-between bg-slate-850/50 hover:bg-slate-850 p-3 rounded-2xl border border-slate-800/60 transition">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="w-7 h-7 rounded-lg bg-slate-800 text-white font-bold flex items-center justify-center text-xs shrink-0">
+                        {name.charAt(0).toUpperCase()}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold truncate text-white">{name}</p>
+                        <p className="text-[10px] text-slate-450 truncate">{email}</p>
+                      </div>
+                    </div>
+                    {matchedUser && (
+                      <span className="px-2.5 py-1 bg-slate-800 border border-slate-700 text-brand text-[10px] font-bold rounded-lg truncate max-w-[130px]">
+                        Active
+                      </span>
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+
+        {/* Visited Page Route Pulse Frequency */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+            <h3 className="text-sm font-bold flex items-center gap-2 text-white">
+              Daily Route Frequency Pulse
+            </h3>
+            <span className="text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">Analytics</span>
+          </div>
+
+          <div className="space-y-3.5 max-h-[220px] overflow-y-auto overscroll-contain pr-1">
+            {pageVisitsToday.length === 0 ? (
+              <p className="text-slate-500 text-xs py-8 text-center font-medium">No page visits recorded today yet.</p>
+            ) : (
+              pageVisitsToday.map((item, idx) => {
+                const maxCount = pageVisitsToday[0]?.count || 1;
+                const percentage = Math.round((item.count / maxCount) * 100);
+                return (
+                  <div key={item.path || idx} className="space-y-1.5">
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="font-semibold text-slate-350 truncate max-w-[70%] select-all">{item.path}</span>
+                      <span className="text-[10px] text-slate-450 font-bold tabular-nums bg-slate-800 px-1.5 py-0.5 rounded-md">{item.count} hits</span>
+                    </div>
+                    <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                      <div 
+                        className="bg-brand h-full rounded-full transition-all duration-500" 
+                        style={{ width: `${percentage}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+
+      </div>
+
       <div className="bg-white rounded-2xl shadow-sm border overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -518,6 +952,7 @@ export default function AdminUsers() {
                 <th className="text-left p-4">Email</th>
                 <th className="text-left p-4">Balance</th>
                 <th className="text-left p-4">Admin</th>
+                <th className="text-left p-4">Last Active</th>
                 <th className="text-left p-4">Status</th>
                 <th className="text-left p-4">Actions</th>
               </tr>
@@ -529,6 +964,16 @@ export default function AdminUsers() {
                   <td className="p-4">{u.email}</td>
                   <td className="p-4">{formatCurrency(u.wallet_balance)}</td>
                   <td className="p-4">{u.is_admin ? 'Yes' : 'No'}</td>
+                  <td className="p-4 whitespace-nowrap">
+                    {onlineUserIds.includes(u.id) ? (
+                      <span className="text-emerald-500 font-bold flex items-center gap-1.5 text-xs">
+                        <span className="w-2 h-2 bg-emerald-500 rounded-full animate-ping shrink-0" />
+                        Online
+                      </span>
+                    ) : (
+                      <span className="text-gray-400 font-semibold text-xs">{formatLastSeen(u.last_seen)}</span>
+                    )}
+                  </td>
                   <td className="p-4">
                     {u.banned ? (
                       <span className="text-red-600 text-xs font-medium">Banned</span>
@@ -570,7 +1015,7 @@ export default function AdminUsers() {
 
             {/* Tabs */}
             <div className="flex border-b border-gray-200 mb-4 overflow-x-auto">
-              {['profile', 'restrictions', 'wallet', 'investments', 'staking', 'properties', 'actions'].map((tab) => (
+              {['profile', 'restrictions', 'wallet', 'investments', 'staking', 'properties', 'chat', 'actions'].map((tab) => (
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
@@ -867,6 +1312,8 @@ export default function AdminUsers() {
                         <th className="p-2 text-left">Property</th>
                         <th className="p-2 text-left">Paid</th>
                         <th className="p-2 text-left">Remaining</th>
+                        <th className="p-2 text-left">Term</th>
+                        <th className="p-2 text-left">Installment</th>
                         <th className="p-2 text-left">Status</th>
                         <th className="p-2 text-left">Action</th>
                       </tr></thead>
@@ -876,20 +1323,30 @@ export default function AdminUsers() {
                             <td className="p-2">{(p as any).property?.title || 'N/A'}</td>
                             <td className="p-2">{formatCurrency(p.amount_paid)}</td>
                             <td className="p-2">{formatCurrency(p.remaining_balance)}</td>
+                            <td className="p-2">{p.term_months ? `${p.term_months}m` : '12m'}</td>
+                            <td className="p-2">{formatCurrency(p.monthly_payment || 0)}/m</td>
                             <td className="p-2">
                               <span className={`px-2 py-1 rounded-full text-xs ${p.status === 'active' ? 'bg-green-100 text-green-700' : p.status === 'pending' ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-700'}`}>{p.status}</span>
                             </td>
                             <td className="p-2">
-                              <select
-                                value={p.status}
-                                onChange={(e) => updatePropertyStatus(p.id, e.target.value)}
-                                className="border rounded px-2 py-1 text-xs"
-                              >
-                                <option value="pending">Pending</option>
-                                <option value="active">Active</option>
-                                <option value="completed">Completed</option>
-                                <option value="defaulted">Defaulted</option>
-                              </select>
+                              <div className="flex items-center gap-2">
+                                <select
+                                  value={p.status}
+                                  onChange={(e) => updatePropertyStatus(p.id, e.target.value)}
+                                  className="border rounded px-2 py-1 text-xs"
+                                >
+                                  <option value="pending">Pending</option>
+                                  <option value="active">Active</option>
+                                  <option value="completed">Completed</option>
+                                  <option value="defaulted">Defaulted</option>
+                                </select>
+                                <button
+                                  onClick={() => openEditInvestment(p)}
+                                  className="text-brand hover:text-brand-dark font-medium text-xs px-2 py-1 bg-brand/5 border border-brand/10 rounded transition"
+                                >
+                                  Edit Details
+                                </button>
+                              </div>
                             </td>
                           </tr>
                         ))}
@@ -897,6 +1354,87 @@ export default function AdminUsers() {
                     </table>
                   </div>
                 )}
+              </div>
+            )}
+
+            {activeTab === 'chat' && (
+              <div className="flex flex-col h-[400px] bg-gray-50 border border-gray-150 rounded-2xl overflow-hidden mb-6">
+                {/* Message display area */}
+                <div className="flex-1 overflow-y-auto overscroll-contain p-4 space-y-3.5">
+                  {chatMessages.length === 0 ? (
+                    <div className="text-center py-12 text-gray-400">
+                      <p className="text-sm font-semibold">No message history with this user</p>
+                      <p className="text-xs text-gray-300 mt-1">Send a message below to start a live support chat.</p>
+                    </div>
+                  ) : (
+                    chatMessages.map((msg, index) => {
+                      const isMe = msg.sender_id === user?.id;
+                      return (
+                        <div key={msg.id || index} className={`flex ${isMe ? 'justify-end' : 'justify-start'} group relative mb-2`}>
+                          {!isMe && (
+                            <button
+                              onClick={() => handleDeleteMessage(msg.id)}
+                              className="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-red-500 rounded-lg hover:bg-gray-100 transition mr-1.5 self-center shrink-0"
+                              title="Delete message"
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          )}
+                          <div className={`max-w-[80%] rounded-xl px-3 py-2 text-sm shadow-sm relative ${
+                            isMe 
+                              ? 'bg-gray-900 text-white rounded-tr-none' 
+                              : 'bg-white text-gray-800 rounded-tl-none border border-gray-100'
+                          }`}>
+                            <p className="leading-relaxed break-words">{msg.body}</p>
+                            <div className="flex items-center justify-end gap-1.5 mt-1 text-[9px] font-medium opacity-60">
+                              <span>
+                                {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                              {isMe && (
+                                <span title={msg.read ? "Read by user" : "Sent"}>
+                                  {msg.read ? (
+                                    <CheckCheck size={11} className="text-emerald-300 inline" />
+                                  ) : (
+                                    <Check size={11} className="text-white/60 inline" />
+                                  )}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          {isMe && (
+                            <button
+                              onClick={() => handleDeleteMessage(msg.id)}
+                              className="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-red-500 rounded-lg hover:bg-gray-100 transition ml-1.5 self-center shrink-0"
+                              title="Delete message"
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })
+                  )}
+                  <div ref={chatEndRef} />
+                </div>
+
+                {/* Input form */}
+                <form onSubmit={sendModalChat} className="p-3 bg-white border-t border-gray-200 flex gap-2">
+                  <input
+                    type="text"
+                    value={chatText}
+                    onChange={e => setChatText(e.target.value)}
+                    placeholder="Type support reply..."
+                    className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none"
+                    disabled={sendingChat}
+                  />
+                  <button
+                    type="submit"
+                    disabled={!chatText.trim() || sendingChat}
+                    className="bg-gray-900 hover:bg-gray-800 disabled:bg-gray-200 text-white rounded-xl px-4 py-2 text-xs transition flex items-center justify-center font-bold disabled:text-gray-400"
+                  >
+                    Send
+                  </button>
+                </form>
               </div>
             )}
 
@@ -1065,6 +1603,96 @@ export default function AdminUsers() {
                 <button
                   type="button"
                   onClick={() => setNewUserModalOpen(false)}
+                  className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-3 rounded-xl transition text-sm"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {/* Edit Property Investment Modal */}
+      {editingInvestment && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full shadow-2xl overflow-hidden">
+            <div className="flex justify-between items-center p-6 border-b border-gray-100">
+              <div>
+                <h2 className="text-xl font-bold text-gray-900">Edit Property Investment</h2>
+                <p className="text-xs text-gray-400 mt-0.5">{(editingInvestment as any).property?.title || 'N/A'}</p>
+              </div>
+              <button onClick={() => setEditingInvestment(null)} className="p-2 hover:bg-gray-100 rounded-xl transition">
+                <X size={18} className="text-gray-400" />
+              </button>
+            </div>
+            <form onSubmit={handleSaveInvestment} className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700">Property Price (Main Amount)</label>
+                <input
+                  type="number"
+                  value={editInvestmentForm.price}
+                  onChange={(e) => handleEditInvestmentFormChange('price', e.target.value)}
+                  className="w-full border rounded-xl px-4 py-2.5 mt-1 focus:ring-2 focus:ring-brand text-sm"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700">Amount Paid (Amount to be Paid)</label>
+                <input
+                  type="number"
+                  value={editInvestmentForm.amount_paid}
+                  onChange={(e) => handleEditInvestmentFormChange('amount_paid', e.target.value)}
+                  className="w-full border rounded-xl px-4 py-2.5 mt-1 focus:ring-2 focus:ring-brand text-sm"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700">Term (months)</label>
+                <select
+                  value={editInvestmentForm.term_months}
+                  onChange={(e) => handleEditInvestmentFormChange('term_months', e.target.value)}
+                  className="w-full border rounded-xl px-4 py-2.5 mt-1 focus:ring-2 focus:ring-brand text-sm"
+                >
+                  <option value="24">2 Years (24 months)</option>
+                  <option value="36">3 Years (36 months)</option>
+                  <option value="48">4 Years (48 months)</option>
+                  <option value="60">5 Years (60 months)</option>
+                  <option value="72">6 Years (72 months)</option>
+                </select>
+              </div>
+              <div className="bg-gray-50 p-4 rounded-xl space-y-2 border">
+                <div className="flex justify-between text-xs">
+                  <span className="text-gray-500">Remaining Balance:</span>
+                  <span className="font-semibold text-gray-800">${parseFloat(editInvestmentForm.remaining_balance).toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-gray-500">Calculated Installment:</span>
+                  <span className="font-semibold text-gray-800">${parseFloat(editInvestmentForm.monthly_payment).toLocaleString()} / month</span>
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700">Status</label>
+                <select
+                  value={editInvestmentForm.status}
+                  onChange={(e) => setEditInvestmentForm({ ...editInvestmentForm, status: e.target.value })}
+                  className="w-full border rounded-xl px-4 py-2.5 mt-1 focus:ring-2 focus:ring-brand text-sm"
+                >
+                  <option value="pending">Pending</option>
+                  <option value="active">Active</option>
+                  <option value="completed">Completed</option>
+                  <option value="defaulted">Defaulted</option>
+                </select>
+              </div>
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="submit"
+                  className="flex-1 bg-brand hover:bg-brand-dark text-white font-semibold py-3 rounded-xl transition text-sm"
+                >
+                  Save Changes
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditingInvestment(null)}
                   className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-3 rounded-xl transition text-sm"
                 >
                   Cancel

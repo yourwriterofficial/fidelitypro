@@ -35,6 +35,9 @@ export default function AdminSettings() {
   const [emailNotif, setEmailNotif] = useState({ deposit: true, withdrawal: true, payout: true, promo: true, low_balance: true });
   const [pushNotif, setPushNotif] = useState({ deposit: true, withdrawal: true, payout: true, promo: true, low_balance: true });
 
+  // Property scroll speed
+  const [scrollSpeed, setScrollSpeed] = useState('3');
+
   useEffect(() => {
     fetchSettings();
   }, []);
@@ -62,6 +65,7 @@ export default function AdminSettings() {
         if (s.key === 'push_notifications') {
           try { setPushNotif(JSON.parse(s.value)); } catch (err) { console.warn('Failed parsing push notif settings', err); }
         }
+        if (s.key === 'property_scroll_speed') setScrollSpeed(s.value);
       });
     }
     setLoading(false);
@@ -81,6 +85,7 @@ export default function AdminSettings() {
         { key: 'inactivity_restriction_type', value: inactivityRestrictionType },
         { key: 'email_notifications', value: JSON.stringify(emailNotif) },
         { key: 'push_notifications', value: JSON.stringify(pushNotif) },
+        { key: 'property_scroll_speed', value: scrollSpeed },
       ];
       for (const u of updates) {
         const { error } = await supabase
@@ -186,6 +191,26 @@ export default function AdminSettings() {
                 <option value="suspend_all">Suspend All Actions (Withdrawals, Investing, Staking, Properties)</option>
               </select>
               <p className="text-xs text-gray-400 mt-1 font-medium text-amber-700">Decide which operations are blocked when a user exceeds the inactivity period.</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Property Gallery Auto-Scroll */}
+        <div className="bg-white rounded-2xl shadow-sm border p-6">
+          <h2 className="text-xl font-semibold flex items-center gap-2"><SettingsIcon size={20} className="text-brand" /> Property Gallery Auto-Scroll</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Auto-Scroll Interval (Seconds)</label>
+              <input
+                type="number"
+                min="1"
+                max="20"
+                value={scrollSpeed}
+                onChange={(e) => setScrollSpeed(e.target.value)}
+                className="w-full border rounded-xl px-4 py-2 mt-1 focus:ring-2 focus:ring-brand"
+                required
+              />
+              <p className="text-xs text-gray-400 mt-1">Number of seconds each property listing image remains visible before sliding.</p>
             </div>
           </div>
         </div>

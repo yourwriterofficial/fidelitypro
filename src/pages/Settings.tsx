@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuthStore } from '../store/authStore';
 import { supabase } from '../lib/supabaseClient';
 import { toast } from 'sonner';
@@ -13,6 +13,77 @@ export default function Settings() {
   const [showNew, setShowNew] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [passwordSaved, setPasswordSaved] = useState(false);
+
+  // Notification Preferences State
+  const [preferences, setPreferences] = useState({
+    email_info: true,
+    email_warning: true,
+    email_success: true,
+    email_alert: true,
+    push_info: true,
+    push_warning: true,
+    push_success: true,
+    push_alert: true
+  });
+
+  const fetchPreferences = async () => {
+    if (!profile?.id) return;
+    try {
+      const { data, error } = await supabase
+        .from('notification_preferences')
+        .select('*')
+        .eq('user_id', profile.id)
+        .single();
+        
+      if (error) {
+        if (error.code === 'PGRST116') {
+          // Record not found, insert default rows
+          const defaults = {
+            user_id: profile.id,
+            email_info: true,
+            email_warning: true,
+            email_success: true,
+            email_alert: true,
+            push_info: true,
+            push_warning: true,
+            push_success: true,
+            push_alert: true
+          };
+          await supabase.from('notification_preferences').insert(defaults);
+          setPreferences(defaults);
+        } else {
+          throw error;
+        }
+      } else if (data) {
+        setPreferences(data);
+      }
+    } catch (err) {
+      console.error('Error fetching notification preferences:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchPreferences();
+  }, [profile?.id]);
+
+  const handleTogglePreference = async (key: keyof typeof preferences) => {
+    if (!profile?.id) return;
+    const newVal = !preferences[key];
+    setPreferences(prev => ({ ...prev, [key]: newVal }));
+    
+    try {
+      const { error } = await supabase
+        .from('notification_preferences')
+        .update({ [key]: newVal })
+        .eq('user_id', profile.id);
+        
+      if (error) throw error;
+      toast.success('Notification preferences updated');
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to update preferences');
+      setPreferences(prev => ({ ...prev, [key]: !newVal })); // Revert on error
+    }
+  };
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -134,6 +205,75 @@ export default function Settings() {
             </button>
           </div>
         </form>
+      </div>
+
+      {/* Notification Settings Panel */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        <div className="flex items-center gap-3 px-6 py-4 border-b border-gray-100 bg-gray-50/50">
+          <div className="p-2 bg-indigo-50 rounded-xl"><Bell size={17} className="text-indigo-600" /></div>
+          <div>
+            <h2 className="font-semibold text-gray-900 text-sm">Notification Preferences</h2>
+            <p className="text-xs text-gray-400">Choose which emails and push alerts you receive</p>
+          </div>
+        </div>
+
+        <div className="p-6 space-y-6">
+          {/* Email Preferences Section */}
+          <div className="space-y-4">
+            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Email Notifications</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {[
+                { key: 'email_info', label: 'Support & Announcements', desc: 'Updates about your chat inquiries and platform news.' },
+                { key: 'email_success', label: 'Successful Operations', desc: 'Confirmations of deposits, investments, and payouts.' },
+                { key: 'email_warning', label: 'Account Safeguards', desc: 'Alerts when changes are made to your login credentials.' },
+                { key: 'email_alert', label: 'Critical Account Events', desc: 'Essential updates regarding restrictions or mandatory fees.' },
+              ].map(({ key, label, desc }) => (
+                <div key={key} className="flex items-start justify-between p-3.5 bg-gray-50 border border-gray-100 rounded-xl">
+                  <div className="space-y-1 pr-3">
+                    <label className="text-xs font-semibold text-gray-800 cursor-pointer" htmlFor={key}>{label}</label>
+                    <p className="text-[10px] text-gray-450 leading-relaxed">{desc}</p>
+                  </div>
+                  <input
+                    id={key}
+                    type="checkbox"
+                    checked={(preferences as any)[key]}
+                    onChange={() => handleTogglePreference(key as any)}
+                    className="w-4 h-4 rounded text-brand border-gray-300 focus:ring-brand shrink-0 cursor-pointer mt-0.5"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <hr className="border-gray-100" />
+
+          {/* Push Preferences Section */}
+          <div className="space-y-4">
+            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Push Alerts</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {[
+                { key: 'push_info', label: 'Live Chat & Messaging', desc: 'Immediate browser notices for support replies.' },
+                { key: 'push_success', label: 'Transaction Notifications', desc: 'Realtime banners for earnings and stake confirmations.' },
+                { key: 'push_warning', label: 'Security & Auth Notices', desc: 'Alerts for logins or security policy refreshes.' },
+                { key: 'push_alert', label: 'Action-Required Warnings', desc: 'Critical instructions, restrictions, and deposit updates.' },
+              ].map(({ key, label, desc }) => (
+                <div key={key} className="flex items-start justify-between p-3.5 bg-gray-50 border border-gray-100 rounded-xl">
+                  <div className="space-y-1 pr-3">
+                    <label className="text-xs font-semibold text-gray-800 cursor-pointer" htmlFor={key}>{label}</label>
+                    <p className="text-[10px] text-gray-450 leading-relaxed">{desc}</p>
+                  </div>
+                  <input
+                    id={key}
+                    type="checkbox"
+                    checked={(preferences as any)[key]}
+                    onChange={() => handleTogglePreference(key as any)}
+                    className="w-4 h-4 rounded text-indigo-650 border-gray-300 focus:ring-indigo-500 shrink-0 cursor-pointer mt-0.5"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Change Password */}

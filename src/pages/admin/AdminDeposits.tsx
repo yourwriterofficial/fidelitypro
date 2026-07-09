@@ -53,13 +53,26 @@ export default function AdminDeposits() {
     });
   };
 
+  const [processingId, setProcessingId] = useState<string | null>(null);
+
   const updateDepositStatus = async (depositId: string, newStatus: string) => {
+    if (processingId) return;
+    setProcessingId(depositId);
     try {
-      const { error } = await supabase
+      // Optimistic concurrency check: only update if status is 'pending'
+      const { data, error } = await supabase
         .from('deposits')
         .update({ status: newStatus, updated_at: new Date().toISOString() })
-        .eq('id', depositId);
+        .eq('id', depositId)
+        .eq('status', 'pending')
+        .select();
+
       if (error) throw error;
+      if (!data || data.length === 0) {
+        toast.error('This deposit has already been processed.');
+        fetchDeposits();
+        return;
+      }
 
       const deposit = deposits.find(d => d.id === depositId);
 
@@ -107,6 +120,8 @@ export default function AdminDeposits() {
       fetchDeposits();
     } catch (err: any) {
       toast.error(err.message);
+    } finally {
+      setProcessingId(null);
     }
   };
 
@@ -167,13 +182,15 @@ export default function AdminDeposits() {
                       <>
                         <button
                           onClick={() => updateDepositStatus(d.id, 'confirmed')}
-                          className="text-green-600 hover:text-green-800"
+                          className="text-green-600 hover:text-green-800 disabled:opacity-40"
+                          disabled={processingId === d.id}
                         >
                           <CheckCircle size={20} />
                         </button>
                         <button
                           onClick={() => updateDepositStatus(d.id, 'failed')}
-                          className="text-red-600 hover:text-red-800"
+                          className="text-red-600 hover:text-red-800 disabled:opacity-40"
+                          disabled={processingId === d.id}
                         >
                           <XCircle size={20} />
                         </button>

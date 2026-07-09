@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuthStore } from '../store/authStore';
 import { supabase } from '../lib/supabaseClient';
 import { useAccountRestriction } from '../hooks/useAccountRestriction';
+import { notifyAdmins, notifyAdminsWithEmail } from '../lib/notify';
 import { toast } from 'sonner';
 import {
   Wallet, ArrowDown, ArrowUp, Copy, Check, Send, RefreshCw,
@@ -120,6 +121,35 @@ export default function WalletPage() {
       setDepositAmount('');
       await fetchTransactionHistory();
       await refreshProfile();
+
+      // Trigger admin notifications
+      const formattedAmount = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
+      const userName = profile.name || profile.email || 'A user';
+      
+      notifyAdmins({
+        title: 'New Deposit Request',
+        message: `${userName} submitted a deposit request of ${formattedAmount} via ${selectedCurrency}.`,
+        type: 'alert',
+        link: '/admin/deposits'
+      });
+
+      notifyAdminsWithEmail(
+        `[RPM] Deposit Alert: ${userName} - ${formattedAmount}`,
+        `
+          <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #f0f0f0; border-radius: 8px;">
+            <h2 style="color: #0f172a; margin-bottom: 20px;">New Deposit Request</h2>
+            <p><strong>User:</strong> ${profile.name} (${profile.email})</p>
+            <p><strong>Amount:</strong> ${formattedAmount}</p>
+            <p><strong>Method:</strong> ${selectedCurrency}</p>
+            <p style="margin-top: 24px;">
+              <a href="${window.location.origin}/admin/deposits" 
+                 style="background: #10b981; color: #ffffff; padding: 10px 16px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
+                 Review Deposit
+              </a>
+            </p>
+          </div>
+        `
+      );
     } catch (err: any) { toast.error(err.message); }
     finally { setLoading(false); }
   };
@@ -141,6 +171,35 @@ export default function WalletPage() {
       toast.success('Withdrawal request submitted!');
       setWithdrawAmount(''); setWithdrawAddress('');
       await fetchTransactionHistory(); await refreshProfile();
+
+      // Trigger admin notifications
+      const formattedAmount = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
+      const userName = profile.name || profile.email || 'A user';
+      
+      notifyAdmins({
+        title: 'New Withdrawal Request',
+        message: `${userName} requested a withdrawal of ${formattedAmount}.`,
+        type: 'alert',
+        link: '/admin/withdrawals'
+      });
+
+      notifyAdminsWithEmail(
+        `[RPM] Withdrawal Alert: ${userName} - ${formattedAmount}`,
+        `
+          <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #f0f0f0; border-radius: 8px;">
+            <h2 style="color: #0f172a; margin-bottom: 20px;">New Withdrawal Request</h2>
+            <p><strong>User:</strong> ${profile.name} (${profile.email})</p>
+            <p><strong>Amount:</strong> ${formattedAmount}</p>
+            <p><strong>Address:</strong> ${withdrawAddress}</p>
+            <p style="margin-top: 24px;">
+              <a href="${window.location.origin}/admin/withdrawals" 
+                 style="background: #ef4444; color: #ffffff; padding: 10px 16px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
+                 Review Withdrawal
+              </a>
+            </p>
+          </div>
+        `
+      );
     } catch (err: any) { toast.error(err.message); }
     finally { setLoading(false); }
   };

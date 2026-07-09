@@ -4,9 +4,10 @@ import {
   LogOut, LayoutDashboard, Package, Users, DollarSign, ShoppingCart,
   Eye, Mail, CreditCard, Settings, Lock, Building, Gift, Bell,
   Menu, X, MoreHorizontal, Activity, Megaphone, ChevronRight, ArrowLeftRight,
-  ChevronsLeft, ChevronsRight,
+  ChevronsLeft, ChevronsRight, MessageSquare,
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
+import { supabase } from '../lib/supabaseClient';
 
 const NAV_SECTIONS = [
   {
@@ -37,6 +38,7 @@ const NAV_SECTIONS = [
     label: 'Users & Comms',
     items: [
       { path: '/admin/users',            icon: Users,       label: 'Users'          },
+      { path: '/admin/chat',             icon: MessageSquare,label: 'Live Chat'        },
       { path: '/admin/notifications',    icon: Bell,        label: 'Notifications'  },
       { path: '/admin/announcements',    icon: Megaphone,   label: 'Announcements'  },
       { path: '/admin/email-templates',  icon: Mail,        label: 'Email Templates'},
@@ -54,13 +56,46 @@ const allNavItems = NAV_SECTIONS.flatMap(s => s.items);
 const bottomNavItems = allNavItems.slice(0, 5);
 
 export default function AdminLayout() {
-  const { signOut, isImpersonating, clearImpersonation } = useAuthStore();
+  const { signOut, isImpersonating, clearImpersonation, profile } = useAuthStore();
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(
     () => typeof localStorage !== 'undefined' && localStorage.getItem('admin-sidebar-collapsed') === '1'
   );
+  const [unreadChatCount, setUnreadChatCount] = useState(0);
+
+  useEffect(() => {
+    if (!profile?.id) return;
+
+    const fetchUnreadCount = async () => {
+      const { count, error } = await supabase
+        .from('messages')
+        .select('*', { count: 'exact', head: true })
+        .neq('sender_id', profile.id)
+        .eq('read', false);
+      if (!error && count !== null) {
+        setUnreadChatCount(count);
+      }
+    };
+
+    fetchUnreadCount();
+
+    const channel = supabase
+      .channel('admin_chat_unread_count')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'messages' },
+        () => {
+          fetchUnreadCount();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [profile?.id]);
 
   useEffect(() => {
     localStorage.setItem('admin-sidebar-collapsed', collapsed ? '1' : '0');
@@ -131,12 +166,20 @@ export default function AdminLayout() {
                   const active = isActive(path);
                   return (
                     <Link key={path} to={path} title={collapsed ? label : undefined}
-                      className={`group flex items-center gap-3 rounded-xl text-sm font-medium transition-all duration-150 ${collapsed ? 'justify-center px-0 py-2.5' : 'px-3.5 py-2.5'} ${
+                      className={`group relative flex items-center gap-3 rounded-xl text-sm font-medium transition-all duration-150 ${collapsed ? 'justify-center px-0 py-2.5' : 'px-3.5 py-2.5'} ${
                         active ? 'bg-gray-900 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
                       }`}>
                       <Icon size={16} className={active ? 'text-white' : 'text-gray-400 group-hover:text-gray-600'} />
                       {!collapsed && label}
-                      {!collapsed && active && <ChevronRight size={12} className="ml-auto opacity-60" />}
+                      {!collapsed && label === 'Live Chat' && unreadChatCount > 0 && (
+                        <span className="ml-auto bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0">
+                          {unreadChatCount}
+                        </span>
+                      )}
+                      {collapsed && label === 'Live Chat' && unreadChatCount > 0 && (
+                        <span className="absolute top-1 right-2 bg-red-500 w-2 h-2 rounded-full" />
+                      )}
+                      {!collapsed && active && label !== 'Live Chat' && <ChevronRight size={12} className="ml-auto opacity-60" />}
                     </Link>
                   );
                 })}
@@ -244,6 +287,11 @@ export default function AdminLayout() {
                             active ? 'bg-gray-900 text-white' : 'text-gray-600 hover:bg-gray-100'
                           }`}>
                           <Icon size={15} /> {label}
+                          {label === 'Live Chat' && unreadChatCount > 0 && (
+                            <span className="ml-auto bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0">
+                              {unreadChatCount}
+                            </span>
+                          )}
                         </Link>
                       );
                     })}

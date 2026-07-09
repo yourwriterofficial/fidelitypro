@@ -46,6 +46,8 @@ import AdminSettings from './pages/admin/AdminSettings';
 import AdminActivityLogs from './pages/admin/AdminActivityLogs';
 import PushAutoSubscriber from './components/PushAutoSubscriber';
 import PWAUpdater from './components/PWAUpdater';
+import Chat from './pages/Chat';
+import AdminChat from './pages/admin/AdminChat';
 
 function App() {
   const { initAuth, setLoading } = useAuthStore();
@@ -94,6 +96,7 @@ function App() {
                 <Route path="properties" element={<Properties />} />
                 <Route path="referral" element={<Referral />} />
                 <Route path="settings" element={<Settings />} />
+                <Route path="chat" element={<Chat />} />
               </Route>
             </Route>
           </Route>
@@ -116,6 +119,7 @@ function App() {
                 <Route path="announcements" element={<AdminAnnouncements />} />
                 <Route path="settings" element={<AdminSettings />} />
                 <Route path="logs" element={<AdminActivityLogs />} />
+                <Route path="chat" element={<AdminChat />} />
               </Route>
             </Route>
           </Route>
