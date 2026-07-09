@@ -209,6 +209,13 @@ export default function Properties() {
     setSubmitting(true);
     try {
       await supabase.rpc('deduct_wallet_balance', { user_id: profile.id, amount });
+      await supabase.from('transactions').insert({
+        user_id: profile.id,
+        type: 'investment',
+        amount: -amount,
+        description: `Property Investment: ${selectedProperty.title}`,
+        status: 'completed',
+      });
       const downPaymentRequired = selectedProperty.price * (selectedProperty.down_payment_percent / 100);
       const remaining = Math.max(0, selectedProperty.price - amount);
       const termMonthsVal = parseInt(selectedTerm);

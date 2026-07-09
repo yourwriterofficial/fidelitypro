@@ -65,7 +65,14 @@ export default function AdminUsers() {
   const { user } = useAuthStore();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
-  const [onlineUserIds, setOnlineUserIds] = useState<string[]>([]);
+  interface OnlineUser {
+    user_id: string;
+    name: string;
+    email: string;
+    current_page: string;
+    last_active: string;
+  }
+  const [onlineUsers, setOnlineUsers] = useState<OnlineUser[]>([]);
   const [pageVisitsToday, setPageVisitsToday] = useState<any[]>([]);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
@@ -162,7 +169,20 @@ export default function AdminUsers() {
     presenceChannel
       .on('presence', { event: 'sync' }, () => {
         const state = presenceChannel.presenceState();
-        setOnlineUserIds(Object.keys(state));
+        const list: OnlineUser[] = [];
+        Object.keys(state).forEach((key) => {
+          const presenceList = state[key] as any[];
+          if (presenceList && presenceList.length > 0) {
+            list.push({
+              user_id: key,
+              name: presenceList[0].name || 'User',
+              email: presenceList[0].email || '',
+              current_page: presenceList[0].current_page || '',
+              last_active: presenceList[0].last_active || '',
+            });
+          }
+        });
+        setOnlineUsers(list);
       })
       .subscribe();
 
@@ -870,34 +890,60 @@ export default function AdminUsers() {
           <div className="flex items-center justify-between border-b border-slate-800 pb-3">
             <h3 className="text-sm font-bold flex items-center gap-2 text-white">
               <span className="w-2 h-2 bg-emerald-550 rounded-full animate-ping shrink-0" />
-              Live Online Users ({onlineUserIds.length})
+              Live Online Users ({onlineUsers.length})
             </h3>
             <span className="text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">Real-time Presence</span>
           </div>
           
           <div className="space-y-3 max-h-[220px] overflow-y-auto overscroll-contain pr-1">
-            {onlineUserIds.length === 0 ? (
+            {onlineUsers.length === 0 ? (
               <p className="text-slate-500 text-xs py-8 text-center font-medium">No users currently active online.</p>
             ) : (
-              onlineUserIds.map(userId => {
-                const matchedUser = users.find(u => u.id === userId);
-                const name = matchedUser?.name || 'Active User';
-                const email = matchedUser?.email || 'Monitoring page...';
+              onlineUsers.map(ou => {
+                const matchedUser = users.find(u => u.id === ou.user_id);
+                const name = ou.name || matchedUser?.name || 'Active User';
+                const email = ou.email || matchedUser?.email || 'Monitoring page...';
+                
+                const getPageLabel = (path: string) => {
+                  if (path === '/app') return 'Dashboard';
+                  if (path.startsWith('/app/wallet')) return 'Wallet';
+                  if (path.startsWith('/app/staking')) return 'Staking';
+                  if (path.startsWith('/app/invest')) return 'Invest';
+                  if (path.startsWith('/app/my-portfolio')) return 'Portfolio';
+                  if (path.startsWith('/app/properties')) return 'Properties';
+                  if (path.startsWith('/app/referral')) return 'Referrals';
+                  if (path.startsWith('/app/chat')) return 'Support Inbox';
+                  if (path.startsWith('/app/settings')) return 'Settings';
+                  if (path.startsWith('/app/notifications')) return 'Notification Center';
+                  if (path.startsWith('/app/history')) return 'History';
+                  if (path.startsWith('/admin')) return 'Admin Panel';
+                  return path || 'Unknown Page';
+                };
+
                 return (
-                  <div key={userId} className="flex items-center justify-between bg-slate-850/50 hover:bg-slate-850 p-3 rounded-2xl border border-slate-800/60 transition">
-                    <div className="flex items-center gap-2.5 min-w-0">
+                  <div key={ou.user_id} className="flex items-center justify-between bg-slate-850/50 hover:bg-slate-850 p-3 rounded-2xl border border-slate-800/60 transition">
+                    <div className="flex items-center gap-2.5 min-w-0 flex-1 pr-2">
                       <div className="w-7 h-7 rounded-lg bg-slate-800 text-white font-bold flex items-center justify-center text-xs shrink-0">
                         {name.charAt(0).toUpperCase()}
                       </div>
-                      <div className="min-w-0">
+                      <div className="min-w-0 flex-1">
                         <p className="text-xs font-bold truncate text-white">{name}</p>
                         <p className="text-[10px] text-slate-450 truncate">{email}</p>
+                        <div className="mt-1">
+                          <span className="px-1.5 py-0.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-md text-[9px] font-bold">
+                            Viewing: {getPageLabel(ou.current_page)}
+                          </span>
+                        </div>
                       </div>
                     </div>
                     {matchedUser && (
-                      <span className="px-2.5 py-1 bg-slate-800 border border-slate-700 text-brand text-[10px] font-bold rounded-lg truncate max-w-[130px]">
-                        Active
-                      </span>
+                      <button
+                        type="button"
+                        onClick={() => openUserModal(matchedUser)}
+                        className="text-[9px] bg-slate-850 hover:bg-slate-800 border border-slate-700 text-slate-300 font-bold px-2 py-1.5 rounded-lg transition shrink-0"
+                      >
+                        Inspect
+                      </button>
                     )}
                   </div>
                 );
@@ -965,7 +1011,7 @@ export default function AdminUsers() {
                   <td className="p-4">{formatCurrency(u.wallet_balance)}</td>
                   <td className="p-4">{u.is_admin ? 'Yes' : 'No'}</td>
                   <td className="p-4 whitespace-nowrap">
-                    {onlineUserIds.includes(u.id) ? (
+                    {onlineUsers.some(ou => ou.user_id === u.id) ? (
                       <span className="text-emerald-500 font-bold flex items-center gap-1.5 text-xs">
                         <span className="w-2 h-2 bg-emerald-500 rounded-full animate-ping shrink-0" />
                         Online
