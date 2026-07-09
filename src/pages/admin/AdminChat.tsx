@@ -53,6 +53,7 @@ export default function AdminChat() {
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadingMessages, setLoadingMessages] = useState(false);
+  const [showMobileDetails, setShowMobileDetails] = useState(false);
 
   // New Chat initiation state
   const [showNewChatModal, setShowNewChatModal] = useState(false);
@@ -634,6 +635,15 @@ export default function AdminChat() {
                     Claim Conversation
                   </button>
                 )}
+                
+                <button
+                  type="button"
+                  onClick={() => setShowMobileDetails(true)}
+                  className="lg:hidden p-2 bg-gray-50 border border-gray-200 rounded-xl hover:bg-gray-100 transition text-gray-600 font-bold shrink-0 flex items-center justify-center"
+                  title="View user details"
+                >
+                  <User size={14} />
+                </button>
               </div>
             </div>
 
@@ -898,6 +908,92 @@ export default function AdminChat() {
               {allProfiles.length === 0 && (
                 <p className="text-center py-6 text-xs text-gray-400">Loading users...</p>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Mobile User Context Details Modal */}
+      {showMobileDetails && activeUser && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 lg:hidden">
+          <div className="absolute inset-0 bg-black/45 backdrop-blur-sm" onClick={() => setShowMobileDetails(false)} />
+          <div className="bg-white rounded-3xl max-w-sm w-full max-h-[85vh] flex flex-col z-10 overflow-hidden border shadow-2xl animate-scale-in">
+            {/* Header */}
+            <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/50 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 bg-brand/10 text-brand rounded-lg shrink-0">
+                  <Info size={15} />
+                </div>
+                <h4 className="font-bold text-gray-900 text-sm">User Context details</h4>
+              </div>
+              <button onClick={() => setShowMobileDetails(false)} className="p-1.5 hover:bg-gray-100 rounded-xl transition text-gray-400">
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-6 overflow-y-auto flex-1 space-y-6 text-slate-800 bg-gray-50/30">
+              <div className="text-center">
+                <div className="w-16 h-16 bg-gray-900/5 text-gray-900 rounded-2xl flex items-center justify-center font-bold text-xl mx-auto border border-gray-150 shadow-inner">
+                  {activeUser.name?.charAt(0).toUpperCase() || 'U'}
+                </div>
+                <h3 className="font-bold text-gray-950 text-sm mt-3">{activeUser.name || 'User'}</h3>
+                <p className="text-xs text-gray-400 select-all font-medium mt-0.5">{activeUser.email}</p>
+                <p className="text-[10px] text-gray-450 font-bold mt-2 uppercase tracking-wider">
+                  Last active: <span className="text-slate-800 font-extrabold">{formatLastSeen(activeUser.last_seen)}</span>
+                </p>
+              </div>
+
+              <div className="bg-white border border-gray-150 rounded-2xl p-4 shadow-sm">
+                <div className="flex items-center gap-2 text-gray-450">
+                  <Wallet size={14} />
+                  <span className="text-[9px] font-bold uppercase tracking-wider">Wallet Balance</span>
+                </div>
+                <p className="text-lg font-extrabold text-gray-950 mt-1">{fmtCurrency(activeUser.wallet_balance)}</p>
+              </div>
+
+              <div className="space-y-3">
+                <h5 className="text-[9px] font-bold text-gray-450 uppercase tracking-wider">Account permissions</h5>
+                <div className="space-y-2 text-xs">
+                  <div className="flex items-center justify-between py-1 border-b border-gray-100">
+                    <span className="text-gray-500">Account status</span>
+                    {activeUser.banned ? (
+                      <span className="px-2.5 py-0.5 bg-red-50 text-red-650 border border-red-100 rounded-full font-bold text-[9px]">Banned</span>
+                    ) : (
+                      <span className="px-2.5 py-0.5 bg-emerald-50 text-emerald-650 border border-emerald-100 rounded-full font-bold text-[9px]">Active</span>
+                    )}
+                  </div>
+                  <div className="flex items-center justify-between py-1 border-b border-gray-100">
+                    <span className="text-gray-500">Withdraw permission</span>
+                    <span className={`font-semibold ${activeUser.can_withdraw ? 'text-emerald-600' : 'text-red-550'}`}>{activeUser.can_withdraw ? 'Allowed' : 'Suspended'}</span>
+                  </div>
+                  <div className="flex items-center justify-between py-1 border-b border-gray-100">
+                    <span className="text-gray-500">Investment permission</span>
+                    <span className={`font-semibold ${activeUser.can_invest ? 'text-emerald-600' : 'text-red-550'}`}>{activeUser.can_invest ? 'Allowed' : 'Suspended'}</span>
+                  </div>
+                  {activeUser.fee_required > 0 && (
+                    <div className="flex items-center justify-between py-1 text-amber-700 font-semibold">
+                      <span>Clearance fee required</span>
+                      <span className="font-bold tabular-nums">{fmtCurrency(activeUser.fee_required)}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-2 pt-2 border-t">
+                <a
+                  href={`/admin/users?search=${encodeURIComponent(activeUser.email)}`}
+                  className="w-full text-center py-2.5 rounded-xl border border-gray-200 text-gray-700 hover:bg-gray-50 transition font-semibold text-xs flex items-center justify-center gap-2 bg-white"
+                >
+                  <User size={13} /> Manage User Account
+                </a>
+                <a
+                  href={`/admin/logs?user=${activeUserId}`}
+                  className="w-full text-center py-2.5 rounded-xl border border-gray-200 text-gray-700 hover:bg-gray-50 transition font-semibold text-xs flex items-center justify-center gap-2 bg-white"
+                >
+                  <Mail size={13} /> View Audit Logs
+                </a>
+              </div>
             </div>
           </div>
         </div>
