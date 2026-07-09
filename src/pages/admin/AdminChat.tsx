@@ -7,7 +7,7 @@ import {
   Wallet, ShieldAlert, ShieldCheck, Mail, User, Info, ArrowLeft, Plus, X, Trash2
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { sendEmailAndLog, sendEmailToUser } from '../../lib/notify';
+import { sendEmailToUser } from '../../lib/notify';
 
 interface Profile {
   id: string;

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { useAuthStore } from '../store/authStore';
 import { toast } from 'sonner';
-import { Wallet, ArrowDownLeft, ArrowUpRight, DollarSign, Calendar, Eye, X, Filter } from 'lucide-react';
+import { Wallet, ArrowDownLeft, ArrowUpRight, DollarSign, Calendar, X } from 'lucide-react';
 
 interface Transaction {
   id: string;

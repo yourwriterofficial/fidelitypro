@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { useAuthStore } from '../store/authStore';
 import { toast } from 'sonner';
-import { Bell, BellOff, Check, CheckCheck, X, Calendar, ArrowRight, ShieldAlert, ShieldCheck, Wallet, Info } from 'lucide-react';
+import { BellOff, Check, CheckCheck, X, Calendar, ArrowRight, ShieldAlert, ShieldCheck, Info } from 'lucide-react';
 
 interface Notification {
   id: string;

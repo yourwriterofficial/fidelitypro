@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { toast } from 'sonner';
-import { Send, Trash, RefreshCw, Users, ShieldAlert, BadgePlus } from 'lucide-react';
+import { Send, Trash, RefreshCw, ShieldAlert } from 'lucide-react';
 import { notifyUsers } from '../../lib/notify';
 
 interface UserProfile {
