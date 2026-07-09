@@ -9,6 +9,7 @@ import { supabase } from '../lib/supabaseClient';
 import NotificationBell from './NotificationBell';
 import { useState, useEffect } from 'react';
 import { useAccountRestriction } from '../hooks/useAccountRestriction';
+import { toast } from 'sonner';
 
 const navItems = [
   { path: '/app',             icon: Home,          label: 'Dashboard' },
@@ -134,6 +135,36 @@ export default function Layout() {
     localStorage.setItem('app-sidebar-collapsed', collapsed ? '1' : '0');
   }, [collapsed]);
 
+  // Real-time In-App Toasts for incoming user notifications
+  useEffect(() => {
+    if (!profile?.id) return;
+
+    const channel = supabase
+      .channel('in_app_notifications_toast')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${profile.id}` },
+        (payload: any) => {
+          const newNotif = payload.new;
+          if (newNotif && !newNotif.read) {
+            toast(newNotif.title, {
+              description: newNotif.message,
+              action: newNotif.link ? {
+                label: 'View',
+                onClick: () => navigate(newNotif.link)
+              } : undefined,
+              duration: 5000,
+            });
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [profile?.id, navigate]);
+
   // Lock body scroll while the mobile sheet is open.
   useEffect(() => {
     document.body.style.overflow = mobileMenuOpen ? 'hidden' : '';
@@ -177,6 +208,18 @@ export default function Layout() {
           )}
           <div className="flex items-center gap-1">
             {!collapsed && <NotificationBell />}
+            {!collapsed && (
+              <Link to="/app/chat"
+                className="relative p-2 rounded-xl text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition-colors"
+                title="Support Inbox">
+                <MessageSquare size={19} className={location.pathname === '/app/chat' ? 'text-brand' : 'text-gray-400'} />
+                {unreadChatCount > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[17px] h-[17px] flex items-center justify-center px-0.5 animate-pulse">
+                    {unreadChatCount}
+                  </span>
+                )}
+              </Link>
+            )}
             <button
               onClick={() => setCollapsed(c => !c)}
               className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition"
@@ -251,10 +294,20 @@ export default function Layout() {
             </div>
             <span className="text-lg font-extrabold text-gray-900">RPM</span>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
+            <Link to="/app/chat"
+              className="relative p-2 rounded-xl text-gray-450 hover:bg-gray-100 hover:text-gray-700 transition-colors"
+              title="Support Inbox">
+              <MessageSquare size={19} className={location.pathname === '/app/chat' ? 'text-brand' : 'text-gray-400'} />
+              {unreadChatCount > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[17px] h-[17px] flex items-center justify-center px-0.5 animate-pulse">
+                  {unreadChatCount}
+                </span>
+              )}
+            </Link>
             <NotificationBell />
             <button onClick={() => setMobileMenuOpen(true)}
-              className="p-1.5 hover:bg-gray-100 rounded-xl transition">
+              className="p-1.5 hover:bg-gray-100 rounded-xl transition ml-1">
               <Menu size={20} className="text-gray-600" />
             </button>
           </div>
@@ -338,12 +391,13 @@ export default function Layout() {
                 const active = isActive(path);
                 return (
                   <Link key={path} to={path} onClick={() => setMobileMenuOpen(false)}
-                    className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition ${
-                      active ? 'bg-brand text-white' : 'text-gray-600 hover:bg-gray-100'
+                    className={`relative flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition ${
+                      active ? 'bg-brand text-white font-semibold shadow-sm' : 'text-gray-600 hover:bg-gray-100'
                     }`}>
-                    <Icon size={16} /> {label}
+                    <Icon size={16} className={active ? 'text-white' : 'text-gray-400'} />
+                    <span>{label}</span>
                     {label === 'Support Inbox' && unreadChatCount > 0 && (
-                      <span className="absolute top-0.5 right-0.5 min-w-4 h-4 px-1 bg-red-500 text-white rounded-full flex items-center justify-center text-[9px] font-extrabold border border-white shadow-sm">
+                      <span className="ml-auto w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center text-[10px] font-bold shadow-sm animate-pulse">
                         {unreadChatCount}
                       </span>
                     )}

@@ -1,4 +1,5 @@
 import { supabase } from './supabaseClient';
+import { toast } from 'sonner';
 
 export interface NotifyParams {
   userId: string;
@@ -8,11 +9,103 @@ export interface NotifyParams {
   link?: string;
 }
 
+let cachedLockedSettings: Record<string, boolean> | null = null;
+let cacheTimestamp = 0;
+const CACHE_TTL = 300000; // 5 minutes in milliseconds
+
+/**
+ * Checks if a specific notification type (email or push) is enabled for a user.
+ * It first checks if the preference is locked (forced ON) by the admin.
+ * If not locked, it falls back to the user's saved preferences.
+ */
+export async function isNotificationEnabled(
+  userId: string,
+  prefKey: 'email_info' | 'email_warning' | 'email_success' | 'email_alert' | 'push_info' | 'push_warning' | 'push_success' | 'push_alert'
+): Promise<boolean> {
+  try {
+    const now = Date.now();
+    let lockedConfig = cachedLockedSettings;
+
+    // 1. Fetch locked config (if cache expired) and user preference in parallel
+    const lockPromise = (!lockedConfig || (now - cacheTimestamp > CACHE_TTL))
+      ? supabase.from('settings').select('value').eq('key', 'locked_notifications').maybeSingle()
+      : Promise.resolve({ data: null, error: null });
+
+    const [lockRes, prefRes] = await Promise.all([
+      lockPromise,
+      supabase.from('notification_preferences').select('*').eq('user_id', userId).maybeSingle()
+    ]);
+
+    // Update cache if we fetched new locked settings
+    if (lockRes?.data?.value) {
+      try {
+        lockedConfig = JSON.parse(lockRes.data.value);
+        cachedLockedSettings = lockedConfig;
+        cacheTimestamp = now;
+      } catch (e) {
+        console.error('[notify] Failed to parse locked_notifications setting:', e);
+      }
+    }
+
+    // 2. If locked by admin, it is forced ON (true)
+    if (lockedConfig && lockedConfig[prefKey] === true) {
+      return true;
+    }
+
+    // 3. Otherwise, check user preference
+    if (prefRes?.data) {
+      return prefRes.data[prefKey] !== false;
+    }
+    
+    // Default to true if no preference row exists
+    return true;
+  } catch (e) {
+    console.error('[notify] Error in isNotificationEnabled:', e);
+    return true; // Safe fallback
+  }
+}
+
+/**
+ * Simple client-side rate limiter for outbound notification triggers.
+ * Limit: 5 dispatches per 60 seconds per client browser.
+ */
+function checkRateLimit(): boolean {
+  if (typeof window === 'undefined' || !window.localStorage) {
+    return true; // SSR or server context: bypass
+  }
+  try {
+    const key = 'notification_rate_limit_timestamps';
+    const now = Date.now();
+    const windowMs = 60000;
+    const limit = 5;
+
+    const raw = localStorage.getItem(key);
+    let timestamps: number[] = raw ? JSON.parse(raw) : [];
+
+    timestamps = timestamps.filter(t => (now - t) < windowMs);
+
+    if (timestamps.length >= limit) {
+      console.warn(`[notify] Rate limit reached.`);
+      return false;
+    }
+
+    timestamps.push(now);
+    localStorage.setItem(key, JSON.stringify(timestamps));
+    return true;
+  } catch (e) {
+    return true; // Fail-safe
+  }
+}
+
 /**
  * Sends a notification: inserts the in-app notification in Supabase
  * and invokes the send-push edge function to dispatch web push.
  */
 export async function notifyUser(params: NotifyParams): Promise<void> {
+  if (!checkRateLimit()) {
+    toast.error('Notification rate limit reached. Please wait a moment.');
+    return;
+  }
   const { userId, title, message, type, link } = params;
 
   // 1. Write to database notifications table
@@ -31,16 +124,10 @@ export async function notifyUser(params: NotifyParams): Promise<void> {
     console.error('[notify] Failed to write to notifications table:', e);
   }
 
-  // 2. Call send-push edge function (respecting push preferences)
+  // 2. Call send-push edge function (respecting push preferences & admin locks)
   try {
-    const { data: prefs } = await supabase
-      .from('notification_preferences')
-      .select('*')
-      .eq('user_id', userId)
-      .single();
-    
     const key = `push_${type}` as const;
-    const pushEnabled = prefs ? prefs[key] !== false : true;
+    const pushEnabled = await isNotificationEnabled(userId, key);
     
     if (pushEnabled) {
       await supabase.functions.invoke('send-push', {
@@ -59,13 +146,17 @@ export async function notifyUser(params: NotifyParams): Promise<void> {
   }
 }
 
-/** Sends an email to a user, respecting their notification preferences */
+/** Sends an email to a user, respecting their notification preferences & admin locks */
 export async function sendEmailToUser(
   userId: string,
   type: 'info' | 'warning' | 'success' | 'alert',
   subject: string,
   htmlContent: string
 ): Promise<boolean> {
+  if (!checkRateLimit()) {
+    toast.error('Email rate limit reached. Please wait a moment.');
+    return false;
+  }
   try {
     // 1. Get user profile and email
     const { data: profile, error: profErr } = await supabase
@@ -76,15 +167,9 @@ export async function sendEmailToUser(
     
     if (profErr || !profile?.email) return false;
 
-    // 2. Get notification preferences
-    const { data: prefs } = await supabase
-      .from('notification_preferences')
-      .select('*')
-      .eq('user_id', userId)
-      .single();
-
+    // 2. Check notification preferences (respecting admin locks)
     const key = `email_${type}` as const;
-    const emailEnabled = prefs ? prefs[key] !== false : true;
+    const emailEnabled = await isNotificationEnabled(userId, key);
     
     if (!emailEnabled) {
       console.log(`[notify] Email notification for type ${type} is disabled by user ${userId}`);

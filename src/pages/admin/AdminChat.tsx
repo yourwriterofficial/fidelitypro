@@ -7,7 +7,7 @@ import {
   Wallet, ShieldAlert, ShieldCheck, Mail, User, Info, ArrowLeft, Plus, X, Trash2
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { sendEmailAndLog } from '../../lib/notify';
+import { sendEmailAndLog, sendEmailToUser } from '../../lib/notify';
 
 interface Profile {
   id: string;
@@ -19,6 +19,7 @@ interface Profile {
   can_invest: boolean;
   fee_required: number;
   last_seen?: string;
+  assigned_admin_id?: string | null;
 }
 
 interface Message {
@@ -45,6 +46,7 @@ export default function AdminChat() {
   const [threads, setThreads] = useState<Thread[]>([]);
   const [activeUserId, setActiveUserId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
+  const [claimFilter, setClaimFilter] = useState<'all' | 'my' | 'unassigned'>('all');
   
   // Input and UI status
   const [replyText, setReplyText] = useState('');
@@ -100,11 +102,46 @@ export default function AdminChat() {
     }
   }, [location.search]);
 
+  const handleClaimToggle = async () => {
+    if (!activeUserId || !profile?.id) return;
+    const activeUser = threads.find(t => t.user_id === activeUserId)?.user ||
+                       allProfiles.find(p => p.id === activeUserId);
+    const currentClaim = activeUser?.assigned_admin_id;
+    const isClaimedByMe = currentClaim === profile.id;
+    const nextClaim = isClaimedByMe ? null : profile.id;
+
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ assigned_admin_id: nextClaim })
+        .eq('id', activeUserId);
+      if (error) throw error;
+
+      // Update thread state locally
+      setThreads(prev => prev.map(t => {
+        if (t.user_id === activeUserId) {
+          return { ...t, user: { ...t.user!, assigned_admin_id: nextClaim } };
+        }
+        return t;
+      }));
+      // Update allProfiles state locally
+      setAllProfiles(prev => prev.map(p => {
+        if (p.id === activeUserId) {
+          return { ...p, assigned_admin_id: nextClaim };
+        }
+        return p;
+      }));
+      toast.success(nextClaim ? 'Conversation claimed!' : 'Conversation released.');
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to update claim assignment.');
+    }
+  };
+
   const fetchProfilesForNewChat = async () => {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, name, email, wallet_balance, banned, can_withdraw, can_invest, fee_required, last_seen')
+        .select('id, name, email, wallet_balance, banned, can_withdraw, can_invest, fee_required, last_seen, assigned_admin_id')
         .eq('is_admin', false);
       if (error) throw error;
       setAllProfiles((data || []) as Profile[]);
@@ -383,31 +420,30 @@ export default function AdminChat() {
           console.warn('Failed to insert user notification:', notifErr);
         }
 
-        // Send email alert to user (using log system)
-        if (activeUser.email) {
-          try {
-            await sendEmailAndLog(
-              activeUser.email,
-              'New message from RPM Support',
-              `
-                <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #f0f0f0; border-radius: 8px;">
-                  <h2 style="color: #0f172a;">New Message from RPM Support</h2>
-                  <p>Our support team has sent you a new reply:</p>
-                  <blockquote style="background: #f8fafc; border-left: 4px solid #0f172a; padding: 12px; margin: 16px 0; font-style: italic;">
-                    "${textToSend}"
-                  </blockquote>
-                  <p style="margin-top: 24px;">
-                    <a href="${window.location.origin}/app/chat" 
-                       style="background: #0f172a; color: #ffffff; padding: 10px 16px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
-                       Open Support Chat
-                    </a>
-                  </p>
-                </div>
-              `
-            );
-          } catch (emailErr) {
-            console.warn('Email notify to user failed:', emailErr);
-          }
+        // Send email alert to user (respecting preference locks)
+        try {
+          await sendEmailToUser(
+            activeUserId,
+            'info',
+            'New message from RPM Support',
+            `
+              <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #f0f0f0; border-radius: 8px;">
+                <h2 style="color: #0f172a;">New Message from RPM Support</h2>
+                <p>Our support team has sent you a new reply:</p>
+                <blockquote style="background: #f8fafc; border-left: 4px solid #0f172a; padding: 12px; margin: 16px 0; font-style: italic;">
+                  "${textToSend}"
+                </blockquote>
+                <p style="margin-top: 24px;">
+                  <a href="${window.location.origin}/app/chat" 
+                     style="background: #0f172a; color: #ffffff; padding: 10px 16px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
+                     Open Support Chat
+                  </a>
+                </p>
+              </div>
+            `
+          );
+        } catch (emailErr) {
+          console.warn('Email notify to user failed:', emailErr);
         }
       }
     } catch (err: any) {
@@ -420,6 +456,17 @@ export default function AdminChat() {
   // Find profile of selected user thread
   const activeThread = threads.find(t => t.user_id === activeUserId);
   const activeUser = activeThread?.user || allProfiles.find(p => p.id === activeUserId);
+
+  // Filter threads by claim status
+  const filteredThreads = threads.filter(t => {
+    if (claimFilter === 'my') {
+      return t.user?.assigned_admin_id === profile?.id;
+    }
+    if (claimFilter === 'unassigned') {
+      return !t.user?.assigned_admin_id;
+    }
+    return true;
+  });
 
   if (loading) {
     return (
@@ -453,14 +500,36 @@ export default function AdminChat() {
           </div>
         </div>
 
+        {/* Claim Assignment filter tabs */}
+        <div className="flex border-b border-gray-100 bg-gray-50/30 p-1.5 gap-1 shrink-0">
+          {[
+            { id: 'all', label: 'All' },
+            { id: 'my', label: 'Mine' },
+            { id: 'unassigned', label: 'Unassigned' },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setClaimFilter(tab.id as any)}
+              className={`flex-1 py-1 text-[10px] font-bold rounded-lg transition ${
+                claimFilter === tab.id
+                  ? 'bg-white text-gray-800 shadow-sm border border-gray-150'
+                  : 'text-gray-400 hover:bg-gray-50 hover:text-gray-700'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
         <div className="flex-1 overflow-y-auto overscroll-contain divide-y divide-gray-50">
-          {threads.length === 0 ? (
+          {filteredThreads.length === 0 ? (
             <div className="py-14 text-center px-4">
               <Users size={28} className="text-gray-200 mx-auto mb-2" />
               <p className="text-gray-400 text-xs">No active support chats</p>
             </div>
           ) : (
-            threads.map(t => {
+            filteredThreads.map(t => {
               const active = t.user_id === activeUserId;
               const name = t.user?.name || 'Unknown User';
               const lastText = t.lastMessage?.body || '';
@@ -492,6 +561,21 @@ export default function AdminChat() {
                     <p className={`text-[11px] truncate mt-0.5 ${t.unreadCount > 0 ? 'text-gray-900 font-semibold' : 'text-gray-400'}`}>
                       {lastText}
                     </p>
+                    <div className="mt-1 flex items-center gap-1.5">
+                      {t.user?.assigned_admin_id === profile?.id ? (
+                        <span className="text-[8px] bg-blue-50 text-blue-650 font-bold border border-blue-200/50 px-1.5 rounded uppercase tracking-wider">
+                          Claimed by Me
+                        </span>
+                      ) : t.user?.assigned_admin_id ? (
+                        <span className="text-[8px] bg-gray-50 text-gray-400 font-medium border border-gray-200 px-1.5 rounded uppercase tracking-wider">
+                          Assigned
+                        </span>
+                      ) : (
+                        <span className="text-[8px] bg-amber-50 text-amber-600 font-bold border border-amber-200/50 px-1.5 rounded uppercase tracking-wider">
+                          Unassigned
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </button>
               );
@@ -526,6 +610,30 @@ export default function AdminChat() {
                     </p>
                   )}
                 </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                {activeUser.assigned_admin_id === profile?.id ? (
+                  <button
+                    type="button"
+                    onClick={handleClaimToggle}
+                    className="inline-flex items-center gap-1 bg-blue-50 text-blue-650 hover:bg-blue-100 border border-blue-200 text-xs font-semibold px-3 py-1.5 rounded-lg transition"
+                  >
+                    <Check size={13} /> Claimed by Me (Release)
+                  </button>
+                ) : activeUser.assigned_admin_id ? (
+                  <span className="text-xs text-gray-400 border bg-gray-50 border-gray-200 px-3 py-1.5 rounded-lg font-semibold cursor-not-allowed select-none">
+                    Assigned
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleClaimToggle}
+                    className="inline-flex items-center gap-1 bg-brand text-white hover:bg-brand-dark text-xs font-bold px-3 py-1.5 rounded-lg shadow-sm transition"
+                  >
+                    Claim Conversation
+                  </button>
+                )}
               </div>
             </div>
 

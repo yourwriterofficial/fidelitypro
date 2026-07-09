@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { toast } from 'sonner';
 import { Edit, Save, X, Eye, Mail, Code2, FileText, RefreshCw } from 'lucide-react';
+import { sendEmailAndLog } from '../../lib/notify';
+import { useAuthStore } from '../../store/authStore';
 
 interface Template {
   id: string; name: string; subject: string;
@@ -138,6 +140,7 @@ const DEFAULT_TEMPLATES = [
 ];
 
 export default function EmailTemplates() {
+  const { profile } = useAuthStore();
   const [templates, setTemplates] = useState<Template[]>([]);
   const [loading, setLoading] = useState(true);
   const [seeding, setSeeding] = useState(false);
@@ -145,6 +148,24 @@ export default function EmailTemplates() {
   const [editData, setEditData] = useState<Partial<Template>>({});
   const [previewHtml, setPreviewHtml] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'html'|'text'>('html');
+  const [sendingTest, setSendingTest] = useState(false);
+
+  const handleSendTestEmail = async () => {
+    if (!profile?.email || !previewHtml || !editData.subject) {
+      toast.error('Admin email or preview HTML not loaded');
+      return;
+    }
+    setSendingTest(true);
+    try {
+      const subject = `[TEST] ${editData.subject}`;
+      await sendEmailAndLog(profile.email, subject, previewHtml);
+      toast.success(`Test email dispatched successfully to ${profile.email}`);
+    } catch (err: any) {
+      toast.error('Failed to send test email: ' + err.message);
+    } finally {
+      setSendingTest(false);
+    }
+  };
 
   const fetchTemplates = async () => {
     const { data, error } = await supabase.from('email_templates').select('*').order('name');
@@ -346,21 +367,34 @@ export default function EmailTemplates() {
 
       {previewHtml && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-3xl max-w-2xl w-full shadow-2xl flex flex-col max-h-[90vh]">
+          <div className="bg-white rounded-3xl max-w-2xl w-full shadow-2xl flex flex-col max-h-[90vh] overflow-hidden border">
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
               <div className="flex items-center gap-2">
                 <div className="p-1.5 bg-blue-50 rounded-lg"><Eye size={15} className="text-blue-600" /></div>
-                <h2 className="font-semibold text-gray-900">Email Preview</h2>
+                <h2 className="font-semibold text-gray-900">Email Preview & Send Test</h2>
               </div>
               <button onClick={() => setPreviewHtml(null)} className="p-2 hover:bg-gray-100 rounded-xl transition"><X size={16} className="text-gray-400" /></button>
             </div>
-            <div className="overflow-y-auto flex-1 p-6">
-              <div className="border border-gray-100 rounded-2xl overflow-hidden">
-                <div dangerouslySetInnerHTML={{ __html: previewHtml }} />
+            <div className="overflow-y-auto flex-1 p-6 bg-gray-50/30">
+              <div className="border border-gray-250 bg-white rounded-2xl overflow-hidden h-96 shadow-sm">
+                <iframe
+                  title="Live email preview"
+                  srcDoc={previewHtml}
+                  sandbox=""
+                  className="w-full h-full border-0"
+                />
               </div>
             </div>
-            <div className="px-6 py-4 border-t border-gray-100 shrink-0">
-              <button onClick={() => setPreviewHtml(null)} className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 py-2.5 rounded-xl text-sm font-medium transition">Close Preview</button>
+            <div className="px-6 py-4 border-t border-gray-100 shrink-0 bg-white flex items-center justify-between gap-3">
+              <button
+                type="button"
+                onClick={handleSendTestEmail}
+                disabled={sendingTest}
+                className="bg-brand hover:bg-brand-dark text-white px-5 py-2.5 rounded-xl text-xs font-bold transition shadow-sm disabled:opacity-60 flex items-center gap-2"
+              >
+                <Mail size={14} /> {sendingTest ? 'Sending Test...' : `Send Test Email (${profile?.email || 'Admin'})`}
+              </button>
+              <button onClick={() => setPreviewHtml(null)} className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-5 py-2.5 rounded-xl text-xs font-semibold transition border border-gray-200/50">Close Preview</button>
             </div>
           </div>
         </div>

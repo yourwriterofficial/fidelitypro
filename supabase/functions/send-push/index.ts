@@ -156,16 +156,36 @@ Deno.serve(async (req) => {
 
   if (!user_ids?.length) return new Response(JSON.stringify({ sent: 0 }), { status: 200, headers: cors });
 
-  // Filter users who haven't disabled this notification type (default = enabled)
+  // Filter users who haven't disabled this notification type (default = enabled), respecting admin locks
   let filteredIds: string[] = [...new Set(user_ids as string[])];
   const prefKey = notification_type ? PREF_KEY[notification_type] : undefined;
   if (prefKey) {
-    const { data: prefs } = await adminClient
-      .from('notification_preferences')
-      .select(`user_id, ${prefKey}`)
-      .in('user_id', filteredIds);
-    const disabled = new Set((prefs || []).filter((p: any) => p[prefKey] === false).map((p: any) => p.user_id));
-    filteredIds = filteredIds.filter(id => !disabled.has(id));
+    const [prefsRes, lockRes] = await Promise.all([
+      adminClient
+        .from('notification_preferences')
+        .select(`user_id, ${prefKey}`)
+        .in('user_id', filteredIds),
+      adminClient
+        .from('settings')
+        .select('value')
+        .eq('key', 'locked_notifications')
+        .maybeSingle()
+    ]);
+
+    let isLocked = false;
+    if (lockRes?.data?.value) {
+      try {
+        const lockedConfig = JSON.parse(lockRes.data.value);
+        isLocked = lockedConfig[prefKey] === true;
+      } catch (e) {
+        console.error('Failed to parse locked_notifications in edge function:', e);
+      }
+    }
+
+    if (!isLocked) {
+      const disabled = new Set((prefsRes?.data || []).filter((p: any) => p[prefKey] === false).map((p: any) => p.user_id));
+      filteredIds = filteredIds.filter(id => !disabled.has(id));
+    }
   }
 
   if (!filteredIds.length) return new Response(JSON.stringify({ sent: 0, skipped: user_ids.length }), { status: 200, headers: cors });

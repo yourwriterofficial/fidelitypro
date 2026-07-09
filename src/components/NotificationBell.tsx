@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 import { useAuthStore } from '../store/authStore';
 import { Bell, BellOff, Check, CheckCheck, X } from 'lucide-react';
@@ -199,13 +200,16 @@ export default function NotificationBell() {
           </div>
 
           {/* Footer */}
-          {notifications.length > 0 && unreadCount > 0 && (
-            <div className="px-4 py-2.5 border-t border-gray-100 bg-gray-50/50">
-              <button onClick={markAllAsRead} className="text-xs text-brand hover:underline font-medium w-full text-center">
-                Mark all {unreadCount} as read
+          <div className="px-4 py-2.5 border-t border-gray-100 bg-gray-50/50 flex flex-col gap-1.5 text-center">
+            {unreadCount > 0 && (
+              <button onClick={markAllAsRead} className="text-xs text-brand hover:underline font-semibold">
+                Mark all as read
               </button>
-            </div>
-          )}
+            )}
+            <Link to="/app/notifications" onClick={() => setOpen(false)} className="text-[10px] text-gray-400 hover:text-gray-600 font-semibold uppercase tracking-wider block">
+              View All Notifications
+            </Link>
+          </div>
         </div>
       )}
     </div>

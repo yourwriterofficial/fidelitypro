@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { toast } from 'sonner';
 import { Save, Wallet, DollarSign, Bell, Gift, Settings as SettingsIcon } from 'lucide-react';
+import { useAuthStore } from '../../store/authStore';
+import { notifyUsers } from '../../lib/notify';
 
 interface DepositMethod {
   currency: string;
@@ -11,8 +13,58 @@ interface DepositMethod {
 }
 
 export default function AdminSettings() {
+  const { profile } = useAuthStore();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [sendingReminders, setSendingReminders] = useState(false);
+
+  const handleSendInactivityReminders = async () => {
+    setSendingReminders(true);
+    try {
+      const graceHours = parseInt(inactivityHours) || 24;
+      const warningWindowStartMs = (graceHours - 48) * 60 * 60 * 1000;
+      const warningWindowEndMs = graceHours * 60 * 65 * 1000;
+
+      const [profilesRes, ordersRes] = await Promise.all([
+        supabase.from('profiles').select('id, name, email, created_at, wallet_balance, is_admin'),
+        supabase.from('orders').select('user_id')
+      ]);
+
+      if (profilesRes.error) throw profilesRes.error;
+      const usersList = profilesRes.data || [];
+      const usersWithOrders = new Set((ordersRes.data || []).map(o => o.user_id));
+
+      const now = Date.now();
+      const targetUsers = usersList.filter(u => {
+        if (u.is_admin) return false;
+        const hasOrders = usersWithOrders.has(u.id);
+        const hasBalance = (u.wallet_balance || 0) > 0;
+        if (hasOrders || hasBalance) return false;
+
+        const ageMs = now - new Date(u.created_at).getTime();
+        return ageMs >= warningWindowStartMs && ageMs < warningWindowEndMs;
+      });
+
+      if (targetUsers.length === 0) {
+        toast.info('No users currently in the 48-hour restriction warning window.');
+        return;
+      }
+
+      const userIds = targetUsers.map(u => u.id);
+      await notifyUsers(userIds, {
+        title: 'Action Required: Account restriction warning',
+        message: 'Your account is approaching restriction due to inactivity. Please top up your wallet or start an investment to keep full access.',
+        type: 'warning',
+        link: '/app/wallet'
+      });
+
+      toast.success(`Successfully dispatched grace warnings to ${targetUsers.length} users.`);
+    } catch (err: any) {
+      toast.error('Failed to dispatch reminders: ' + err.message);
+    } finally {
+      setSendingReminders(false);
+    }
+  };
 
   // Deposit methods
   const [depositMethods, setDepositMethods] = useState<DepositMethod[]>([
@@ -34,6 +86,18 @@ export default function AdminSettings() {
   // Notification defaults
   const [emailNotif, setEmailNotif] = useState({ deposit: true, withdrawal: true, payout: true, promo: true, low_balance: true });
   const [pushNotif, setPushNotif] = useState({ deposit: true, withdrawal: true, payout: true, promo: true, low_balance: true });
+
+  // Notification Locks (Enforcements)
+  const [lockedNotif, setLockedNotif] = useState<Record<string, boolean>>({
+    email_info: false,
+    email_success: false,
+    email_warning: true,
+    email_alert: true,
+    push_info: false,
+    push_success: false,
+    push_warning: true,
+    push_alert: true,
+  });
 
   // Property scroll speed
   const [scrollSpeed, setScrollSpeed] = useState('3');
@@ -65,6 +129,9 @@ export default function AdminSettings() {
         if (s.key === 'push_notifications') {
           try { setPushNotif(JSON.parse(s.value)); } catch (err) { console.warn('Failed parsing push notif settings', err); }
         }
+        if (s.key === 'locked_notifications') {
+          try { setLockedNotif(JSON.parse(s.value)); } catch (err) { console.warn('Failed parsing locked notifications settings', err); }
+        }
         if (s.key === 'property_scroll_speed') setScrollSpeed(s.value);
       });
     }
@@ -85,6 +152,7 @@ export default function AdminSettings() {
         { key: 'inactivity_restriction_type', value: inactivityRestrictionType },
         { key: 'email_notifications', value: JSON.stringify(emailNotif) },
         { key: 'push_notifications', value: JSON.stringify(pushNotif) },
+        { key: 'locked_notifications', value: JSON.stringify(lockedNotif) },
         { key: 'property_scroll_speed', value: scrollSpeed },
       ];
       for (const u of updates) {
@@ -93,6 +161,22 @@ export default function AdminSettings() {
           .upsert({ key: u.key, value: u.value, updated_at: new Date().toISOString() }, { onConflict: 'key' });
         if (error) throw error;
       }
+      
+      // Log the admin audit trail
+      if (profile?.id) {
+        await supabase.from('admin_actions').insert({
+          admin_id: profile.id,
+          action: 'update_settings',
+          target_table: 'settings',
+          target_id: 'locked_notifications',
+          details: {
+            changes: {
+              locked_notifications: lockedNotif
+            }
+          }
+        });
+      }
+
       toast.success('Settings updated');
     } catch (err: any) {
       toast.error(err.message);
@@ -191,6 +275,86 @@ export default function AdminSettings() {
                 <option value="suspend_all">Suspend All Actions (Withdrawals, Investing, Staking, Properties)</option>
               </select>
               <p className="text-xs text-gray-400 mt-1 font-medium text-amber-700">Decide which operations are blocked when a user exceeds the inactivity period.</p>
+            </div>
+          </div>
+          <div className="mt-5 pt-4 border-t flex justify-end">
+            <button
+              type="button"
+              onClick={handleSendInactivityReminders}
+              disabled={sendingReminders}
+              className="inline-flex items-center gap-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-250 text-xs font-bold px-4 py-2.5 rounded-xl transition disabled:opacity-60 shadow-sm"
+            >
+              Send Inactivity Warning Emails (48h Grace Window)
+            </button>
+          </div>
+        </div>
+
+        {/* User Notification Enforcements (Locks) */}
+        <div className="bg-white rounded-2xl shadow-sm border p-6">
+          <h2 className="text-xl font-semibold flex items-center gap-2"><Bell size={20} className="text-brand" /> User Notification Enforcements (Locks)</h2>
+          <p className="text-xs text-gray-500 mt-1">
+            Specify which notification categories are mandatory (Locked) for all members. Locked notifications are forced to be <strong>ON</strong> and cannot be disabled by users in their settings. Flexible notifications can be toggled by members at will.
+          </p>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+            {/* Email Locks */}
+            <div className="space-y-4">
+              <h3 className="text-sm font-bold text-gray-700 border-b pb-2 flex items-center justify-between">
+                <span>Email Category</span>
+                <span className="text-xs font-semibold text-gray-400">Lock Switch</span>
+              </h3>
+              {[
+                { key: 'email_info', label: 'Support & Announcements (Info)' },
+                { key: 'email_success', label: 'Successful Operations (Success)' },
+                { key: 'email_warning', label: 'Account Safeguards (Warning)' },
+                { key: 'email_alert', label: 'Critical Account Events (Alert)' },
+              ].map(({ key, label }) => (
+                <div key={key} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100 hover:bg-gray-100/50 transition">
+                  <span className="text-sm font-medium text-gray-700">{label}</span>
+                  <label className="relative inline-flex items-center cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={lockedNotif[key] || false}
+                      onChange={(e) => setLockedNotif({ ...lockedNotif, [key]: e.target.checked })}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-focus:ring-2 peer-focus:ring-brand/30 dark:bg-gray-300 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
+                    <span className="ml-2 text-xs font-semibold text-gray-600 min-w-[55px]">
+                      {lockedNotif[key] ? 'Locked' : 'Flexible'}
+                    </span>
+                  </label>
+                </div>
+              ))}
+            </div>
+
+            {/* Push/In-App Locks */}
+            <div className="space-y-4">
+              <h3 className="text-sm font-bold text-gray-700 border-b pb-2 flex items-center justify-between">
+                <span>Push & In-App Category</span>
+                <span className="text-xs font-semibold text-gray-400">Lock Switch</span>
+              </h3>
+              {[
+                { key: 'push_info', label: 'Live Chat & Messaging (Info)' },
+                { key: 'push_success', label: 'Transaction Notifications (Success)' },
+                { key: 'push_warning', label: 'Security & Auth Notices (Warning)' },
+                { key: 'push_alert', label: 'Action-Required Warnings (Alert)' },
+              ].map(({ key, label }) => (
+                <div key={key} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100 hover:bg-gray-100/50 transition">
+                  <span className="text-sm font-medium text-gray-700">{label}</span>
+                  <label className="relative inline-flex items-center cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={lockedNotif[key] || false}
+                      onChange={(e) => setLockedNotif({ ...lockedNotif, [key]: e.target.checked })}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-focus:ring-2 peer-focus:ring-brand/30 dark:bg-gray-300 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
+                    <span className="ml-2 text-xs font-semibold text-gray-600 min-w-[55px]">
+                      {lockedNotif[key] ? 'Locked' : 'Flexible'}
+                    </span>
+                  </label>
+                </div>
+              ))}
             </div>
           </div>
         </div>

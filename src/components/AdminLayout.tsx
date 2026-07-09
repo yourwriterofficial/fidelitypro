@@ -42,6 +42,7 @@ const NAV_SECTIONS = [
       { path: '/admin/notifications',    icon: Bell,        label: 'Notifications'  },
       { path: '/admin/announcements',    icon: Megaphone,   label: 'Announcements'  },
       { path: '/admin/email-templates',  icon: Mail,        label: 'Email Templates'},
+      { path: '/admin/email-logs',       icon: Mail,        label: 'Email Logs'     },
     ],
   },
   {

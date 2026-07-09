@@ -41,12 +41,14 @@ import AdminReferrals from './pages/admin/AdminReferrals';
 import AdminUsers from './pages/admin/AdminUsers';
 import AdminNotifications from './pages/admin/AdminNotifications';
 import EmailTemplates from './pages/admin/EmailTemplates';
+import AdminEmailLogs from './pages/admin/AdminEmailLogs';
 import AdminAnnouncements from './pages/admin/AdminAnnouncements';
 import AdminSettings from './pages/admin/AdminSettings';
 import AdminActivityLogs from './pages/admin/AdminActivityLogs';
 import PushAutoSubscriber from './components/PushAutoSubscriber';
 import PWAUpdater from './components/PWAUpdater';
 import Chat from './pages/Chat';
+import NotificationsPage from './pages/NotificationsPage';
 import AdminChat from './pages/admin/AdminChat';
 
 function App() {
@@ -97,6 +99,7 @@ function App() {
                 <Route path="referral" element={<Referral />} />
                 <Route path="settings" element={<Settings />} />
                 <Route path="chat" element={<Chat />} />
+                <Route path="notifications" element={<NotificationsPage />} />
               </Route>
             </Route>
           </Route>
@@ -116,6 +119,7 @@ function App() {
                 <Route path="users" element={<AdminUsers />} />
                 <Route path="notifications" element={<AdminNotifications />} />
                 <Route path="email-templates" element={<EmailTemplates />} />
+                <Route path="email-logs" element={<AdminEmailLogs />} />
                 <Route path="announcements" element={<AdminAnnouncements />} />
                 <Route path="settings" element={<AdminSettings />} />
                 <Route path="logs" element={<AdminActivityLogs />} />

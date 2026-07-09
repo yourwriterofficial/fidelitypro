@@ -26,17 +26,59 @@ export default function Settings() {
     push_alert: true
   });
 
+  // Admin Notification Lock State
+  const [lockedNotifications, setLockedNotifications] = useState<Record<string, boolean>>({
+    email_info: false,
+    email_success: false,
+    email_warning: true,
+    email_alert: true,
+    push_info: false,
+    push_success: false,
+    push_warning: true,
+    push_alert: true
+  });
+
+  const [devices, setDevices] = useState<any[]>([]);
+
   const fetchPreferences = async () => {
     if (!profile?.id) return;
     try {
-      const { data, error } = await supabase
-        .from('notification_preferences')
-        .select('*')
-        .eq('user_id', profile.id)
-        .single();
-        
-      if (error) {
-        if (error.code === 'PGRST116') {
+      // Fetch both locked settings and user preferences in parallel
+      const [prefRes, lockRes] = await Promise.all([
+        supabase
+          .from('notification_preferences')
+          .select('*')
+          .eq('user_id', profile.id)
+          .maybeSingle(),
+        supabase
+          .from('settings')
+          .select('value')
+          .eq('key', 'locked_notifications')
+          .maybeSingle()
+      ]);
+
+      let activeLocked = {
+        email_info: false,
+        email_success: false,
+        email_warning: true,
+        email_alert: true,
+        push_info: false,
+        push_success: false,
+        push_warning: true,
+        push_alert: true
+      };
+
+      if (lockRes?.data?.value) {
+        try {
+          activeLocked = JSON.parse(lockRes.data.value);
+          setLockedNotifications(activeLocked);
+        } catch (e) {
+          console.error('Failed parsing locked notifications settings', e);
+        }
+      }
+
+      if (prefRes?.error) {
+        if (prefRes.error.code === 'PGRST116') {
           // Record not found, insert default rows
           const defaults = {
             user_id: profile.id,
@@ -52,13 +94,31 @@ export default function Settings() {
           await supabase.from('notification_preferences').insert(defaults);
           setPreferences(defaults);
         } else {
-          throw error;
+          throw prefRes.error;
         }
-      } else if (data) {
-        setPreferences(data);
+      } else if (prefRes?.data) {
+        // Enforce that locked fields must be true in local state
+        const mergedPrefs = { ...prefRes.data };
+        Object.keys(activeLocked).forEach((key) => {
+          if (activeLocked[key as keyof typeof activeLocked] === true) {
+            mergedPrefs[key] = true;
+          }
+        });
+        setPreferences(mergedPrefs);
+      }
+
+      // Fetch push subscriptions
+      const subsRes = await supabase
+        .from('push_subscriptions')
+        .select('id, user_agent, created_at')
+        .eq('user_id', profile.id)
+        .order('created_at', { ascending: false });
+
+      if (!subsRes.error) {
+        setDevices(subsRes.data || []);
       }
     } catch (err) {
-      console.error('Error fetching notification preferences:', err);
+      console.error('Error fetching preferences & devices:', err);
     }
   };
 
@@ -66,8 +126,52 @@ export default function Settings() {
     fetchPreferences();
   }, [profile?.id]);
 
+  useEffect(() => {
+    const channel = supabase
+      .channel('notification_locks_sync')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'settings',
+          filter: 'key=eq.locked_notifications'
+        },
+        (payload: any) => {
+          if (payload.new && payload.new.value) {
+            try {
+              const activeLocked = JSON.parse(payload.new.value);
+              setLockedNotifications(activeLocked);
+              
+              // Synchronize checkboxes to true for newly locked preferences
+              setPreferences(prev => {
+                const updated = { ...prev };
+                Object.keys(activeLocked).forEach((key) => {
+                  if (activeLocked[key] === true) {
+                    (updated as any)[key] = true;
+                  }
+                });
+                return updated;
+              });
+            } catch (e) {
+              console.error('Realtime locks sync error:', e);
+            }
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
   const handleTogglePreference = async (key: keyof typeof preferences) => {
     if (!profile?.id) return;
+    if (lockedNotifications[key] === true) {
+      toast.error('This notification setting is locked by the administrator.');
+      return;
+    }
     const newVal = !preferences[key];
     setPreferences(prev => ({ ...prev, [key]: newVal }));
     
@@ -82,6 +186,21 @@ export default function Settings() {
     } catch (err: any) {
       toast.error(err.message || 'Failed to update preferences');
       setPreferences(prev => ({ ...prev, [key]: !newVal })); // Revert on error
+    }
+  };
+
+  const handleDeleteDevice = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('push_subscriptions')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+      setDevices(prev => prev.filter(d => d.id !== id));
+      toast.success('Device push registration revoked.');
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to revoke device registration.');
     }
   };
 
@@ -227,21 +346,40 @@ export default function Settings() {
                 { key: 'email_success', label: 'Successful Operations', desc: 'Confirmations of deposits, investments, and payouts.' },
                 { key: 'email_warning', label: 'Account Safeguards', desc: 'Alerts when changes are made to your login credentials.' },
                 { key: 'email_alert', label: 'Critical Account Events', desc: 'Essential updates regarding restrictions or mandatory fees.' },
-              ].map(({ key, label, desc }) => (
-                <div key={key} className="flex items-start justify-between p-3.5 bg-gray-50 border border-gray-100 rounded-xl">
-                  <div className="space-y-1 pr-3">
-                    <label className="text-xs font-semibold text-gray-800 cursor-pointer" htmlFor={key}>{label}</label>
-                    <p className="text-[10px] text-gray-450 leading-relaxed">{desc}</p>
+              ].map(({ key, label, desc }) => {
+                const isLocked = lockedNotifications[key] === true;
+                return (
+                  <div key={key} className={`flex items-start justify-between p-3.5 border rounded-xl transition ${
+                    isLocked ? 'bg-gray-50/70 border-amber-100/60' : 'bg-gray-50 border-gray-100 hover:bg-gray-100/30'
+                  }`}>
+                    <div className="space-y-1 pr-3">
+                      <div className="flex items-center flex-wrap gap-1.5">
+                        <label className={`text-xs font-semibold text-gray-800 ${isLocked ? 'cursor-not-allowed' : 'cursor-pointer'}`} htmlFor={key}>
+                          {label}
+                        </label>
+                        {isLocked && (
+                          <span className="text-[8px] bg-amber-50 text-amber-600 font-bold border border-amber-200/50 px-1 rounded uppercase tracking-wider">
+                            Enforced
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[10px] text-gray-450 leading-relaxed">{desc}</p>
+                    </div>
+                    <input
+                      id={key}
+                      type="checkbox"
+                      checked={isLocked ? true : ((preferences as any)[key] ?? true)}
+                      disabled={isLocked}
+                      onChange={() => handleTogglePreference(key as any)}
+                      className={`w-4 h-4 rounded border-gray-300 focus:ring-brand shrink-0 mt-0.5 ${
+                        isLocked 
+                          ? 'text-amber-500 cursor-not-allowed bg-amber-50 border-amber-200 opacity-80' 
+                          : 'text-brand cursor-pointer'
+                      }`}
+                    />
                   </div>
-                  <input
-                    id={key}
-                    type="checkbox"
-                    checked={(preferences as any)[key]}
-                    onChange={() => handleTogglePreference(key as any)}
-                    className="w-4 h-4 rounded text-brand border-gray-300 focus:ring-brand shrink-0 cursor-pointer mt-0.5"
-                  />
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
 
@@ -256,27 +394,84 @@ export default function Settings() {
                 { key: 'push_success', label: 'Transaction Notifications', desc: 'Realtime banners for earnings and stake confirmations.' },
                 { key: 'push_warning', label: 'Security & Auth Notices', desc: 'Alerts for logins or security policy refreshes.' },
                 { key: 'push_alert', label: 'Action-Required Warnings', desc: 'Critical instructions, restrictions, and deposit updates.' },
-              ].map(({ key, label, desc }) => (
-                <div key={key} className="flex items-start justify-between p-3.5 bg-gray-50 border border-gray-100 rounded-xl">
-                  <div className="space-y-1 pr-3">
-                    <label className="text-xs font-semibold text-gray-800 cursor-pointer" htmlFor={key}>{label}</label>
-                    <p className="text-[10px] text-gray-450 leading-relaxed">{desc}</p>
+              ].map(({ key, label, desc }) => {
+                const isLocked = lockedNotifications[key] === true;
+                return (
+                  <div key={key} className={`flex items-start justify-between p-3.5 border rounded-xl transition ${
+                    isLocked ? 'bg-gray-50/70 border-amber-100/60' : 'bg-gray-50 border-gray-100 hover:bg-gray-100/30'
+                  }`}>
+                    <div className="space-y-1 pr-3">
+                      <div className="flex items-center flex-wrap gap-1.5">
+                        <label className={`text-xs font-semibold text-gray-800 ${isLocked ? 'cursor-not-allowed' : 'cursor-pointer'}`} htmlFor={key}>
+                          {label}
+                        </label>
+                        {isLocked && (
+                          <span className="text-[8px] bg-amber-50 text-amber-600 font-bold border border-amber-200/50 px-1 rounded uppercase tracking-wider">
+                            Enforced
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[10px] text-gray-450 leading-relaxed">{desc}</p>
+                    </div>
+                    <input
+                      id={key}
+                      type="checkbox"
+                      checked={isLocked ? true : ((preferences as any)[key] ?? true)}
+                      disabled={isLocked}
+                      onChange={() => handleTogglePreference(key as any)}
+                      className={`w-4 h-4 rounded border-gray-300 focus:ring-indigo-500 shrink-0 mt-0.5 ${
+                        isLocked 
+                          ? 'text-amber-500 cursor-not-allowed bg-amber-50 border-amber-200 opacity-80' 
+                          : 'text-indigo-650 cursor-pointer'
+                      }`}
+                    />
                   </div>
-                  <input
-                    id={key}
-                    type="checkbox"
-                    checked={(preferences as any)[key]}
-                    onChange={() => handleTogglePreference(key as any)}
-                    className="w-4 h-4 rounded text-indigo-650 border-gray-300 focus:ring-indigo-500 shrink-0 cursor-pointer mt-0.5"
-                  />
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
+          </div>
         </div>
-      </div>
 
-      {/* Change Password */}
+        {/* Registered Devices Panel */}
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+          <div className="flex items-center gap-3 px-6 py-4 border-b border-gray-100 bg-gray-50/50">
+            <div className="p-2 bg-indigo-50 rounded-xl"><User size={17} className="text-indigo-600" /></div>
+            <div>
+              <h2 className="font-semibold text-gray-900 text-sm">Registered Push Devices</h2>
+              <p className="text-xs text-gray-400">Manage browsers authorized to receive push notifications on this account</p>
+            </div>
+          </div>
+          <div className="p-6">
+            {devices.length === 0 ? (
+              <p className="text-xs text-gray-400 text-center py-4">No devices registered for push alerts. Enable push notifications in support chat to register this browser.</p>
+            ) : (
+              <div className="space-y-3">
+                {devices.map((device) => (
+                  <div key={device.id} className="flex items-center justify-between p-3.5 bg-gray-50 border border-gray-100 rounded-xl">
+                    <div className="min-w-0 flex-1 pr-3">
+                      <p className="text-xs font-semibold text-gray-800 truncate" title={device.user_agent || 'Unknown Device'}>
+                        {device.user_agent || 'Unknown Browser/Device'}
+                      </p>
+                      <p className="text-[10px] text-gray-400 mt-0.5">
+                        Registered: {new Date(device.created_at).toLocaleString()}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteDevice(device.id)}
+                      className="text-xs font-semibold text-red-650 hover:text-red-800 bg-red-50 hover:bg-red-100 border border-red-205/50 px-2.5 py-1.5 rounded-lg transition"
+                    >
+                      Revoke
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Change Password */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         <div className="flex items-center gap-3 px-6 py-4 border-b border-gray-100 bg-gray-50/50">
           <div className="p-2 bg-red-50 rounded-xl"><Lock size={17} className="text-red-500" /></div>
