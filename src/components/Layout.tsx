@@ -286,7 +286,7 @@ export default function Layout() {
       </aside>
 
       {/* ===== MAIN CONTENT ===== */}
-      <main className={`flex-1 flex flex-col min-h-0 overflow-hidden transition-[margin] duration-200 ${collapsed ? 'md:ml-20' : 'md:ml-64'}`}>
+      <main className={`flex-1 flex flex-col min-h-0 md:overflow-hidden transition-[margin] duration-200 ${collapsed ? 'md:ml-20' : 'md:ml-64'}`}>
 
         {/* Mobile Header */}
         <header className="md:hidden bg-white border-b border-gray-100 px-4 py-3 flex items-center justify-between sticky top-0 z-20 shadow-sm">
@@ -321,7 +321,7 @@ export default function Layout() {
         </header>
 
         {/* Page content */}
-        <div className="flex-1 flex flex-col min-h-0 p-4 md:p-6 pb-20 md:pb-6">
+        <div className="flex-1 flex flex-col min-h-0 overflow-y-auto p-4 md:p-6 pb-20 md:pb-6">
           {(restricted || withdrawRestricted || investRestricted || stakeRestricted || propertyRestricted) && (
             <div className="mb-5 rounded-2xl border border-amber-200 bg-amber-50 flex items-start gap-3 px-4 py-3.5 shadow-sm shrink-0">
               <div className="p-1.5 rounded-lg bg-amber-100 shrink-0 mt-0.5">

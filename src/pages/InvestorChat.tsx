@@ -696,6 +696,14 @@ export default function InvestorChat() {
     localStorage.setItem('rpm_chat_custom_topic', simCustomTopic);
   }, [simCustomTopic]);
 
+  // Controlled state for admin panel uncontrolled inputs (prevents reset on re-render)
+  const [schedCountrySelect, setSchedCountrySelect] = useState<string>(Object.keys({
+    US: '🇺🇸', GB: '🇬🇧', CA: '🇨🇦', AU: '🇦🇺', NG: '🇳🇬', GH: '🇬🇭', ZA: '🇿🇦', KE: '🇰🇪',
+  })[0] || 'US');
+  const [schedHoursSelect, setSchedHoursSelect] = useState<number>(1);
+  const [impersonateNameInput, setImpersonateNameInput] = useState('');
+  const [impersonateCountryInput, setImpersonateCountryInput] = useState('US');
+
   // Shuffled sequence list ref for rotating posters
   const shuffledUsersRef = useRef<{ name: string; country: string }[]>([]);
   const simUserIndexRef = useRef(0);
@@ -1257,6 +1265,30 @@ export default function InvestorChat() {
         }
       }
 
+      // ── Reply notification ───────────────────────────────────────
+      // Notify the person being replied to (only for real profiles,
+      // not when replying to your own message or simulated users).
+      if (replyTarget?.reply_to_name || replyTarget?.sender_name) {
+        const replyToName = replyTarget.sender_name;
+        if (replyToName && replyToName !== senderName) {
+          const { data: repliedUser } = await supabase
+            .from('profiles')
+            .select('id, name')
+            .ilike('name', replyToName.replace(/_/g, ' '))
+            .maybeSingle();
+
+          if (repliedUser && repliedUser.id !== profile?.id) {
+            await notifyUser({
+              userId: repliedUser.id,
+              title: '💬 Someone replied to your message',
+              message: `${senderName} replied to you: "${text.substring(0, 60)}${text.length > 60 ? '...' : ''}"`,
+              type: 'info',
+              link: '/app/investor-chat'
+            });
+          }
+        }
+      }
+
       setText('');
       setReplyTarget(null);
       scrollToBottom();
@@ -1751,11 +1783,27 @@ export default function InvestorChat() {
                               <Bell size={12} />
                             </button>
                           )}
+                          {/* Impersonate (post as) */}
                           <button
-                            onClick={() => setImpersonatedUser({ name: msg.sender_name, country: msg.sender_country })}
+                            onClick={() => {
+                              setImpersonatedUser({ name: msg.sender_name, country: msg.sender_country });
+                              toast.success(`Now posting as @${msg.sender_name}`);
+                              document.getElementById('chat-input-field')?.focus();
+                            }}
                             className="p-1.5 hover:bg-purple-50 dark:hover:bg-purple-900/30 rounded-lg text-purple-400 text-[9px] font-bold transition"
-                            title="Impersonate"
+                            title={`Post as @${msg.sender_name}`}
                           >@</button>
+                          {/* Reply as sender — sets both impersonation + reply target */}
+                          <button
+                            onClick={() => {
+                              setImpersonatedUser({ name: msg.sender_name, country: msg.sender_country });
+                              setReplyTarget(msg);
+                              toast.success(`Reply as @${msg.sender_name}`);
+                              document.getElementById('chat-input-field')?.focus();
+                            }}
+                            className="p-1.5 hover:bg-purple-50 dark:hover:bg-purple-900/30 rounded-lg text-purple-500 text-[9px] font-bold transition"
+                            title={`Reply to this message as @${msg.sender_name}`}
+                          >↩@</button>
                           <button
                             onClick={() => handleBanUser(msg.sender_name)}
                             className="p-1.5 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg text-red-400 transition"
@@ -1765,6 +1813,7 @@ export default function InvestorChat() {
                           </button>
                         </>
                       )}
+
                     </div>
                   </div>
                 );
@@ -2021,7 +2070,8 @@ export default function InvestorChat() {
                         <div className="space-y-2">
                           <div className="flex gap-2">
                             <select 
-                              id="sched-country"
+                              value={schedCountrySelect}
+                              onChange={(e) => setSchedCountrySelect(e.target.value)}
                               className="flex-1 border rounded-xl px-2.5 py-2 text-xs focus:ring-1 focus:ring-gray-950 outline-none"
                             >
                               {COUNTRIES.map(k => (
@@ -2029,7 +2079,8 @@ export default function InvestorChat() {
                               ))}
                             </select>
                             <select 
-                              id="sched-hours"
+                              value={schedHoursSelect}
+                              onChange={(e) => setSchedHoursSelect(Number(e.target.value))}
                               className="border rounded-xl px-2.5 py-2 text-xs focus:ring-1 focus:ring-gray-950 outline-none w-[90px]"
                             >
                               <option value={1}>1 hour</option>
@@ -2042,14 +2093,11 @@ export default function InvestorChat() {
                           <button
                             type="button"
                             onClick={() => {
-                              const cCode = (document.getElementById('sched-country') as HTMLSelectElement)?.value;
-                              const hrs = Number((document.getElementById('sched-hours') as HTMLSelectElement)?.value);
-                              if (!cCode) return;
-                              
-                              const untilStr = new Date(Date.now() + hrs * 60 * 60 * 1000).toISOString();
-                              setScheduledCountry(cCode);
+                              if (!schedCountrySelect) return;
+                              const untilStr = new Date(Date.now() + schedHoursSelect * 60 * 60 * 1000).toISOString();
+                              setScheduledCountry(schedCountrySelect);
                               setScheduledUntil(untilStr);
-                              toast.success(`Scheduled exclusive posts for ${cCode} for next ${hrs} hours.`);
+                              toast.success(`Scheduled exclusive posts for ${schedCountrySelect} for next ${schedHoursSelect} hours.`);
                             }}
                             className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition shadow-sm"
                           >
@@ -2081,11 +2129,13 @@ export default function InvestorChat() {
                       <input
                         type="text"
                         placeholder="Enter custom username..."
-                        id="imp-name"
+                        value={impersonateNameInput}
+                        onChange={(e) => setImpersonateNameInput(e.target.value)}
                         className="w-full border rounded-xl px-3 py-2 text-xs focus:ring-1 focus:ring-gray-950 outline-none font-semibold"
                       />
                       <select 
-                        id="imp-country"
+                        value={impersonateCountryInput}
+                        onChange={(e) => setImpersonateCountryInput(e.target.value)}
                         className="w-full border rounded-xl px-3 py-2 text-xs focus:ring-1 focus:ring-gray-950 outline-none"
                       >
                         {Object.keys(COUNTRY_FLAGS).map(k => (
@@ -2095,11 +2145,11 @@ export default function InvestorChat() {
                       <button
                         type="button"
                         onClick={() => {
-                          const name = (document.getElementById('imp-name') as HTMLInputElement)?.value;
-                          const country = (document.getElementById('imp-country') as HTMLSelectElement)?.value;
-                          if (!name) return toast.error("Enter a valid name");
-                          setImpersonatedUser({ name, country });
-                          toast.success(`Impersonation active for @${name}`);
+                          if (!impersonateNameInput.trim()) return toast.error("Enter a valid name");
+                          setImpersonatedUser({ name: impersonateNameInput.trim(), country: impersonateCountryInput });
+                          setImpersonateNameInput('');
+                          toast.success(`Impersonation active for @${impersonateNameInput.trim()}`);
+                          document.getElementById('chat-input-field')?.focus();
                         }}
                         className="w-full py-2 bg-gray-900 text-white rounded-xl text-xs font-bold transition hover:bg-gray-800"
                       >

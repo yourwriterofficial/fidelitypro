@@ -114,6 +114,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   initAuth: async () => {
+    // Prevent duplicate listeners if initAuth is called multiple times
+    // (e.g. React Strict Mode double-invocation in development)
+    const { data: { subscription: existingSub } } = supabase.auth.onAuthStateChange(() => {});
+    existingSub.unsubscribe();
+
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
@@ -128,16 +133,19 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         set({ loading: false });
       }
 
-      supabase.auth.onAuthStateChange(async (event, session) => {
-        // A failed token refresh (invalid/expired refresh token) is what caused
-        // the random "403" dead-ends: the client kept a stale user in memory so
-        // the app stayed on protected routes while every request was rejected.
-        // Treat any event without a valid session as a clean sign-out.
-        if (event === 'SIGNED_OUT' || (!session?.user && event !== 'INITIAL_SESSION')) {
-          set({ user: null, profile: null, isAdmin: false, loading: false });
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+        // Only clear the user on an explicit SIGNED_OUT — do NOT sign out on
+        // TOKEN_REFRESHED, PASSWORD_RECOVERY, USER_UPDATED or any other event
+        // that might arrive with a briefly-null session mid-cycle.
+        if (event === 'SIGNED_OUT') {
+          set({ user: null, profile: null, isAdmin: false, loading: false,
+                isImpersonating: false, originalUser: null, originalProfile: null });
           return;
         }
         if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') && session?.user) {
+          const { isImpersonating } = get();
+          // Don't overwrite profile/user while actively impersonating
+          if (isImpersonating) return;
           const profile = await fetchProfile(session.user.id);
           set({
             user: session.user,
@@ -147,6 +155,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           });
         }
       });
+
+      // Store subscription reference for potential cleanup
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (get as any)._authSubscription = subscription;
     } catch (error) {
       console.error('Auth init error:', error);
       set({ loading: false });
