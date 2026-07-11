@@ -50,6 +50,7 @@ import PWAUpdater from './components/PWAUpdater';
 import Chat from './pages/Chat';
 import NotificationsPage from './pages/NotificationsPage';
 import HistoryPage from './pages/HistoryPage';
+import InvestorChat from './pages/InvestorChat';
 import AdminChat from './pages/admin/AdminChat';
 
 function App() {
@@ -102,6 +103,7 @@ function App() {
                 <Route path="chat" element={<Chat />} />
                 <Route path="notifications" element={<NotificationsPage />} />
                 <Route path="history" element={<HistoryPage />} />
+                <Route path="investor-chat" element={<InvestorChat />} />
               </Route>
             </Route>
           </Route>

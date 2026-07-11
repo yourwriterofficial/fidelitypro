@@ -3,7 +3,7 @@ import { useAuthStore } from '../store/authStore';
 import {
   LogOut, Home, Wallet, Briefcase, Settings, Shield, Lock, Gift,
   Building, LayoutDashboard, Menu, X, MoreHorizontal, ChevronRight, AlertCircle,
-  ChevronsLeft, ChevronsRight, MessageSquare, History,
+  ChevronsLeft, ChevronsRight, MessageSquare, History, Users,
 } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 import NotificationBell from './NotificationBell';
@@ -20,6 +20,7 @@ const navItems = [
   { path: '/app/properties',  icon: Building,      label: 'Properties'},
   { path: '/app/referral',    icon: Gift,          label: 'Referral'  },
   { path: '/app/chat',        icon: MessageSquare, label: 'Support Inbox' },
+  { path: '/app/investor-chat',icon: Users,        label: 'Investor Chat' },
   { path: '/app/history',     icon: History,       label: 'History'   },
   { path: '/app/settings',    icon: Settings,      label: 'Settings'  },
 ];
