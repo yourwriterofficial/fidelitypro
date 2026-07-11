@@ -103,7 +103,10 @@ const PROCEDURAL_USERNAMES = (() => {
     "omar","hassan","ali","khalid","ahmed","ibrahim","yusuf","ismail","tariq","sameer",
     "raj","priya","arjun","kavya","rohit","ananya","vivek","pooja","manish","shreya",
     "dmitri","ivan","aleksei","nikolai","mikhail","boris","sergei","andrei","vadim","kirill",
-    "sofia","lena","anastasia","katerina","olga","irina","natasha","polina","daria","yulia"
+    "sofia","lena","anastasia","katerina","olga","irina","natasha","polina","daria","yulia",
+    "lorenzo","marcello","sandro","giovanni","luigi","paolo","vincenzo","stefano","claudio","fabio",
+    "mathias","ludvig","rasmus","mikkel","magnus","emil","oskar","hugo","lukas_k","lucas_v",
+    "chloe_f","elise_m","clara_g","emma_h","sophie_d","zoey_e","mia_r","ava_s","luna_t","lola_u"
   ];
   const tags = [
     "trades","holds","stacks","invests","wins","hodls","builds","earns","saves","grows",
@@ -709,6 +712,61 @@ export default function InvestorChat() {
   // Reply target message state
   const [replyTarget, setReplyTarget] = useState<InvestorChatMessage | null>(null);
 
+  // Keep track of simulated user post timestamps to enforce "twice a day (24h)" limit
+  const userPostTimesRef = useRef<Record<string, number[]>>({});
+
+  const canUserPost = (username: string): boolean => {
+    const now = Date.now();
+    const times = userPostTimesRef.current[username] || [];
+    const oneDayAgo = now - 24 * 60 * 60 * 1000;
+    const recentTimes = times.filter(t => t > oneDayAgo);
+    userPostTimesRef.current[username] = recentTimes;
+    return recentTimes.length < 2;
+  };
+
+  const recordUserPost = (username: string) => {
+    const times = userPostTimesRef.current[username] || [];
+    times.push(Date.now());
+    userPostTimesRef.current[username] = times;
+  };
+
+  // Trigger alert if current user is tagged or replied to
+  const checkAndAlertMentions = (msg: InvestorChatMessage) => {
+    if (!profile || msg.sender_id === profile.id || msg.sender_name === 'System') return;
+
+    const myName = profile.name?.toLowerCase() || '';
+    const myUsername = myName.replace(/\s+/g, '_');
+    const bodyText = msg.body.toLowerCase();
+
+    const isTagged = myName && (
+      bodyText.includes(`@${myName}`) || 
+      (myUsername && bodyText.includes(`@${myUsername}`))
+    );
+
+    const isReplied = msg.reply_to_name && (
+      msg.reply_to_name.toLowerCase() === myName ||
+      msg.reply_to_name.toLowerCase() === myUsername
+    );
+
+    if (isTagged || isReplied) {
+      toast(isTagged ? `You were tagged by @${msg.sender_name}` : `Reply from @${msg.sender_name}`, {
+        description: msg.body.substring(0, 60) + (msg.body.length > 60 ? '...' : ''),
+        action: {
+          label: "View",
+          onClick: () => {
+            const el = document.getElementById(`msg-${msg.id}`);
+            if (el) {
+              el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              el.classList.add('!bg-[#2b5278]/20');
+              setTimeout(() => el.classList.remove('!bg-[#2b5278]/20'), 2000);
+            }
+          }
+        },
+        duration: 6000
+      });
+    }
+  };
+
   // Scroll details for virtual scrollback
   const [virtualHistoryCount, setVirtualHistoryCount] = useState(40);
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -748,6 +806,9 @@ export default function InvestorChat() {
             if (prev.some(m => m.id === newMsg.id)) return prev;
             return [...prev, newMsg];
           });
+
+          // Check if current user is tagged or responded to
+          checkAndAlertMentions(newMsg);
 
           // Check if followed user posted (Admin alert)
           if (profile?.is_admin) {
@@ -960,14 +1021,20 @@ export default function InvestorChat() {
         candidates = candidates.filter(u => actC.includes(u.country));
       }
 
+      // Filter by daily post limits (max 2 per day)
+      let eligibleCandidates = candidates.filter(u => canUserPost(u.name));
+      if (eligibleCandidates.length === 0) {
+        eligibleCandidates = candidates;
+      }
+
       // Fallback if filter left empty
-      if (candidates.length === 0) {
-        candidates = shuffledUsersRef.current;
+      if (eligibleCandidates.length === 0) {
+        eligibleCandidates = shuffledUsersRef.current;
       }
 
       // Pick sequential user from candidates to ensure rotating variety
-      const user = candidates[simUserIndexRef.current % candidates.length];
-      simUserIndexRef.current = (simUserIndexRef.current + 1) % candidates.length;
+      const user = eligibleCandidates[simUserIndexRef.current % eligibleCandidates.length];
+      simUserIndexRef.current = (simUserIndexRef.current + 1) % eligibleCandidates.length;
       
       const decider = Math.random();
       if (decider < 0.05) {
@@ -1026,12 +1093,18 @@ export default function InvestorChat() {
           reply_to_body: shouldReply ? lastMsg.body : undefined
         };
 
+        // Record simulated post frequency
+        recordUserPost(user.name);
+
         setMessages(prev => {
           // Prevent adjacent identical messages
           if (prev.length > 0 && prev[prev.length - 1].body === body) return prev;
           return [...prev, simulatedMsg];
         });
         scrollToBottom();
+
+        // Check if current user is tagged or responded to
+        checkAndAlertMentions(simulatedMsg);
 
         // Check if followed user posted (Admin alert)
         if (profile?.is_admin) {
@@ -1416,16 +1489,29 @@ export default function InvestorChat() {
             </div>
           </div>
 
-          {/* Search bar */}
-          <div className="relative max-w-[200px] w-full">
-            <Search className="absolute left-2.5 top-2 text-[#4a6a80]" size={13} />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search..."
-              className="w-full bg-[#0d1117] border border-[#2b3d4f] rounded-xl pl-8 pr-3 py-1.5 text-xs text-white placeholder-[#4a6a80] focus:outline-none focus:ring-1 focus:ring-blue-500"
-            />
+          <div className="flex items-center gap-2 max-w-[300px] w-full justify-end">
+            {/* Search bar */}
+            <div className="relative max-w-[120px] sm:max-w-[180px] w-full">
+              <Search className="absolute left-2.5 top-2 text-[#4a6a80]" size={13} />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search..."
+                className="w-full bg-[#0d1117] border border-[#2b3d4f] rounded-xl pl-8 pr-3 py-1.5 text-xs text-white placeholder-[#4a6a80] focus:outline-none focus:ring-1 focus:ring-blue-500"
+              />
+            </div>
+
+            {/* Admin control panel toggle button on mobile */}
+            {profile?.is_admin && (
+              <button
+                onClick={() => setShowAdminPanel(!showAdminPanel)}
+                className="md:hidden flex items-center justify-center p-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl transition shadow shrink-0"
+                title={showAdminPanel ? "Hide Admin Panel" : "Show Admin Panel"}
+              >
+                <ShieldCheck size={16} />
+              </button>
+            )}
           </div>
         </div>
 

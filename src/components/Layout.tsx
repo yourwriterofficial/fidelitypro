@@ -297,6 +297,11 @@ export default function Layout() {
             <span className="text-lg font-extrabold text-gray-900">RPM</span>
           </div>
           <div className="flex items-center gap-1">
+            <Link to="/app/investor-chat"
+              className="relative p-2 rounded-xl text-gray-450 hover:bg-gray-100 hover:text-gray-700 transition-colors"
+              title="Investor Chat">
+              <Users size={19} className={location.pathname === '/app/investor-chat' ? 'text-brand' : 'text-gray-400'} />
+            </Link>
             <Link to="/app/chat"
               className="relative p-2 rounded-xl text-gray-450 hover:bg-gray-100 hover:text-gray-700 transition-colors"
               title="Support Inbox">
