@@ -332,8 +332,15 @@ export default function Chat() {
             <div className="w-10 h-10 bg-gradient-to-tr from-brand to-indigo-600 rounded-2xl flex items-center justify-center text-white font-extrabold text-lg shadow-lg shadow-brand/35 ring-2 ring-white/10">
               R
             </div>
-            <div>
-              <h1 className="font-bold text-sm tracking-wide">Support Inbox</h1>
+             <div>
+              <h1 className="font-bold text-sm tracking-wide flex items-center gap-1.5">
+                Support Inbox
+                <span className="inline-flex items-center justify-center bg-blue-500 text-white rounded-full p-0.5 w-3.5 h-3.5 shadow-sm shrink-0" title="Verified Support Account">
+                  <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="4.5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                </span>
+              </h1>
               <p className="text-[10px] text-emerald-450 font-bold flex items-center gap-1.5 mt-0.5">
                 <span className="w-1.5 h-1.5 bg-emerald-450 rounded-full animate-ping shrink-0" />
                 Real-time Support Agent Online
@@ -380,6 +387,17 @@ export default function Chat() {
                     ? 'bg-gradient-to-br from-brand to-indigo-600 text-white rounded-tr-none border border-brand/5 shadow-brand/10' 
                     : 'bg-white text-slate-800 rounded-tl-none border border-slate-100/80 shadow-slate-100'
                 }`}>
+                  {/* Header/Badge for Support messages */}
+                  {!isMe && (
+                    <div className="flex items-center gap-1 mb-1">
+                      <span className="text-[10px] font-extrabold text-blue-600">Support</span>
+                      <span className="inline-flex items-center justify-center bg-blue-500 text-white rounded-full p-0.5 w-3 h-3 shadow-xs" title="Verified Support Account">
+                        <svg className="w-2 h-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="5">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                      </span>
+                    </div>
+                  )}
                   {/* Body */}
                   <p className="leading-relaxed break-words font-medium">{msg.body}</p>
                   

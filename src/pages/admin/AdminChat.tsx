@@ -4,7 +4,7 @@ import { supabase } from '../../lib/supabaseClient';
 import { useLocation } from 'react-router-dom';
 import { 
   Send, Users, Check, CheckCheck, RefreshCw, 
-  Wallet, ShieldAlert, ShieldCheck, Mail, User, Info, ArrowLeft, Plus, X, Trash2
+  Wallet, ShieldAlert, ShieldCheck, Mail, User, Info, ArrowLeft, Plus, X, Trash2, Bell
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { sendEmailToUser } from '../../lib/notify';
@@ -62,6 +62,7 @@ export default function AdminChat() {
 
   // Real-time typing status
   const [isUserTyping, setIsUserTyping] = useState(false);
+  const [followedInvestors, setFollowedInvestors] = useState<string[]>([]);
   
   const chatEndRef = useRef<HTMLDivElement>(null);
   const threadsChannelRef = useRef<any>(null);
@@ -121,7 +122,7 @@ export default function AdminChat() {
       // Update thread state locally
       setThreads(prev => prev.map(t => {
         if (t.user_id === activeUserId) {
-          return { ...t, user: { ...t.user!, assigned_admin_id: nextClaim } };
+          return { ...t, user: t.user ? { ...t.user, assigned_admin_id: nextClaim } : undefined };
         }
         return t;
       }));
@@ -135,6 +136,32 @@ export default function AdminChat() {
       toast.success(nextClaim ? 'Conversation claimed!' : 'Conversation released.');
     } catch (err: any) {
       toast.error(err.message || 'Failed to update claim assignment.');
+    }
+  };
+
+  const handleFollowToggle = async (targetName: string) => {
+    if (!profile?.id) return;
+    const isFollowing = followedInvestors.includes(targetName.toLowerCase());
+    try {
+      if (isFollowing) {
+        const { error } = await supabase
+          .from('investor_chat_follows')
+          .delete()
+          .eq('admin_id', profile.id)
+          .eq('target_name', targetName);
+        if (error) throw error;
+        setFollowedInvestors(prev => prev.filter(name => name !== targetName.toLowerCase()));
+        toast.success(`Stopped following @${targetName}`);
+      } else {
+        const { error } = await supabase
+          .from('investor_chat_follows')
+          .insert({ admin_id: profile.id, target_name: targetName });
+        if (error) throw error;
+        setFollowedInvestors(prev => [...prev, targetName.toLowerCase()]);
+        toast.success(`Following @${targetName}. You will be notified when they post in Investor Chat.`);
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to update follow status');
     }
   };
 
@@ -177,7 +204,7 @@ export default function AdminChat() {
       const userIds = latestMsgs.map((m: any) => m.user_id);
       const { data: profiles } = await supabase
         .from('profiles')
-        .select('id, name, email, wallet_balance, banned, can_withdraw, can_invest, fee_required, last_seen')
+        .select('id, name, email, wallet_balance, banned, can_withdraw, can_invest, fee_required, last_seen, assigned_admin_id')
         .in('id', userIds);
 
       const profileMap: Record<string, Profile> = {};
@@ -274,6 +301,17 @@ export default function AdminChat() {
   useEffect(() => {
     if (!profile?.id) return;
     fetchThreads();
+
+    const fetchFollows = async () => {
+      const { data } = await supabase
+        .from('investor_chat_follows')
+        .select('target_name')
+        .eq('admin_id', profile.id);
+      if (data) {
+        setFollowedInvestors(data.map((f: any) => f.target_name.toLowerCase()));
+      }
+    };
+    fetchFollows();
 
     threadsChannelRef.current = supabase
       .channel('admin_threads_sync')
@@ -479,7 +517,7 @@ export default function AdminChat() {
   }
 
   return (
-    <div className="h-[calc(100dvh-130px)] md:h-[calc(100dvh-120px)] bg-white border border-gray-100 shadow-sm rounded-2xl flex overflow-hidden">
+    <div className="h-[calc(100dvh-170px)] md:h-[calc(100dvh-120px)] mb-16 md:mb-0 bg-white border border-gray-100 shadow-sm rounded-2xl flex overflow-hidden">
       
       {/* Thread list (Left panel) */}
       <div className={`w-full md:w-80 border-r border-gray-100 flex flex-col shrink-0 ${activeUserId && 'hidden md:flex'}`}>
@@ -679,6 +717,16 @@ export default function AdminChat() {
                           ? 'bg-gradient-to-br from-brand to-indigo-600 text-white rounded-tr-none border border-brand/5 shadow-brand/10' 
                           : 'bg-white text-slate-800 rounded-tl-none border border-slate-100/85 shadow-slate-105'
                       }`}>
+                        {isMe && (
+                          <div className="flex items-center gap-1 mb-1">
+                            <span className="text-[10px] font-extrabold text-blue-200">Support</span>
+                            <span className="inline-flex items-center justify-center bg-white text-blue-600 rounded-full p-0.5 w-3 h-3 shadow-xs" title="Verified Support Account">
+                              <svg className="w-2 h-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="5">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                              </svg>
+                            </span>
+                          </div>
+                        )}
                         <p className="leading-relaxed break-words font-medium">{msg.body}</p>
                         
                         <div className="flex items-center justify-end gap-1.5 mt-1.5">
@@ -835,6 +883,20 @@ export default function AdminChat() {
               >
                 <Mail size={13} /> View Audit Logs
               </a>
+              <button
+                type="button"
+                onClick={() => handleFollowToggle(activeUser.name || 'User')}
+                className={`w-full py-2.5 rounded-xl border transition font-bold text-xs flex items-center justify-center gap-2 ${
+                  followedInvestors.includes((activeUser.name || 'User').toLowerCase())
+                    ? 'bg-blue-50 border-blue-200 text-blue-650 hover:bg-blue-100'
+                    : 'border-gray-200 text-gray-700 hover:bg-gray-50'
+                }`}
+              >
+                <Bell size={13} />
+                {followedInvestors.includes((activeUser.name || 'User').toLowerCase())
+                  ? 'Following Investor'
+                  : 'Follow Investor'}
+              </button>
             </div>
 
           </div>
@@ -993,6 +1055,23 @@ export default function AdminChat() {
                 >
                   <Mail size={13} /> View Audit Logs
                 </a>
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleFollowToggle(activeUser.name || 'User');
+                    setShowMobileDetails(false);
+                  }}
+                  className={`w-full py-2.5 rounded-xl border transition font-bold text-xs flex items-center justify-center gap-2 ${
+                    followedInvestors.includes((activeUser.name || 'User').toLowerCase())
+                      ? 'bg-blue-50 border-blue-200 text-blue-650 hover:bg-blue-100'
+                      : 'border-gray-200 text-gray-700 hover:bg-gray-50 bg-white'
+                  }`}
+                >
+                  <Bell size={13} />
+                  {followedInvestors.includes((activeUser.name || 'User').toLowerCase())
+                    ? 'Following Investor'
+                    : 'Follow Investor'}
+                </button>
               </div>
             </div>
           </div>

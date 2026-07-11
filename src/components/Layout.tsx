@@ -194,7 +194,7 @@ export default function Layout() {
     path === '/app' ? location.pathname === '/app' : location.pathname.startsWith(path);
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row">
+    <div className="h-screen bg-gray-50 flex flex-col md:flex-row overflow-hidden">
 
       {/* ===== DESKTOP SIDEBAR (collapsible) ===== */}
       <aside className={`bg-white border-r border-gray-100 hidden md:flex md:flex-col md:fixed md:inset-y-0 md:left-0 md:z-30 transition-[width] duration-200 ${collapsed ? 'md:w-20' : 'md:w-64'}`}>
@@ -286,7 +286,7 @@ export default function Layout() {
       </aside>
 
       {/* ===== MAIN CONTENT ===== */}
-      <main className={`flex-1 min-h-screen flex flex-col transition-[margin] duration-200 ${collapsed ? 'md:ml-20' : 'md:ml-64'}`}>
+      <main className={`flex-1 flex flex-col min-h-0 overflow-hidden transition-[margin] duration-200 ${collapsed ? 'md:ml-20' : 'md:ml-64'}`}>
 
         {/* Mobile Header */}
         <header className="md:hidden bg-white border-b border-gray-100 px-4 py-3 flex items-center justify-between sticky top-0 z-20 shadow-sm">
@@ -316,9 +316,9 @@ export default function Layout() {
         </header>
 
         {/* Page content */}
-        <div className="flex-1 p-4 md:p-6 pb-24 md:pb-6">
+        <div className="flex-1 flex flex-col min-h-0 p-4 md:p-6 pb-20 md:pb-6">
           {(restricted || withdrawRestricted || investRestricted || stakeRestricted || propertyRestricted) && (
-            <div className="mb-5 rounded-2xl border border-amber-200 bg-amber-50 flex items-start gap-3 px-4 py-3.5 shadow-sm">
+            <div className="mb-5 rounded-2xl border border-amber-200 bg-amber-50 flex items-start gap-3 px-4 py-3.5 shadow-sm shrink-0">
               <div className="p-1.5 rounded-lg bg-amber-100 shrink-0 mt-0.5">
                 <AlertCircle size={15} className="text-amber-600" />
               </div>
@@ -333,7 +333,10 @@ export default function Layout() {
               </div>
             </div>
           )}
-          <Outlet />
+          {/* flex-1 wrapper so full-height pages like InvestorChat can fill remaining space */}
+          <div className="flex-1 min-h-0 flex flex-col">
+            <Outlet />
+          </div>
         </div>
 
         {/* Mobile Bottom Navigation */}
