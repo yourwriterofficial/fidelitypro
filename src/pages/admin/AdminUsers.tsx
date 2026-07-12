@@ -3,10 +3,10 @@ import { supabase } from '../../lib/supabaseClient';
 import { useAuthStore } from '../../store/authStore';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { 
-  Ban, UserCheck, Eye, Edit, Plus, Minus, Save, X, Mail, Lock, Key, Check, CheckCheck, Trash2
+import {
+  Ban, UserCheck, Eye, Edit, Plus, Minus, Save, X, Mail, Lock, Key, Check, CheckCheck, Trash2, Bell, BellRing, Clock, ChevronDown, ChevronUp
 } from 'lucide-react';
-import { sendEmailAndLog } from '../../lib/notify';
+import { sendEmailAndLog, notifyUser } from '../../lib/notify';
 
 interface User {
   id: string;
@@ -73,7 +73,13 @@ export default function AdminUsers() {
     last_active: string;
   }
   const [onlineUsers, setOnlineUsers] = useState<OnlineUser[]>([]);
-  const [pageVisitsToday, setPageVisitsToday] = useState<any[]>([]);
+  const [visitorSearch, setVisitorSearch] = useState('');
+  const [watchedUserIds, setWatchedUserIds] = useState<Set<string>>(new Set());
+  const [expandedVisitorId, setExpandedVisitorId] = useState<string | null>(null);
+  const [visitorHistory, setVisitorHistory] = useState<Record<string, { path: string; created_at: string }[]>>({});
+  const [loadingHistoryFor, setLoadingHistoryFor] = useState<string | null>(null);
+  const previousOnlineIdsRef = useRef<Set<string>>(new Set());
+  const lastAlertedAtRef = useRef<Record<string, number>>({});
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('profile');
@@ -134,37 +140,70 @@ export default function AdminUsers() {
     return parts.join(', ') + ' ago';
   };
 
-  const fetchPageVisitsToday = async () => {
+  // Keep a ref mirror of watchedUserIds so the presence handler (set up once)
+  // always reads the latest watch list without needing to resubscribe.
+  const watchedUserIdsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    watchedUserIdsRef.current = watchedUserIds;
+  }, [watchedUserIds]);
+
+  const fetchWatchedUsers = async () => {
+    if (!user?.id) return;
+    const { data } = await supabase.from('admin_watched_users').select('target_user_id').eq('admin_id', user.id);
+    setWatchedUserIds(new Set((data || []).map((r: any) => r.target_user_id)));
+  };
+
+  const toggleWatch = async (targetUserId: string, targetName: string) => {
+    if (!user?.id) return;
+    const isWatching = watchedUserIds.has(targetUserId);
     try {
-      const today = new Date();
-      today.setHours(0,0,0,0);
-      
-      const { data, error } = await supabase
-        .from('user_page_visits')
-        .select('path')
-        .gte('created_at', today.toISOString());
-         
-      if (error) throw error;
-      
-      const counts: Record<string, number> = {};
-      (data || []).forEach(v => {
-        counts[v.path] = (counts[v.path] || 0) + 1;
-      });
-      
-      const sorted = Object.entries(counts)
-        .map(([path, count]) => ({ path, count }))
-        .sort((a, b) => b.count - a.count);
-         
-      setPageVisitsToday(sorted);
-    } catch (err) {
-      console.error('Error fetching page visits:', err);
+      if (isWatching) {
+        await supabase.from('admin_watched_users').delete().eq('admin_id', user.id).eq('target_user_id', targetUserId);
+        setWatchedUserIds(prev => { const next = new Set(prev); next.delete(targetUserId); return next; });
+        toast.success(`Stopped watching ${targetName}`);
+      } else {
+        await supabase.from('admin_watched_users').insert({ admin_id: user.id, target_user_id: targetUserId });
+        setWatchedUserIds(prev => new Set(prev).add(targetUserId));
+        toast.success(`Watching ${targetName} — you'll be alerted when they come online`);
+      }
+    } catch (err: any) {
+      toast.error('Failed to update watch: ' + err.message);
     }
+  };
+
+  const fetchVisitHistory = async (userId: string) => {
+    setLoadingHistoryFor(userId);
+    try {
+      const { data } = await supabase
+        .from('user_page_visits')
+        .select('path, created_at')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(10);
+      setVisitorHistory(prev => ({ ...prev, [userId]: data || [] }));
+    } finally {
+      setLoadingHistoryFor(null);
+    }
+  };
+
+  const expandedVisitorIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    expandedVisitorIdRef.current = expandedVisitorId;
+  }, [expandedVisitorId]);
+
+  const toggleVisitorExpanded = (userId: string) => {
+    if (expandedVisitorId === userId) {
+      setExpandedVisitorId(null);
+      return;
+    }
+    setExpandedVisitorId(userId);
+    fetchVisitHistory(userId);
   };
 
   useEffect(() => {
     fetchUsers();
     fetchTemplates();
-    fetchPageVisitsToday();
+    fetchWatchedUsers();
 
     // 1. Subscribe to presence tracking channel
     const presenceChannel = supabase.channel('online_users');
@@ -185,14 +224,48 @@ export default function AdminUsers() {
           }
         });
         setOnlineUsers(list);
+
+        // Detect users who just transitioned offline -> online and alert any
+        // admin watching them (push + in-app + toast). A 5-minute per-user
+        // cooldown absorbs brief presence flicker from page navigation so a
+        // watched user browsing around doesn't spam repeat alerts.
+        const newOnlineIds = new Set(list.map(l => l.user_id));
+        const prevOnlineIds = previousOnlineIdsRef.current;
+        const watched = watchedUserIdsRef.current;
+        const now = Date.now();
+        list.forEach(ou => {
+          if (prevOnlineIds.has(ou.user_id)) return;
+          if (!watched.has(ou.user_id)) return;
+          const lastAlerted = lastAlertedAtRef.current[ou.user_id] || 0;
+          if (now - lastAlerted < 5 * 60 * 1000) return;
+          lastAlertedAtRef.current[ou.user_id] = now;
+
+          const displayName = ou.name || ou.email || 'A watched user';
+          toast(`${displayName} just came online`, {
+            description: `Now viewing ${ou.current_page || 'the site'}`,
+          });
+          if (user?.id) {
+            notifyUser({
+              userId: user.id,
+              title: 'Watched user online',
+              message: `${displayName} just came online (viewing ${ou.current_page || 'the site'}).`,
+              type: 'alert',
+              link: '/admin/users',
+            });
+          }
+        });
+        previousOnlineIdsRef.current = newOnlineIds;
       })
       .subscribe();
 
-    // 2. Subscribe to page visit updates
+    // 2. Live-refresh an expanded visitor's page history the moment they navigate
     const visitsChannel = supabase
       .channel('realtime_page_visits')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'user_page_visits' }, () => {
-        fetchPageVisitsToday();
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'user_page_visits' }, (payload: any) => {
+        const visitedUserId = payload.new?.user_id;
+        if (visitedUserId && visitedUserId === expandedVisitorIdRef.current) {
+          fetchVisitHistory(visitedUserId);
+        }
       })
       .subscribe();
 
@@ -210,7 +283,7 @@ export default function AdminUsers() {
       supabase.removeChannel(visitsChannel);
       supabase.removeChannel(profilesChannel);
     };
-  }, []);
+  }, [user?.id]);
 
   const fetchTemplates = async () => {
     const { data } = await supabase.from('email_templates').select('*');
@@ -742,6 +815,33 @@ export default function AdminUsers() {
     return `Rpm-${out}`;
   };
 
+  const buildTempPasswordEmail = (name: string, email: string, pwd: string) => `
+    <div style="font-family: 'Inter', Helvetica, Arial, sans-serif; background-color: #f9fafb; padding: 40px 20px; color: #1f2937;">
+      <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); border: 1px solid #f3f4f6;">
+        <div style="background-color: #0f172a; padding: 32px; text-align: center;">
+          <span style="color: #ffffff; font-size: 24px; font-weight: 800; letter-spacing: -0.5px; font-family: sans-serif;">RPM</span>
+        </div>
+        <div style="padding: 40px 32px;">
+          <h2 style="font-size: 20px; font-weight: 700; color: #111827; margin-top: 0; margin-bottom: 16px;">A temporary password was set for your account, ${name}</h2>
+          <p style="font-size: 15px; line-height: 1.6; color: #4b5563; margin-bottom: 24px;">Our support team has set a temporary password for your account so you can get back in right away. Use the credentials below to log in, then change your password from Settings.</p>
+          <div style="background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 12px; padding: 20px 24px; margin-bottom: 28px;">
+            <p style="font-size: 13px; color: #6b7280; margin: 0 0 6px 0; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em;">Username / Email</p>
+            <p style="font-size: 15px; color: #111827; margin: 0 0 16px 0; font-weight: 600;">${email}</p>
+            <p style="font-size: 13px; color: #6b7280; margin: 0 0 6px 0; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em;">Temporary Password</p>
+            <p style="font-size: 18px; color: #111827; margin: 0; font-weight: 700; font-family: 'Courier New', monospace; letter-spacing: 0.02em;">${pwd}</p>
+          </div>
+          <div style="text-align: center; margin-bottom: 32px;">
+            <a href="${window.location.origin}/login" style="display: inline-block; background-color: #10b981; color: #ffffff; padding: 14px 28px; font-weight: 600; font-size: 15px; border-radius: 12px; text-decoration: none; box-shadow: 0 4px 6px -1px rgba(16, 185, 129, 0.2);">Log In Now</a>
+          </div>
+          <p style="font-size: 14px; line-height: 1.5; color: #6b7280; margin-bottom: 0;">For your security, please change this password from <strong>Settings</strong> immediately after logging in. If you did not request this, contact our support team right away.</p>
+        </div>
+        <div style="background-color: #f3f4f6; padding: 24px; text-align: center; border-top: 1px solid #e5e7eb;">
+          <p style="font-size: 12px; color: #9ca3af; margin: 0;">&copy; 2026 RPM. All rights reserved.</p>
+        </div>
+      </div>
+    </div>
+  `;
+
   const setUserPassword = async () => {
     if (!selectedUser) return;
     const pwd = (tempPassword.trim() || generateTempPassword());
@@ -765,7 +865,19 @@ export default function AdminUsers() {
       if (error) throw error;
       setTempPassword(pwd);
       try { await navigator.clipboard.writeText(pwd); } catch { /* clipboard may be blocked */ }
-      toast.success(`Temp password set & copied: ${pwd}`, { id: 'set-pwd', duration: 12000 });
+
+      // Email the user their new credentials and instructions to change it
+      try {
+        await sendEmailAndLog(
+          selectedUser.email,
+          'Your temporary RPM password',
+          buildTempPasswordEmail(selectedUser.name || selectedUser.email, selectedUser.email, pwd)
+        );
+      } catch (emailErr) {
+        console.warn('[setUserPassword] Failed to email temp password:', emailErr);
+      }
+
+      toast.success(`Temp password set, emailed & copied: ${pwd}`, { id: 'set-pwd', duration: 12000 });
     } catch (err: any) {
       toast.error('Failed to set password: ' + err.message, { id: 'set-pwd' });
     } finally {
@@ -927,28 +1039,59 @@ export default function AdminUsers() {
         </button>
       </div>
 
-      {/* Live Tracking & Route Frequency Analytics Hub */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 bg-slate-900 text-white p-6 rounded-3xl shadow-xl border border-slate-800">
-        
-        {/* Real-time Online Users Panel */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-            <h3 className="text-sm font-bold flex items-center gap-2 text-white">
-              <span className="w-2 h-2 bg-emerald-550 rounded-full animate-ping shrink-0" />
-              Live Online Users ({onlineUsers.length})
-            </h3>
+      {/* Live Visitors Hub (Tidio-style real-time presence) */}
+      <div className="bg-slate-900 text-white p-6 rounded-3xl shadow-xl border border-slate-800 space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-3">
+          <h3 className="text-sm font-bold flex items-center gap-2 text-white">
+            <span className="w-2 h-2 bg-emerald-550 rounded-full animate-ping shrink-0" />
+            Live Visitors ({onlineUsers.length})
+          </h3>
+          <div className="flex items-center gap-1.5">
+            {watchedUserIds.size > 0 && (
+              <span className="text-[10px] bg-amber-500/10 border border-amber-500/20 text-amber-400 px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
+                <BellRing size={10} /> {watchedUserIds.size} watched
+              </span>
+            )}
             <span className="text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">Real-time Presence</span>
           </div>
-          
-          <div className="space-y-3 max-h-[220px] overflow-y-auto overscroll-contain pr-1">
-            {onlineUsers.length === 0 ? (
-              <p className="text-slate-500 text-xs py-8 text-center font-medium">No users currently active online.</p>
-            ) : (
-              onlineUsers.map(ou => {
+        </div>
+
+        <input
+          type="text"
+          value={visitorSearch}
+          onChange={(e) => setVisitorSearch(e.target.value)}
+          placeholder="Search visitors by name or email…"
+          className="w-full bg-slate-850 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-brand"
+        />
+
+        <div className="space-y-2 max-h-[520px] overflow-y-auto overscroll-contain pr-1">
+          {onlineUsers.length === 0 ? (
+            <p className="text-slate-500 text-xs py-8 text-center font-medium">No visitors currently active online.</p>
+          ) : (
+            (() => {
+              const search = visitorSearch.trim().toLowerCase();
+              const filtered = onlineUsers.filter(ou => {
+                if (!search) return true;
                 const matchedUser = users.find(u => u.id === ou.user_id);
-                const name = ou.name || matchedUser?.name || 'Active User';
+                const name = (ou.name || matchedUser?.name || '').toLowerCase();
+                const email = (ou.email || matchedUser?.email || '').toLowerCase();
+                return name.includes(search) || email.includes(search);
+              });
+              const sorted = [...filtered].sort((a, b) => {
+                const aWatched = watchedUserIds.has(a.user_id) ? 1 : 0;
+                const bWatched = watchedUserIds.has(b.user_id) ? 1 : 0;
+                return bWatched - aWatched;
+              });
+              if (sorted.length === 0) {
+                return <p className="text-slate-500 text-xs py-8 text-center font-medium">No visitors match "{visitorSearch}".</p>;
+              }
+              return sorted.map(ou => {
+                const matchedUser = users.find(u => u.id === ou.user_id);
+                const name = ou.name || matchedUser?.name || 'Active Visitor';
                 const email = ou.email || matchedUser?.email || 'Monitoring page...';
-                
+                const isWatched = watchedUserIds.has(ou.user_id);
+                const isExpanded = expandedVisitorId === ou.user_id;
+
                 const getPageLabel = (path: string) => {
                   if (path === '/app') return 'Dashboard';
                   if (path.startsWith('/app/wallet')) return 'Wallet';
@@ -958,6 +1101,7 @@ export default function AdminUsers() {
                   if (path.startsWith('/app/properties')) return 'Properties';
                   if (path.startsWith('/app/referral')) return 'Referrals';
                   if (path.startsWith('/app/chat')) return 'Support Inbox';
+                  if (path.startsWith('/app/investor-chat')) return 'Investor Chat';
                   if (path.startsWith('/app/settings')) return 'Settings';
                   if (path.startsWith('/app/notifications')) return 'Notification Center';
                   if (path.startsWith('/app/history')) return 'History';
@@ -966,72 +1110,80 @@ export default function AdminUsers() {
                 };
 
                 return (
-                  <div key={ou.user_id} className="flex items-center justify-between bg-slate-850/50 hover:bg-slate-850 p-3 rounded-2xl border border-slate-800/60 transition">
-                    <div className="flex items-center gap-2.5 min-w-0 flex-1 pr-2">
-                      <div className="w-7 h-7 rounded-lg bg-slate-800 text-white font-bold flex items-center justify-center text-xs shrink-0">
-                        {name.charAt(0).toUpperCase()}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-xs font-bold truncate text-white">{name}</p>
-                        <p className="text-[10px] text-slate-450 truncate">{email}</p>
-                        <div className="mt-1">
-                          <span className="px-1.5 py-0.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-md text-[9px] font-bold">
-                            Viewing: {getPageLabel(ou.current_page)}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                    {matchedUser && (
+                  <div key={ou.user_id} className="bg-slate-850/50 hover:bg-slate-850 rounded-2xl border border-slate-800/60 transition overflow-hidden">
+                    <div className="flex items-center justify-between p-3">
                       <button
                         type="button"
-                        onClick={() => openUserModal(matchedUser)}
-                        className="text-[9px] bg-slate-850 hover:bg-slate-800 border border-slate-700 text-slate-300 font-bold px-2 py-1.5 rounded-lg transition shrink-0"
+                        onClick={() => toggleVisitorExpanded(ou.user_id)}
+                        className="flex items-center gap-2.5 min-w-0 flex-1 pr-2 text-left"
                       >
-                        Inspect
+                        <div className="w-7 h-7 rounded-lg bg-slate-800 text-white font-bold flex items-center justify-center text-xs shrink-0">
+                          {name.charAt(0).toUpperCase()}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-bold truncate text-white flex items-center gap-1">
+                            {name}
+                            {isWatched && <BellRing size={10} className="text-amber-400 shrink-0" />}
+                          </p>
+                          <p className="text-[10px] text-slate-450 truncate">{email}</p>
+                          <div className="mt-1">
+                            <span className="px-1.5 py-0.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-md text-[9px] font-bold">
+                              Viewing: {getPageLabel(ou.current_page)}
+                            </span>
+                          </div>
+                        </div>
+                        {isExpanded ? <ChevronUp size={14} className="text-slate-500 shrink-0" /> : <ChevronDown size={14} className="text-slate-500 shrink-0" />}
                       </button>
+                      <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                        {matchedUser && (
+                          <button
+                            type="button"
+                            onClick={() => toggleWatch(matchedUser.id, name)}
+                            title={isWatched ? 'Stop watching' : 'Watch — get alerted when they come online'}
+                            className={`p-1.5 rounded-lg border transition ${isWatched ? 'bg-amber-500/10 border-amber-500/30 text-amber-400' : 'bg-slate-850 border-slate-700 text-slate-400 hover:text-amber-400'}`}
+                          >
+                            {isWatched ? <BellRing size={13} /> : <Bell size={13} />}
+                          </button>
+                        )}
+                        {matchedUser && (
+                          <button
+                            type="button"
+                            onClick={() => openUserModal(matchedUser)}
+                            className="text-[9px] bg-slate-850 hover:bg-slate-800 border border-slate-700 text-slate-300 font-bold px-2 py-1.5 rounded-lg transition"
+                          >
+                            Inspect
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {isExpanded && (
+                      <div className="px-3 pb-3 border-t border-slate-800/60 pt-2.5">
+                        <p className="text-[9px] uppercase tracking-wider font-bold text-slate-500 mb-2 flex items-center gap-1">
+                          <Clock size={10} /> Recent page history
+                        </p>
+                        {loadingHistoryFor === ou.user_id ? (
+                          <p className="text-slate-500 text-[10px] py-2">Loading history…</p>
+                        ) : (visitorHistory[ou.user_id] || []).length === 0 ? (
+                          <p className="text-slate-500 text-[10px] py-2">No recorded visits yet.</p>
+                        ) : (
+                          <div className="space-y-1.5">
+                            {(visitorHistory[ou.user_id] || []).map((v, i) => (
+                              <div key={i} className="flex items-center justify-between text-[10px]">
+                                <span className="text-slate-300 font-medium truncate max-w-[70%]">{getPageLabel(v.path)}</span>
+                                <span className="text-slate-500 tabular-nums">{formatLastSeen(v.created_at)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     )}
                   </div>
                 );
-              })
-            )}
-          </div>
+              });
+            })()
+          )}
         </div>
-
-        {/* Visited Page Route Pulse Frequency */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-            <h3 className="text-sm font-bold flex items-center gap-2 text-white">
-              Daily Route Frequency Pulse
-            </h3>
-            <span className="text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">Analytics</span>
-          </div>
-
-          <div className="space-y-3.5 max-h-[220px] overflow-y-auto overscroll-contain pr-1">
-            {pageVisitsToday.length === 0 ? (
-              <p className="text-slate-500 text-xs py-8 text-center font-medium">No page visits recorded today yet.</p>
-            ) : (
-              pageVisitsToday.map((item, idx) => {
-                const maxCount = pageVisitsToday[0]?.count || 1;
-                const percentage = Math.round((item.count / maxCount) * 100);
-                return (
-                  <div key={item.path || idx} className="space-y-1.5">
-                    <div className="flex justify-between items-center text-xs">
-                      <span className="font-semibold text-slate-350 truncate max-w-[70%] select-all">{item.path}</span>
-                      <span className="text-[10px] text-slate-450 font-bold tabular-nums bg-slate-800 px-1.5 py-0.5 rounded-md">{item.count} hits</span>
-                    </div>
-                    <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
-                      <div 
-                        className="bg-brand h-full rounded-full transition-all duration-500" 
-                        style={{ width: `${percentage}%` }}
-                      />
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
-        </div>
-
       </div>
 
       <div className="bg-white rounded-2xl shadow-sm border overflow-hidden">
@@ -1083,6 +1235,13 @@ export default function AdminUsers() {
                     )}
                     <button onClick={() => impersonateUser(u)} className="text-purple-600 hover:text-purple-800" title="Impersonate user">
                       <Eye size={18} />
+                    </button>
+                    <button
+                      onClick={() => toggleWatch(u.id, u.name || u.email)}
+                      className={watchedUserIds.has(u.id) ? 'text-amber-500 hover:text-amber-600' : 'text-gray-400 hover:text-amber-500'}
+                      title={watchedUserIds.has(u.id) ? 'Stop watching (online alerts)' : 'Watch — get alerted when they come online'}
+                    >
+                      {watchedUserIds.has(u.id) ? <BellRing size={18} /> : <Bell size={18} />}
                     </button>
                   </td>
                 </tr>

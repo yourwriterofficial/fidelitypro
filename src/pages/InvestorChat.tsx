@@ -703,20 +703,12 @@ export default function InvestorChat() {
       // Ephemeral room: real messages are NOT replayed as history every time
       // someone opens the chat. Once a message scrolls out of a live session
       // it's gone — the "Resuming Chat Session" banner tells users exactly this.
-      // The ONLY real messages we reload are:
-      //   • pinned messages (a deliberate, persistent admin action), and
-      //   • messages that are part of a reply thread — i.e. a message that was
-      //     responded to, or the reply itself ("gone, unless responded to").
-      // Everything else is dropped on load and only ever appears live via the
-      // realtime subscription while the user is actually present.
-      const repliedToIds = new Set(
-        dbMsgs.map(m => m.reply_to_id).filter(Boolean)
-      );
-      const persistent = dbMsgs.filter(m =>
-        m.is_pinned ||
-        !!m.reply_to_id ||        // this message is itself a reply
-        repliedToIds.has(m.id)    // this message was replied to
-      );
+      // The ONLY real messages we reload are pinned ones (a deliberate,
+      // persistent admin action). Everything else — including a user's own
+      // old messages and any replies to them — is dropped on load, so a
+      // session never re-anchors on stale content. It only ever reappears
+      // live via the realtime subscription while the user is actually present.
+      const persistent = dbMsgs.filter(m => m.is_pinned);
 
       setMessages(persistent);
       const pinned = dbMsgs.find(m => m.is_pinned);
