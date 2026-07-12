@@ -204,7 +204,7 @@ export default function AdminLayout() {
       </aside>
 
       {/* ===== MAIN CONTENT ===== */}
-      <main className={`flex-1 min-h-screen flex flex-col transition-[margin] duration-200 ${collapsed ? 'md:ml-20' : 'md:ml-64'}`}>
+      <main className={`flex-1 min-h-screen flex flex-col min-w-0 max-w-full md:overflow-hidden transition-[margin] duration-200 ${collapsed ? 'md:ml-20' : 'md:ml-64'}`}>
 
         {/* Mobile Header */}
         <header className="md:hidden bg-white border-b border-gray-100 px-4 py-3 flex items-center justify-between sticky top-0 z-20 shadow-sm">
@@ -224,7 +224,7 @@ export default function AdminLayout() {
         </header>
 
         {/* Page content */}
-        <div className="flex-1 p-4 md:p-6 pb-24 md:pb-6">
+        <div className="flex-1 p-4 md:p-6 pb-24 md:pb-6 overflow-x-hidden w-full min-w-0">
           <Outlet />
         </div>
 

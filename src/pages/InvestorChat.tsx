@@ -3,7 +3,7 @@ import { useAuthStore } from '../store/authStore';
 import { supabase } from '../lib/supabaseClient';
 import { 
   Send, Users, Pin, VolumeX, ShieldAlert, ShieldCheck, 
-  Bell, X, Search, ChevronDown
+  Bell, X, Search, ChevronDown, Info
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { notifyUser, sendEmailToUser } from '../lib/notify';
@@ -679,6 +679,10 @@ export default function InvestorChat() {
   const [simCustomTopic, setSimCustomTopic] = useState<string>(() => {
     return localStorage.getItem('rpm_chat_custom_topic') || '';
   });
+  const [simTopicDraft, setSimTopicDraft] = useState<string>(() => {
+    return localStorage.getItem('rpm_chat_custom_topic') || '';
+  });
+  const [showOfflineNotice, setShowOfflineNotice] = useState(true);
 
   // Persist scheduling settings in localStorage
   useEffect(() => {
@@ -1586,6 +1590,28 @@ export default function InvestorChat() {
           </div>
         )}
 
+        {/* Resuming Session Notice */}
+        {showOfflineNotice && (
+          <div className="bg-amber-50 dark:bg-[#1a232f] border-b border-amber-200/50 dark:border-[#243547] px-4 py-2.5 flex items-center justify-between gap-3 shrink-0 transition-all select-none">
+            <div className="flex items-start gap-2.5 min-w-0">
+              <Info size={16} className="text-amber-600 dark:text-[#7da4c4] shrink-0 mt-0.5" />
+              <div className="min-w-0">
+                <span className="text-xs font-bold text-amber-800 dark:text-[#8ab4d8] block">Resuming Chat Session</span>
+                <p className="text-[11px] text-amber-700 dark:text-[#8aa5bc] leading-relaxed">
+                  Real-time updates have been resumed. To optimize platform performance and conserve bandwidth, messages dispatched during your absence are not synchronized to your local client history.
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => setShowOfflineNotice(false)}
+              className="text-amber-500 hover:text-amber-800 dark:text-gray-400 dark:hover:text-white p-1 hover:bg-amber-100 dark:hover:bg-[#2b3d4f] rounded-lg transition shrink-0"
+              title="Dismiss Notice"
+            >
+              <X size={14} />
+            </button>
+          </div>
+        )}
+
         {/* Messages feed — Telegram style */}
         <div 
           ref={chatContainerRef}
@@ -1923,15 +1949,15 @@ export default function InvestorChat() {
                 </button>
                 {openAdminSections.topic && (
                   <div className="bg-white border rounded-2xl p-4 shadow-sm space-y-3 mt-1">
-                    <p className="text-[10px] text-gray-400 font-semibold leading-normal">Select one, multiple, or shuffle random topics below.</p>
+                    <p className="text-[10px] text-gray-400 font-semibold leading-normal">Select one, multiple, or shuffle random topics below. Press the button below to apply changes.</p>
                     <div className="space-y-2.5">
                       {/* Shortcut Buttons */}
                       <div className="flex gap-2">
                         <button
                           type="button"
-                          onClick={() => setSimCustomTopic("__random__")}
+                          onClick={() => setSimTopicDraft("__random__")}
                           className={`flex-1 py-1.5 px-2 border rounded-xl text-[10px] font-bold transition ${
-                            simCustomTopic === "__random__"
+                            simTopicDraft === "__random__"
                               ? 'bg-blue-500 text-white border-transparent shadow-sm'
                               : 'bg-white text-gray-650 hover:bg-gray-50'
                           }`}
@@ -1940,9 +1966,9 @@ export default function InvestorChat() {
                         </button>
                         <button
                           type="button"
-                          onClick={() => setSimCustomTopic('')}
+                          onClick={() => setSimTopicDraft('')}
                           className={`flex-1 py-1.5 px-2 border rounded-xl text-[10px] font-bold transition ${
-                            !simCustomTopic
+                            !simTopicDraft
                               ? 'bg-gray-500 text-white border-transparent shadow-sm'
                               : 'bg-white text-gray-650 hover:bg-gray-50'
                           }`}
@@ -1956,7 +1982,7 @@ export default function InvestorChat() {
                         <label className="text-[10px] font-bold text-gray-400">System Listings/Staking Topics (Select Multiple):</label>
                         <div className="max-h-36 overflow-y-auto border border-gray-150 rounded-xl p-2 bg-slate-50/20 space-y-1">
                           {systemTopics.map(t => {
-                            const selectedList = simCustomTopic.split(',').map(s => s.trim());
+                            const selectedList = simTopicDraft.split(',').map(s => s.trim());
                             const isSelected = selectedList.includes(t);
                             return (
                               <label key={t} className="flex items-center gap-2 text-[10px] font-semibold text-gray-650 hover:text-gray-900 cursor-pointer select-none">
@@ -1964,16 +1990,16 @@ export default function InvestorChat() {
                                   type="checkbox"
                                   checked={isSelected}
                                   onChange={() => {
-                                    if (simCustomTopic === "__random__") {
-                                      setSimCustomTopic(t);
+                                    if (simTopicDraft === "__random__") {
+                                      setSimTopicDraft(t);
                                     } else {
-                                      let nextList = simCustomTopic ? simCustomTopic.split(',').map(s => s.trim()).filter(Boolean) : [];
+                                      let nextList = simTopicDraft ? simTopicDraft.split(',').map(s => s.trim()).filter(Boolean) : [];
                                       if (nextList.includes(t)) {
                                         nextList = nextList.filter(x => x !== t);
                                       } else {
                                         nextList.push(t);
                                       }
-                                      setSimCustomTopic(nextList.join(', '));
+                                      setSimTopicDraft(nextList.join(', '));
                                     }
                                   }}
                                   className="rounded text-brand focus:ring-brand w-3.5 h-3.5 border-gray-200"
@@ -1991,14 +2017,27 @@ export default function InvestorChat() {
                         <input
                           type="text"
                           placeholder="Type custom or comma-separated list..."
-                          value={simCustomTopic}
-                          onChange={(e) => setSimCustomTopic(e.target.value)}
+                          value={simTopicDraft}
+                          onChange={(e) => setSimTopicDraft(e.target.value)}
                           className="w-full border rounded-xl px-3 py-2 text-xs focus:ring-1 focus:ring-gray-950 outline-none font-semibold text-slate-800"
                         />
                       </div>
+
+                      {/* Confirmation Apply Button */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSimCustomTopic(simTopicDraft);
+                          toast.success("Simulation topics applied successfully!");
+                        }}
+                        className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition shadow-sm"
+                      >
+                        Apply Topic Settings
+                      </button>
                     </div>
                   </div>
                 )}
+
               </div>
 
               {/* Accordion 2: Country Scheduling & Filters */}
