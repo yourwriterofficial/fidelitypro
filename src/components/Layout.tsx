@@ -141,24 +141,29 @@ export default function Layout() {
     };
   }, [profile?.id]);
 
-  // Real-time Presence, Page Route Logging and Last Seen updates
+  // Presence ('online_users') answers "who is online" only — it is tracked
+  // ONCE per connection and never re-tracked on navigation. An earlier
+  // version called .track() again on every route change to keep
+  // current_page fresh, on the theory that re-tracking on the same open
+  // channel just patches that connection's existing entry in place. In
+  // practice, repeated track() calls on this Supabase/Phoenix setup each
+  // added a NEW presence entry under the same user_id key instead of
+  // replacing the old one — so the list only ever grew, and code reading
+  // "the" entry for a user (e.g. array index 0) got stuck on whichever
+  // stale entry happened to sort first, which is why Live Visitors always
+  // showed the very first page ("Dashboard") a user landed on after login
+  // and never updated after that.
+  //
+  // current_page is tracked separately instead, from `user_page_visits` —
+  // a table already written on every navigation (see logPageVisit below)
+  // purely for page-history purposes. Subscribing to INSERTs on it gives an
+  // equally real-time, and far simpler, feed of "what page is this user on
+  // right now" without touching presence's join/leave semantics at all.
+  const [pageByUser, setPageByUser] = useState<Record<string, { path: string; at: string }>>({});
+
   useEffect(() => {
     if (!profile?.id) return;
 
-    // 1. Log page visit to user_page_visits table — guarded against firing
-    // twice in a row for the same path (e.g. a profile object refresh that
-    // doesn't represent an actual navigation).
-    const logPageVisit = async () => {
-      if (lastLoggedPathRef.current === location.pathname) return;
-      lastLoggedPathRef.current = location.pathname;
-      await supabase.from('user_page_visits').insert({
-        user_id: profile.id,
-        path: location.pathname
-      });
-    };
-    logPageVisit();
-
-    // 2. Track presence
     const presenceChannel = supabase.channel('online_users', {
       config: {
         presence: {
@@ -175,15 +180,19 @@ export default function Layout() {
       const state = presenceChannel.presenceState();
       const list: OnlineVisitor[] = [];
       Object.values(state).forEach((presenceList: any) => {
-        if (presenceList?.length) {
-          list.push({
-            user_id: presenceList[0].user_id,
-            name: presenceList[0].name || 'User',
-            email: presenceList[0].email || '',
-            current_page: presenceList[0].current_page || '',
-            last_active: presenceList[0].last_active || '',
-          });
-        }
+        if (!presenceList?.length) return;
+        // Defense in depth: if more than one entry ever ends up under the
+        // same key, prefer the most recently active one.
+        const latest = presenceList.reduce((a: any, b: any) =>
+          new Date(b.last_active || 0).getTime() > new Date(a.last_active || 0).getTime() ? b : a
+        );
+        list.push({
+          user_id: latest.user_id,
+          name: latest.name || 'User',
+          email: latest.email || '',
+          current_page: latest.current_page || '',
+          last_active: latest.last_active || '',
+        });
       });
       setOnlineUsers(list);
     });
@@ -200,7 +209,56 @@ export default function Layout() {
       }
     });
 
-    // 3. Throttle last_seen updates in profiles table (max once per 5 seconds)
+    return () => {
+      supabase.removeChannel(presenceChannel);
+    };
+    // location.pathname intentionally omitted: this only tracks the page the
+    // user landed on when the connection was opened, as a fallback for the
+    // brief window before their first user_page_visits row (below) arrives.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile?.id]);
+
+  // Admins watch every user's page-visit inserts in real time so Live
+  // Visitors reflects current_page immediately as anyone navigates.
+  useEffect(() => {
+    if (!profile?.is_admin) return;
+
+    const visitsChannel = supabase
+      .channel('admin_live_page_visits')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'user_page_visits' }, (payload: any) => {
+        const row = payload.new;
+        if (!row?.user_id) return;
+        setPageByUser(prev => ({ ...prev, [row.user_id]: { path: row.path, at: row.created_at } }));
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(visitsChannel);
+    };
+  }, [profile?.is_admin]);
+
+  // Page Route Logging and Last Seen — run on every navigation.
+  useEffect(() => {
+    if (!profile?.id) return;
+
+    // 1. Log page visit to user_page_visits table — guarded against firing
+    // twice in a row for the same path (e.g. a profile object refresh that
+    // doesn't represent an actual navigation).
+    const logPageVisit = async () => {
+      if (lastLoggedPathRef.current === location.pathname) return;
+      lastLoggedPathRef.current = location.pathname;
+      const nowIso = new Date().toISOString();
+      // Optimistic local update — don't wait on the INSERT's realtime
+      // round-trip just to see your own navigation reflected instantly.
+      setPageByUser(prev => ({ ...prev, [profile.id]: { path: location.pathname, at: nowIso } }));
+      await supabase.from('user_page_visits').insert({
+        user_id: profile.id,
+        path: location.pathname
+      });
+    };
+    logPageVisit();
+
+    // 2. Throttle last_seen updates in profiles table (max once per 5 seconds)
     const updateLastSeen = async () => {
       const now = new Date().toISOString();
       const lastUpdate = localStorage.getItem('last_seen_updated');
@@ -213,11 +271,15 @@ export default function Layout() {
       }
     };
     updateLastSeen();
-
-    return () => {
-      supabase.removeChannel(presenceChannel);
-    };
   }, [location.pathname, profile?.id]);
+
+  // Merge the live page-visit feed into the presence list so Live Visitors
+  // (and anything else reading onlineUsers) sees each user's actual current
+  // page instead of the stale value from when their connection first opened.
+  const onlineUsersWithLivePage = onlineUsers.map(u => ({
+    ...u,
+    current_page: pageByUser[u.user_id]?.path ?? u.current_page,
+  }));
 
   useEffect(() => {
     localStorage.setItem('app-sidebar-collapsed', collapsed ? '1' : '0');
@@ -453,9 +515,20 @@ export default function Layout() {
               </div>
             </div>
           )}
-          {/* flex-1 wrapper so full-height pages like InvestorChat can fill remaining space */}
-          <div className="flex-1 min-h-0 flex flex-col">
-            <Outlet context={{ onlineUsers } satisfies LayoutOutletContext} />
+          {/* flex-1 wrapper so full-height pages like InvestorChat can fill remaining space.
+              Every page root Outlet renders becomes a flex item of this flex-col container.
+              Many pages use `max-w-* mx-auto` to center their content column on desktop — but
+              an auto margin on a flex item's cross axis (width, here) opts that item OUT of
+              the default stretch-to-fill behavior, so instead of being capped at the
+              container's width it sizes to its content's max-content width (e.g. a table row
+              with a long unbroken string), silently blowing out every ancestor's layout width.
+              overflow-x-hidden/auto deeper in the tree then only clips the result instead of
+              containing it — that's what caused pages to render cut off / shifted on mobile.
+              min-w-0 removes the auto min-content floor; w-full gives the item a definite
+              width so its own mx-auto centers it normally instead of disabling stretch. Both
+              are applied via a child selector so every route's root gets this for free. */}
+          <div className="flex-1 min-h-0 min-w-0 flex flex-col [&>*]:min-w-0 [&>*]:w-full">
+            <Outlet context={{ onlineUsers: onlineUsersWithLivePage } satisfies LayoutOutletContext} />
           </div>
         </div>
 

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
-import { Mail, Lock, LogIn, Sparkles } from 'lucide-react';
+import { Mail, Lock, LogIn, Sparkles, KeyRound } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function Login() {
@@ -11,6 +11,9 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [method, setMethod] = useState<'password' | 'magic'>('password');
+  const [magicLinkSent, setMagicLinkSent] = useState(false);
+  const [otp, setOtp] = useState('');
+  const [verifyingOtp, setVerifyingOtp] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -46,7 +49,8 @@ export default function Login() {
           throw new Error(otpError.message);
         }
 
-        toast.success('Magic link sent! Please check your email.');
+        setMagicLinkSent(true);
+        toast.success('Magic link sent! Click the link or enter the code from your email.');
       }
     } catch (err: any) {
       let msg = err.message || 'Authentication failed';
@@ -59,6 +63,33 @@ export default function Login() {
       console.error('Login error:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    if (!otp || otp.trim().length < 6) {
+      setError('Enter the 6-digit code from your email');
+      return;
+    }
+    setVerifyingOtp(true);
+    try {
+      const { data, error: verifyErr } = await supabase.auth.verifyOtp({
+        email,
+        token: otp.trim(),
+        type: 'email',
+      });
+      if (verifyErr) throw verifyErr;
+      if (!data.session) throw new Error('Could not verify code');
+      toast.success('Welcome back!');
+      navigate('/app');
+    } catch (err: any) {
+      const msg = err.message || 'Invalid or expired code';
+      setError(msg);
+      toast.error(msg);
+    } finally {
+      setVerifyingOtp(false);
     }
   };
 
@@ -81,7 +112,7 @@ export default function Login() {
           </button>
           <button
             type="button"
-            onClick={() => { setMethod('magic'); setError(''); }}
+            onClick={() => { setMethod('magic'); setError(''); setMagicLinkSent(false); }}
             className={`flex-1 pb-3 text-sm font-semibold border-b-2 transition-all ${method === 'magic' ? 'border-brand text-brand' : 'border-transparent text-gray-400'}`}
           >
             Magic Link (Passwordless)
@@ -89,6 +120,45 @@ export default function Login() {
         </div>
 
         {error && <div className="bg-red-50 text-red-600 p-3 rounded-xl text-sm mb-4">{error}</div>}
+
+        {method === 'magic' && magicLinkSent ? (
+          <form onSubmit={handleVerifyOtp} className="space-y-5">
+            <div className="bg-emerald-50 text-emerald-700 p-3 rounded-xl text-sm">
+              We sent a sign-in link and a 6-digit code to <strong>{email}</strong>. Click the link, or enter the code below.
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">6-digit code</label>
+              <div className="relative">
+                <KeyRound className="absolute left-3 top-3 text-gray-400" size={18} />
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  maxLength={6}
+                  value={otp}
+                  onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
+                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-brand focus:border-transparent tracking-[0.3em] font-mono text-lg"
+                  placeholder="000000"
+                  required
+                />
+              </div>
+            </div>
+            <button
+              type="submit"
+              disabled={verifyingOtp}
+              className="w-full bg-brand hover:bg-brand-dark text-white font-semibold py-3 rounded-xl transition disabled:opacity-70 flex items-center justify-center gap-2"
+            >
+              {verifyingOtp ? 'Verifying...' : <><LogIn size={18} /> Verify & Sign In</>}
+            </button>
+            <button
+              type="button"
+              onClick={() => { setMagicLinkSent(false); setOtp(''); setError(''); }}
+              className="w-full text-center text-sm text-gray-500 hover:text-gray-700"
+            >
+              Use a different email or method
+            </button>
+          </form>
+        ) : (
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
             <label className="block text-sm font-medium text-gray-700">Email</label>
@@ -142,6 +212,7 @@ export default function Login() {
             )}
           </button>
         </form>
+        )}
         <p className="text-center text-sm text-gray-600 mt-6">
           Don't have an account? <Link to="/signup" className="text-brand font-medium hover:underline">Sign up</Link>
         </p>

@@ -47,6 +47,7 @@ import AdminSettings from './pages/admin/AdminSettings';
 import AdminActivityLogs from './pages/admin/AdminActivityLogs';
 import PushAutoSubscriber from './components/PushAutoSubscriber';
 import PWAUpdater from './components/PWAUpdater';
+import InstallPWAPrompt from './components/InstallPWAPrompt';
 import Chat from './pages/Chat';
 import NotificationsPage from './pages/NotificationsPage';
 import HistoryPage from './pages/HistoryPage';
@@ -72,6 +73,7 @@ function App() {
         <Toaster position="top-center" richColors theme="light" />
         <PushAutoSubscriber />
         <PWAUpdater />
+        <InstallPWAPrompt />
         <Routes>
           {/* Public Routes */}
           <Route path="/" element={<Landing />} />

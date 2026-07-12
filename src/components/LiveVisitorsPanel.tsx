@@ -56,6 +56,13 @@ const formatLastSeen = (dateStr?: string) => {
   return parts.join(', ') + ' ago';
 };
 
+const formatDuration = (ms: number) => {
+  const totalSeconds = Math.max(0, Math.round(ms / 1000));
+  const m = Math.floor(totalSeconds / 60);
+  const s = totalSeconds % 60;
+  return m === 0 ? `${s}s` : `${m}m ${s}s`;
+};
+
 /**
  * Tidio-style real-time visitor panel: who's online right now, what page
  * they're on, their recent page history, and a watch/follow toggle that
@@ -306,13 +313,39 @@ export default function LiveVisitorsPanel({ onlineUsers, onInspectUser }: { onli
                     ) : (visitorHistory[ou.user_id] || []).length === 0 ? (
                       <p className="text-slate-500 text-[10px] py-2">No recorded visits yet.</p>
                     ) : (
-                      <div className="space-y-1.5">
-                        {(visitorHistory[ou.user_id] || []).map((v, i) => (
-                          <div key={i} className="flex items-center justify-between text-[10px]">
-                            <span className="text-slate-300 font-medium truncate max-w-[70%]">{getPageLabel(v.path)}</span>
-                            <span className="text-slate-500 tabular-nums">{formatLastSeen(v.created_at)}</span>
-                          </div>
-                        ))}
+                      <div className="space-y-2">
+                        {(visitorHistory[ou.user_id] || []).map((v, i, arr) => {
+                          // arr is sorted most-recent-first, so the entry one
+                          // index earlier (i - 1) is where they navigated TO
+                          // next, and the gap between the two timestamps is
+                          // how long they stayed on this page.
+                          const isCurrent = i === 0;
+                          const next = i > 0 ? arr[i - 1] : null;
+                          const durationMs = next
+                            ? new Date(next.created_at).getTime() - new Date(v.created_at).getTime()
+                            : null;
+                          return (
+                            <div key={i} className="text-[10px] border-l-2 border-slate-800 pl-2">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-slate-200 font-semibold truncate max-w-[65%] flex items-center gap-1.5">
+                                  {getPageLabel(v.path)}
+                                  {isCurrent && (
+                                    <span className="text-emerald-400 font-bold text-[9px] flex items-center gap-1">
+                                      <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" /> here now
+                                    </span>
+                                  )}
+                                </span>
+                                <span className="text-slate-500 tabular-nums shrink-0">{formatLastSeen(v.created_at)}</span>
+                              </div>
+                              {next && (
+                                <p className="text-slate-500 mt-0.5">
+                                  spent {formatDuration(durationMs!)}, then moved to{' '}
+                                  <span className="text-slate-300 font-medium">{getPageLabel(next.path)}</span>
+                                </p>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
                   </div>

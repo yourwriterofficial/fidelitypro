@@ -99,7 +99,7 @@ serve(async (req: Request) => {
       const { data: linkData, error: linkErr } = await supabaseAdmin.auth.admin.generateLink({
         type: 'recovery',
         email,
-        options: { redirectTo: redirectTo || `${SUPABASE_URL.replace('.supabase.co', '.vercel.app')}/reset-password` }
+        options: { redirectTo: redirectTo || 'https://remaprofitmachine.com/reset-password' }
       });
 
       if (linkErr) throw linkErr;
@@ -121,7 +121,7 @@ serve(async (req: Request) => {
       const { data: linkData, error: linkErr } = await supabaseAdmin.auth.admin.generateLink({
         type: 'magiclink',
         email,
-        options: { redirectTo: redirectTo || `${SUPABASE_URL.replace('.supabase.co', '.vercel.app')}/app` }
+        options: { redirectTo: redirectTo || 'https://remaprofitmachine.com/app' }
       });
 
       if (linkErr) throw linkErr;

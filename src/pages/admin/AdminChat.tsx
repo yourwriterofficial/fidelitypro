@@ -628,52 +628,52 @@ export default function AdminChat() {
         {activeUserId && activeUser ? (
           <>
             {/* Header info */}
-            <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
-              <div className="flex items-center gap-3">
-                <button 
+            <div className="p-4 border-b border-gray-100 flex items-center justify-between gap-2 bg-gray-50/50">
+              <div className="flex items-center gap-3 min-w-0 flex-1">
+                <button
                   onClick={() => setActiveUserId(null)}
-                  className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-400 md:hidden mr-1"
+                  className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-400 md:hidden mr-1 shrink-0"
                 >
                   <ArrowLeft size={16} />
                 </button>
-                <div className="w-9 h-9 rounded-xl bg-gray-950/5 text-gray-800 font-extrabold flex items-center justify-center text-xs">
+                <div className="w-9 h-9 rounded-xl bg-gray-950/5 text-gray-800 font-extrabold flex items-center justify-center text-xs shrink-0">
                   {activeUser.name?.charAt(0).toUpperCase() || 'U'}
                 </div>
-                <div>
-                  <h3 className="font-bold text-gray-900 text-sm">{activeUser.name || 'User'}</h3>
+                <div className="min-w-0">
+                  <h3 className="font-bold text-gray-900 text-sm truncate">{activeUser.name || 'User'}</h3>
                   {isUserTyping ? (
                     <p className="text-[10px] text-emerald-500 font-bold animate-pulse">typing...</p>
                   ) : (
-                    <p className="text-[10px] text-gray-400 font-semibold flex items-center gap-1 mt-0.5">
+                    <p className="text-[10px] text-gray-400 font-semibold flex items-center gap-1 mt-0.5 truncate">
                       {activeUser.email}
                     </p>
                   )}
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 shrink-0">
                 {activeUser.assigned_admin_id === profile?.id ? (
                   <button
                     type="button"
                     onClick={handleClaimToggle}
-                    className="inline-flex items-center gap-1 bg-blue-50 text-blue-650 hover:bg-blue-100 border border-blue-200 text-xs font-semibold px-3 py-1.5 rounded-lg transition"
+                    className="hidden sm:inline-flex items-center gap-1 bg-blue-50 text-blue-650 hover:bg-blue-100 border border-blue-200 text-xs font-semibold px-3 py-1.5 rounded-lg transition whitespace-nowrap"
                   >
                     <Check size={13} /> Claimed by Me (Release)
                   </button>
                 ) : activeUser.assigned_admin_id ? (
-                  <span className="text-xs text-gray-400 border bg-gray-50 border-gray-200 px-3 py-1.5 rounded-lg font-semibold cursor-not-allowed select-none">
+                  <span className="hidden sm:inline-block text-xs text-gray-400 border bg-gray-50 border-gray-200 px-3 py-1.5 rounded-lg font-semibold cursor-not-allowed select-none whitespace-nowrap">
                     Assigned
                   </span>
                 ) : (
                   <button
                     type="button"
                     onClick={handleClaimToggle}
-                    className="inline-flex items-center gap-1 bg-brand text-white hover:bg-brand-dark text-xs font-bold px-3 py-1.5 rounded-lg shadow-sm transition"
+                    className="hidden sm:inline-flex items-center gap-1 bg-brand text-white hover:bg-brand-dark text-xs font-bold px-3 py-1.5 rounded-lg shadow-sm transition whitespace-nowrap"
                   >
                     Claim Conversation
                   </button>
                 )}
-                
+
                 <button
                   type="button"
                   onClick={() => setShowMobileDetails(true)}
@@ -1043,6 +1043,27 @@ export default function AdminChat() {
               </div>
 
               <div className="space-y-2 pt-2 border-t">
+                {activeUser.assigned_admin_id === profile?.id ? (
+                  <button
+                    type="button"
+                    onClick={() => { handleClaimToggle(); setShowMobileDetails(false); }}
+                    className="w-full py-2.5 rounded-xl border transition font-bold text-xs flex items-center justify-center gap-2 bg-blue-50 border-blue-200 text-blue-650 hover:bg-blue-100"
+                  >
+                    <Check size={13} /> Claimed by Me (Tap to Release)
+                  </button>
+                ) : activeUser.assigned_admin_id ? (
+                  <span className="w-full py-2.5 rounded-xl border text-center font-bold text-xs flex items-center justify-center gap-2 bg-gray-50 border-gray-200 text-gray-400 select-none">
+                    Assigned to another admin
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => { handleClaimToggle(); setShowMobileDetails(false); }}
+                    className="w-full py-2.5 rounded-xl border transition font-bold text-xs flex items-center justify-center gap-2 bg-brand border-brand text-white hover:bg-brand-dark shadow-sm"
+                  >
+                    Claim Conversation
+                  </button>
+                )}
                 <a
                   href={`/admin/users?search=${encodeURIComponent(activeUser.email)}`}
                   className="w-full text-center py-2.5 rounded-xl border border-gray-200 text-gray-700 hover:bg-gray-50 transition font-semibold text-xs flex items-center justify-center gap-2 bg-white"

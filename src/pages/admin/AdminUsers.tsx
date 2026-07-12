@@ -140,6 +140,13 @@ export default function AdminUsers() {
     return parts.join(', ') + ' ago';
   };
 
+  const formatDuration = (ms: number) => {
+    const totalSeconds = Math.max(0, Math.round(ms / 1000));
+    const m = Math.floor(totalSeconds / 60);
+    const s = totalSeconds % 60;
+    return m === 0 ? `${s}s` : `${m}m ${s}s`;
+  };
+
   // Keep a ref mirror of watchedUserIds so the presence handler (set up once)
   // always reads the latest watch list without needing to resubscribe.
   const watchedUserIdsRef = useRef<Set<string>>(new Set());
@@ -214,16 +221,32 @@ export default function AdminUsers() {
         Object.keys(state).forEach((key) => {
           const presenceList = state[key] as any[];
           if (presenceList && presenceList.length > 0) {
+            // Prefer the most recently active entry rather than assuming
+            // index 0 — presence.track() can leave more than one entry
+            // under the same key (see the note on the equivalent code in
+            // Layout.tsx), and current_page here is only used as an initial
+            // fallback anyway; the realtime_page_visits subscription below
+            // is what actually keeps it live.
+            const latest = presenceList.reduce((a: any, b: any) =>
+              new Date(b.last_active || 0).getTime() > new Date(a.last_active || 0).getTime() ? b : a
+            );
             list.push({
               user_id: key,
-              name: presenceList[0].name || 'User',
-              email: presenceList[0].email || '',
-              current_page: presenceList[0].current_page || '',
-              last_active: presenceList[0].last_active || '',
+              name: latest.name || 'User',
+              email: latest.email || '',
+              current_page: latest.current_page || '',
+              last_active: latest.last_active || '',
             });
           }
         });
-        setOnlineUsers(list);
+        setOnlineUsers(prev => list.map(u => {
+          // Carry forward a fresher current_page already learned from the
+          // page-visits feed if presence's own snapshot is older.
+          const existing = prev.find(p => p.user_id === u.user_id);
+          return existing && new Date(existing.last_active) > new Date(u.last_active || 0)
+            ? { ...u, current_page: existing.current_page, last_active: existing.last_active }
+            : u;
+        }));
 
         // Detect users who just transitioned offline -> online and alert any
         // admin watching them (push + in-app + toast). A 5-minute per-user
@@ -258,12 +281,21 @@ export default function AdminUsers() {
       })
       .subscribe();
 
-    // 2. Live-refresh an expanded visitor's page history the moment they navigate
+    // 2. Live-refresh current_page for every online visitor the moment they
+    // navigate, and refresh the expanded visitor's page history too. This
+    // (not presence.track(), which only reflects the page a connection
+    // opened on) is what makes "Viewing: X" update in real time.
     const visitsChannel = supabase
       .channel('realtime_page_visits')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'user_page_visits' }, (payload: any) => {
         const visitedUserId = payload.new?.user_id;
-        if (visitedUserId && visitedUserId === expandedVisitorIdRef.current) {
+        if (!visitedUserId) return;
+        setOnlineUsers(prev => prev.map(u =>
+          u.user_id === visitedUserId
+            ? { ...u, current_page: payload.new.path, last_active: payload.new.created_at }
+            : u
+        ));
+        if (visitedUserId === expandedVisitorIdRef.current) {
           fetchVisitHistory(visitedUserId);
         }
       })
@@ -1167,13 +1199,39 @@ export default function AdminUsers() {
                         ) : (visitorHistory[ou.user_id] || []).length === 0 ? (
                           <p className="text-slate-500 text-[10px] py-2">No recorded visits yet.</p>
                         ) : (
-                          <div className="space-y-1.5">
-                            {(visitorHistory[ou.user_id] || []).map((v, i) => (
-                              <div key={i} className="flex items-center justify-between text-[10px]">
-                                <span className="text-slate-300 font-medium truncate max-w-[70%]">{getPageLabel(v.path)}</span>
-                                <span className="text-slate-500 tabular-nums">{formatLastSeen(v.created_at)}</span>
-                              </div>
-                            ))}
+                          <div className="space-y-2">
+                            {(visitorHistory[ou.user_id] || []).map((v, i, arr) => {
+                              // arr is sorted most-recent-first, so the entry
+                              // one index earlier (i - 1) is where they
+                              // navigated TO next, and the gap between the
+                              // two timestamps is how long they stayed here.
+                              const isCurrent = i === 0;
+                              const next = i > 0 ? arr[i - 1] : null;
+                              const durationMs = next
+                                ? new Date(next.created_at).getTime() - new Date(v.created_at).getTime()
+                                : null;
+                              return (
+                                <div key={i} className="text-[10px] border-l-2 border-slate-800 pl-2">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <span className="text-slate-200 font-semibold truncate max-w-[65%] flex items-center gap-1.5">
+                                      {getPageLabel(v.path)}
+                                      {isCurrent && (
+                                        <span className="text-emerald-400 font-bold text-[9px] flex items-center gap-1">
+                                          <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" /> here now
+                                        </span>
+                                      )}
+                                    </span>
+                                    <span className="text-slate-500 tabular-nums shrink-0">{formatLastSeen(v.created_at)}</span>
+                                  </div>
+                                  {next && (
+                                    <p className="text-slate-500 mt-0.5">
+                                      spent {formatDuration(durationMs!)}, then moved to{' '}
+                                      <span className="text-slate-300 font-medium">{getPageLabel(next.path)}</span>
+                                    </p>
+                                  )}
+                                </div>
+                              );
+                            })}
                           </div>
                         )}
                       </div>

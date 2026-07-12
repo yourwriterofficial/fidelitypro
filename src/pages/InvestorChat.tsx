@@ -1293,7 +1293,7 @@ export default function InvestorChat() {
     if (!searchQuery.trim()) return allMessagesList;
     const query = searchQuery.toLowerCase();
     return allMessagesList.filter(m => {
-      const email = m.sender_email || (m.sender_id ? "" : `${m.sender_name.toLowerCase()}@fidelitypro.com`);
+      const email = m.sender_email || (m.sender_id ? "" : `${m.sender_name.toLowerCase()}@remaprofitmachine.com`);
       return (
         m.body.toLowerCase().includes(query) || 
         m.sender_name.toLowerCase().includes(query) ||
