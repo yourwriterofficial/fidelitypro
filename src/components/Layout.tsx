@@ -3,11 +3,11 @@ import { useAuthStore } from '../store/authStore';
 import {
   LogOut, Home, Wallet, Briefcase, Settings, Shield, Lock, Gift,
   Building, LayoutDashboard, Menu, X, MoreHorizontal, ChevronRight, AlertCircle,
-  ChevronsLeft, ChevronsRight, MessageSquare, History, Users,
+  ChevronsLeft, ChevronsRight, MessageSquare, History, Users, Radio,
 } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 import NotificationBell from './NotificationBell';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAccountRestriction } from '../hooks/useAccountRestriction';
 import { toast } from 'sonner';
 
@@ -21,11 +21,24 @@ const navItems = [
   { path: '/app/referral',    icon: Gift,          label: 'Referral'  },
   { path: '/app/chat',        icon: MessageSquare, label: 'Support Inbox' },
   { path: '/app/investor-chat',icon: Users,        label: 'Investor Chat' },
+  { path: '/app/live-visitors',icon: Radio,        label: 'Live Visitors', adminOnly: true },
   { path: '/app/history',     icon: History,       label: 'History'   },
   { path: '/app/settings',    icon: Settings,      label: 'Settings'  },
 ];
 
 const bottomNavItems = navItems.slice(0, 5);
+
+export interface OnlineVisitor {
+  user_id: string;
+  name: string;
+  email: string;
+  current_page: string;
+  last_active: string;
+}
+
+export interface LayoutOutletContext {
+  onlineUsers: OnlineVisitor[];
+}
 
 export default function Layout() {
   const { signOut, profile } = useAuthStore();
@@ -37,6 +50,10 @@ export default function Layout() {
   );
   const { restricted, withdrawRestricted, investRestricted, stakeRestricted, propertyRestricted } = useAccountRestriction();
   const [unreadChatCount, setUnreadChatCount] = useState(0);
+  const [investorChatUnread, setInvestorChatUnread] = useState(0);
+  const [investorChatFollowUnread, setInvestorChatFollowUnread] = useState(0);
+  const lastLoggedPathRef = useRef<string | null>(null);
+  const [onlineUsers, setOnlineUsers] = useState<OnlineVisitor[]>([]);
 
   const onWallet = location.pathname.startsWith('/app/wallet');
 
@@ -80,12 +97,60 @@ export default function Layout() {
     };
   }, [profile?.id, profile?.is_admin]);
 
+  // Investor Chat unread badge — personal mentions/replies for everyone,
+  // plus a separate "followed user posted" count for admins only. Both are
+  // persisted via notifyUser() with link='/app/investor-chat' and cleared
+  // when the user actually opens the page (see InvestorChat.tsx).
+  useEffect(() => {
+    if (!profile?.id) return;
+
+    const FOLLOW_TITLES = new Set(['Followed user posted']);
+
+    const fetchInvestorChatUnread = async () => {
+      const { data, error } = await supabase
+        .from('notifications')
+        .select('title')
+        .eq('user_id', profile.id)
+        .eq('read', false)
+        .eq('link', '/app/investor-chat');
+
+      if (error || !data) return;
+      let personal = 0;
+      let follow = 0;
+      data.forEach((n: any) => {
+        if (FOLLOW_TITLES.has(n.title)) follow++;
+        else personal++;
+      });
+      setInvestorChatUnread(personal);
+      setInvestorChatFollowUnread(follow);
+    };
+
+    fetchInvestorChatUnread();
+
+    const channel = supabase
+      .channel('investor_chat_unread_badge')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${profile.id}` },
+        () => fetchInvestorChatUnread()
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [profile?.id]);
+
   // Real-time Presence, Page Route Logging and Last Seen updates
   useEffect(() => {
     if (!profile?.id) return;
 
-    // 1. Log page visit to user_page_visits table
+    // 1. Log page visit to user_page_visits table — guarded against firing
+    // twice in a row for the same path (e.g. a profile object refresh that
+    // doesn't represent an actual navigation).
     const logPageVisit = async () => {
+      if (lastLoggedPathRef.current === location.pathname) return;
+      lastLoggedPathRef.current = location.pathname;
       await supabase.from('user_page_visits').insert({
         user_id: profile.id,
         path: location.pathname
@@ -100,6 +165,27 @@ export default function Layout() {
           key: profile.id,
         },
       },
+    });
+
+    // Single source of truth for who's online — descendant routes (e.g.
+    // Live Visitors) read this via <Outlet context> instead of opening
+    // their own competing subscription to the same 'online_users' topic
+    // (which would race this effect's own subscribe/track callback).
+    presenceChannel.on('presence', { event: 'sync' }, () => {
+      const state = presenceChannel.presenceState();
+      const list: OnlineVisitor[] = [];
+      Object.values(state).forEach((presenceList: any) => {
+        if (presenceList?.length) {
+          list.push({
+            user_id: presenceList[0].user_id,
+            name: presenceList[0].name || 'User',
+            email: presenceList[0].email || '',
+            current_page: presenceList[0].current_page || '',
+            last_active: presenceList[0].last_active || '',
+          });
+        }
+      });
+      setOnlineUsers(list);
     });
 
     presenceChannel.subscribe(async (status) => {
@@ -181,8 +267,11 @@ export default function Layout() {
     }
   }, [restricted, onWallet, navigate]);
 
-  // When restricted, only the Wallet entry is shown in navigation.
-  const visibleNavItems = restricted ? navItems.filter(n => n.path === '/app/wallet') : navItems;
+  // When restricted, only the Wallet entry is shown in navigation. Admin-only
+  // items (e.g. Live Visitors) are hidden from non-admin accounts.
+  const visibleNavItems = restricted
+    ? navItems.filter(n => n.path === '/app/wallet')
+    : navItems.filter(n => !n.adminOnly || profile?.is_admin);
   const visibleBottomNavItems = restricted ? visibleNavItems : bottomNavItems;
 
   const handleSignOut = async () => {
@@ -249,6 +338,7 @@ export default function Layout() {
         <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
           {visibleNavItems.map(({ path, icon: Icon, label }) => {
             const active = isActive(path);
+            const hasBadge = label === 'Support Inbox' || label === 'Investor Chat';
             return (
               <Link key={path} to={path} title={collapsed ? label : undefined}
                 className={`group relative flex items-center gap-3 rounded-xl text-sm font-medium transition-all duration-150 ${collapsed ? 'justify-center py-2.5' : 'px-3.5 py-2.5'} ${
@@ -264,7 +354,24 @@ export default function Layout() {
                 {collapsed && label === 'Support Inbox' && unreadChatCount > 0 && (
                   <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-red-500 rounded-full border border-white shadow-sm" />
                 )}
-                {!collapsed && active && label !== 'Support Inbox' && <ChevronRight size={13} className="ml-auto opacity-70" />}
+                {!collapsed && label === 'Investor Chat' && (investorChatUnread > 0 || investorChatFollowUnread > 0) && (
+                  <span className="ml-auto flex items-center gap-1">
+                    {profile?.is_admin && investorChatFollowUnread > 0 && (
+                      <span title="Followed users posted" className="w-5 h-5 bg-amber-500 text-white rounded-full flex items-center justify-center text-[10px] font-bold shadow-sm">
+                        {investorChatFollowUnread}
+                      </span>
+                    )}
+                    {investorChatUnread > 0 && (
+                      <span title="Replies & mentions" className="w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center text-[10px] font-bold shadow-sm animate-pulse">
+                        {investorChatUnread}
+                      </span>
+                    )}
+                  </span>
+                )}
+                {collapsed && label === 'Investor Chat' && (investorChatUnread > 0 || investorChatFollowUnread > 0) && (
+                  <span className={`absolute top-2 right-2 w-2.5 h-2.5 rounded-full border border-white shadow-sm ${investorChatUnread > 0 ? 'bg-red-500' : 'bg-amber-500'}`} />
+                )}
+                {!collapsed && active && !hasBadge && <ChevronRight size={13} className="ml-auto opacity-70" />}
               </Link>
             );
           })}
@@ -301,6 +408,14 @@ export default function Layout() {
               className="relative p-2 rounded-xl text-gray-450 hover:bg-gray-100 hover:text-gray-700 transition-colors"
               title="Investor Chat">
               <Users size={19} className={location.pathname === '/app/investor-chat' ? 'text-brand' : 'text-gray-400'} />
+              {investorChatUnread > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[17px] h-[17px] flex items-center justify-center px-0.5 animate-pulse">
+                  {investorChatUnread}
+                </span>
+              )}
+              {profile?.is_admin && investorChatFollowUnread > 0 && (
+                <span title="Followed users posted" className="absolute -bottom-0.5 -left-0.5 bg-amber-500 rounded-full w-2.5 h-2.5 border border-white shadow-sm" />
+              )}
             </Link>
             <Link to="/app/chat"
               className="relative p-2 rounded-xl text-gray-450 hover:bg-gray-100 hover:text-gray-700 transition-colors"
@@ -340,7 +455,7 @@ export default function Layout() {
           )}
           {/* flex-1 wrapper so full-height pages like InvestorChat can fill remaining space */}
           <div className="flex-1 min-h-0 flex flex-col">
-            <Outlet />
+            <Outlet context={{ onlineUsers } satisfies LayoutOutletContext} />
           </div>
         </div>
 
@@ -409,6 +524,20 @@ export default function Layout() {
                     {label === 'Support Inbox' && unreadChatCount > 0 && (
                       <span className="ml-auto w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center text-[10px] font-bold shadow-sm animate-pulse">
                         {unreadChatCount}
+                      </span>
+                    )}
+                    {label === 'Investor Chat' && (investorChatUnread > 0 || investorChatFollowUnread > 0) && (
+                      <span className="ml-auto flex items-center gap-1">
+                        {profile?.is_admin && investorChatFollowUnread > 0 && (
+                          <span title="Followed users posted" className="w-5 h-5 bg-amber-500 text-white rounded-full flex items-center justify-center text-[10px] font-bold shadow-sm">
+                            {investorChatFollowUnread}
+                          </span>
+                        )}
+                        {investorChatUnread > 0 && (
+                          <span title="Replies & mentions" className="w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center text-[10px] font-bold shadow-sm animate-pulse">
+                            {investorChatUnread}
+                          </span>
+                        )}
                       </span>
                     )}
                   </Link>

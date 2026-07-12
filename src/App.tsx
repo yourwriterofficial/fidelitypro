@@ -51,6 +51,7 @@ import Chat from './pages/Chat';
 import NotificationsPage from './pages/NotificationsPage';
 import HistoryPage from './pages/HistoryPage';
 import InvestorChat from './pages/InvestorChat';
+import LiveVisitors from './pages/LiveVisitors';
 import AdminChat from './pages/admin/AdminChat';
 
 function App() {
@@ -104,6 +105,7 @@ function App() {
                 <Route path="notifications" element={<NotificationsPage />} />
                 <Route path="history" element={<HistoryPage />} />
                 <Route path="investor-chat" element={<InvestorChat />} />
+                <Route path="live-visitors" element={<LiveVisitors />} />
               </Route>
             </Route>
           </Route>

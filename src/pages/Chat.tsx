@@ -327,39 +327,39 @@ export default function Chat() {
       {/* Main Chat (Center panel) */}
       <div className="flex-1 flex flex-col min-w-0 bg-white">
         {/* Chat Header */}
-        <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 px-6 py-4 flex items-center justify-between text-white shrink-0 shadow-md border-b border-indigo-900/10">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-tr from-brand to-indigo-600 rounded-2xl flex items-center justify-center text-white font-extrabold text-lg shadow-lg shadow-brand/35 ring-2 ring-white/10">
+        <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 px-4 sm:px-6 py-4 flex items-center justify-between gap-2 text-white shrink-0 shadow-md border-b border-indigo-900/10">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-10 h-10 bg-gradient-to-tr from-brand to-indigo-600 rounded-2xl flex items-center justify-center text-white font-extrabold text-lg shadow-lg shadow-brand/35 ring-2 ring-white/10 shrink-0">
               R
             </div>
-             <div>
-              <h1 className="font-bold text-sm tracking-wide flex items-center gap-1.5">
-                Support Inbox
+             <div className="min-w-0">
+              <h1 className="font-bold text-sm tracking-wide flex items-center gap-1.5 truncate">
+                <span className="truncate">Support Inbox</span>
                 <span className="inline-flex items-center justify-center bg-blue-500 text-white rounded-full p-0.5 w-3.5 h-3.5 shadow-sm shrink-0" title="Verified Support Account">
                   <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="4.5">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                   </svg>
                 </span>
               </h1>
-              <p className="text-[10px] text-emerald-450 font-bold flex items-center gap-1.5 mt-0.5">
+              <p className="text-[10px] text-emerald-450 font-bold flex items-center gap-1.5 mt-0.5 truncate">
                 <span className="w-1.5 h-1.5 bg-emerald-450 rounded-full animate-ping shrink-0" />
-                Real-time Support Agent Online
+                <span className="truncate">Real-time Support Agent Online</span>
               </p>
             </div>
           </div>
 
           {/* Push Notification Toggle for iOS/PWA visibility */}
-          <button 
+          <button
             onClick={handlePushToggle}
             title={subscribed ? "Push notifications active" : "Enable push notifications"}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition-all duration-300 border ${
-              subscribed 
-                ? 'bg-emerald-500/20 text-emerald-350 border-emerald-500/30' 
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition-all duration-300 border shrink-0 ${
+              subscribed
+                ? 'bg-emerald-500/20 text-emerald-350 border-emerald-500/30'
                 : 'bg-white/10 text-gray-300 border-white/5 hover:bg-white/15'
             }`}
           >
-            {subscribed ? <Bell size={13} className="animate-bounce" /> : <BellOff size={13} />}
-            <span className="hidden sm:inline">{subscribed ? 'Notifications Active' : 'Enable Push Alerts'}</span>
+            {subscribed ? <Bell size={13} className="animate-bounce shrink-0" /> : <BellOff size={13} className="shrink-0" />}
+            <span className="hidden sm:inline whitespace-nowrap">{subscribed ? 'Notifications Active' : 'Enable Push Alerts'}</span>
           </button>
         </div>
 

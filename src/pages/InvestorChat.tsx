@@ -561,6 +561,16 @@ export default function InvestorChat() {
         },
         duration: 6000
       });
+
+      // Persist so the Investor Chat nav badge (Layout.tsx) reflects this
+      // even when the user isn't currently on the page.
+      notifyUser({
+        userId: profile.id,
+        title: isTagged ? 'You were mentioned in Investor Chat' : 'New reply in Investor Chat',
+        message: `@${msg.sender_name}: ${msg.body.substring(0, 80)}${msg.body.length > 80 ? '...' : ''}`,
+        type: 'info',
+        link: '/app/investor-chat'
+      });
     }
   };
 
@@ -568,6 +578,19 @@ export default function InvestorChat() {
   const [virtualHistoryCount, setVirtualHistoryCount] = useState(40);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
+
+  // Clear the Investor Chat nav badge (mentions, replies, and — for admins —
+  // followed-user alerts) the moment the user actually opens this page.
+  useEffect(() => {
+    if (!profile?.id) return;
+    supabase
+      .from('notifications')
+      .update({ read: true })
+      .eq('user_id', profile.id)
+      .eq('link', '/app/investor-chat')
+      .eq('read', false)
+      .then(() => {});
+  }, [profile?.id]);
 
   // Fetch initial db entries and setup real-time channels
   useEffect(() => {
@@ -968,6 +991,15 @@ export default function InvestorChat() {
                   }
                 }
               });
+              if (profile?.id) {
+                notifyUser({
+                  userId: profile.id,
+                  title: `Followed user posted`,
+                  message: `${user.name} posted a new update in Investor Chat.`,
+                  type: 'info',
+                  link: '/app/investor-chat'
+                });
+              }
               setFollowAlerts(prev => [...prev, { id: simulatedMsg.id, msg: simulatedMsg }]);
             }
           }
