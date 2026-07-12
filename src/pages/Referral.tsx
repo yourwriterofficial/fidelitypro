@@ -152,7 +152,7 @@ export default function Referral() {
       {/* How it works */}
       <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-5">
         <h3 className="font-semibold text-emerald-900 mb-3 text-sm">How Referrals Work</h3>
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {[
             { step: '1', text: 'Share your unique referral link' },
             { step: '2', text: 'Your contact signs up & invests' },

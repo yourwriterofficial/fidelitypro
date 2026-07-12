@@ -132,7 +132,7 @@ export default function Invest() {
       </div>
 
       {/* Benefits strip */}
-      <div className="grid grid-cols-3 gap-4 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
         {[
           { icon: <TrendingUp size={18} className="text-blue-600" />, label: 'Daily Payouts', sub: 'Every 24 hours' },
           { icon: <Shield     size={18} className="text-emerald-600" />, label: 'Principal Safe', sub: 'Capital protected' },

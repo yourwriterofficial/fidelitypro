@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { notifyUser, sendEmailToUser } from '../lib/notify';
+import { HUMAN_MSGS, HUMAN_TOPIC_TEMPLATES } from './investorChatCorpus';
 
 interface InvestorChatMessage {
   id: string;
@@ -73,7 +74,7 @@ const COUNTRY_FLAGS = COUNTRIES.reduce((acc, code) => {
   return acc;
 }, {} as Record<string, string>);
 
-// 30,000 unique realistic usernames — 300 first names × 100 last-name-style tags
+// 60,000 unique realistic usernames — 300 first names × 200 last-name-style tags
 // Each name looks like a real handle a person would choose on a chat platform
 const PROCEDURAL_USERNAMES = (() => {
   const firsts = [
@@ -118,7 +119,17 @@ const PROCEDURAL_USERNAMES = (() => {
     "london","dubai","tokyo","nyc","paris","berlin","miami","lagos","sg","hk",
     "fx","rei","cap","mgmt","fund","hq","labs","works","io","fi",
     "23","24","25","88","99","00","01","7","77","2025",
-    "one","two","three","go","now","fast","live","up","on","in"
+    "one","two","three","go","now","fast","live","up","on","in",
+    "reads","cooks","bakes","hikes","bikes","swims","runs","climbs","games","codes",
+    "paints","writes","travels","explores","dreams","grinds","hustles","thrives","rises","shines",
+    "vibes","chills","jams","rocks","grooves","flows","soars","wanders","roams","ventures",
+    "forever","always","truly","simply","freely","boldly","quietly","loudly","gently","kindly",
+    "junior","senior","original","classic","modern","vintage","retro","fresh","raw","genuine",
+    "north","south","east","west","central","uptown","downtown","midtown","coastal","highland",
+    "papa","mama","auntie","uncle","og","jr","sr","esq","doc","chief",
+    "fit","strong","active","calm","bold","brave","kind","wise","sharp","steady",
+    "star","spark","flame","storm","wave","river","stone","forest","summit","horizon",
+    "52","63","74","85","96","07","13","19","31","42"
   ];
 
   const list: { name: string; country: string }[] = [];
@@ -145,374 +156,8 @@ const SIMULATED_USERS = PROCEDURAL_USERNAMES;
 // ─────────────────────────────────────────────────────────────────────────────
 
 // Category A — genuine investment reactions (casual, personal)
-const MSGS_INVEST = [
-  "just got my withdrawal through, took like 8 mins. pretty solid",
-  "staked another 5k last night. fingers crossed lol",
-  "anyone else reinvesting their dividends straight back in?",
-  "withdrew $1,200 this morning. no issues at all",
-  "been on this for 3 months now. returns are genuinely consistent",
-  "put in $2,500 last week. already seeing daily payouts",
-  "what's the minimum to get the VIP tier?",
-  "the compound interest on the 30-day plan is wild. seriously",
-  "i was sceptical at first but the payouts just keep coming",
-  "doubled my initial stake. feeling good about this one",
-  "does anyone know when the next yield cycle hits?",
-  "been compounding for 6 weeks. up about 40% on my initial",
-  "my partner thought i was crazy investing here. now she wants in 😂",
-  "is there a referral bonus? asking for a friend",
-  "just moved $10k from my savings into the locked plan",
-  "honestly this beats the interest rate my bank gives me by miles",
-  "anyone tried the commercial office listing? curious about the returns",
-  "set up auto-reinvest and basically just watch it grow",
-  "daily dividends hit at 9am every morning like clockwork",
-  "been recommending this to people in my investment group",
-  "the withdrawal speed alone sold me. no delays whatsoever",
-  "started small with $500 to test it. now i'm all in",
-  "what plan is everyone on? i'm on the 90-day compound",
-  "the real estate backed options feel way more stable than pure crypto",
-  "got my brother signed up last week. he's already happy with it",
-  "thinking of topping up before the next cycle. anyone else?",
-  "consistent daily returns. haven't had a single failed withdrawal",
-  "i like that the platform shows real transaction history",
-  "this is my second platform like this and by far the best one",
-  "anyone know if the VIP compound plan has a hard cap?",
-  "withdrew profits every friday for 8 weeks. never a problem",
-  "locked in $7,500 for the 60-day plan. update in 2 months",
-  "the residential duplex listing has been paying out really well",
-  "support team replied to my question in under 10 minutes",
-  "been here since last year. never once had a withdrawal issue",
-  "my dividend hit before i even finished my morning coffee",
-  "put in $15,000 across two plans. diversifying the yield sources",
-  "just cashed out $4,500. took about 12 minutes total",
-  "is the 30-day locked better than the rolling plan? anyone compared?",
-  "the compound interest schedule on this is genuinely impressive",
-  "wish i'd found this 12 months ago honestly",
-  "just hit my first $1,000 in total dividends. small milestone but still",
-  "staking plus real estate backing feels like a smart combo",
-  "anyone invested in the new commercial block listing?",
-  "returns have been beating my equity portfolio this quarter",
-  "not financial advice but i've been very happy with the outcomes",
-  "weekly dividends are nice but i prefer the daily plan personally",
-  "does the VIP tier require verification?",
-  "the interface is really clean. makes tracking easy",
-  "first withdrawal done ✅ very smooth process",
-];
+const ALL_MSGS = HUMAN_MSGS;
 
-// Category B — off-topic casual chat (sports, life, random)
-const MSGS_CASUAL = [
-  "anyone watching the champions league tonight?",
-  "that match last night was unreal",
-  "what a goal though. didn't see that coming",
-  "weather here is terrible lately. summer where??",
-  "i've been trying this new coffee and i'm genuinely hooked",
-  "just got back from holiday. needed that break",
-  "traffic today was an absolute nightmare",
-  "is anyone else working from home full time now?",
-  "saw the new marvel film. honestly better than expected",
-  "gym is closed for maintenance this week. annoying",
-  "just had sushi for the first time in months. perfection",
-  "the new iphone is nice but not worth the upgrade imo",
-  "anyone tried that new japanese restaurant downtown?",
-  "cost of living is getting crazy. groceries alone 😤",
-  "started learning spanish on duolingo. on a 45 day streak now",
-  "my cat knocked my laptop off the desk this morning",
-  "finally finished that netflix series everyone was talking about",
-  "anyone else think the offside rule needs changing?",
-  "planning a trip to dubai next spring. any tips?",
-  "my dog is literally sleeping 20 hours a day. goals",
-  "thought the referee made some terrible calls last night",
-  "just finished a 10k run. new personal best 🎉",
-  "anyone else been binge watching documentaries lately?",
-  "my wifi keeps dropping and i'm losing my mind",
-  "the formula 1 race this weekend should be good",
-  "been meal prepping for the first time. kind of loving it",
-  "missed the game last night but caught the highlights. mad scenes",
-  "flights to europe are so expensive right now",
-  "working out consistently for 6 months now. starting to see results",
-  "anyone else find mondays absolutely brutal",
-  "just upgraded my home office setup. makes a difference tbh",
-  "the local team finally won something. about time",
-  "going to a wedding this weekend. dreading the traffic getting there",
-  "summer internship starts monday. nervous but excited",
-  "been reading way more since deleting instagram. 10/10 would recommend",
-  "that podcast episode about ai was genuinely mind blowing",
-  "just signed a new gym contract. no more excuses i guess",
-  "anyone playing the new release? worth it?",
-  "my commute is an hour each way. the chat here makes it bearable 😂",
-  "friday energy ✅ let's go",
-  "the economy discourse on twitter is driving me mad",
-  "my cousin just moved to canada. apparently it's freezing",
-  "getting into cycling recently. anyone have bike recommendations?",
-  "the city marathon is next month. not running it but will cheer",
-  "just found a great bakery near my office",
-  "kids are off school next week. house will be chaos",
-  "stayed up way too late watching the tennis. worth it though",
-  "is anyone here from london? there's something happening near my area",
-  "having a slow day at work. this chat is my entertainment",
-  "that transfer news dropped out of nowhere. didn't see it coming",
-];
-
-// Category C — crypto / markets chatter
-const MSGS_CRYPTO = [
-  "bitcoin looking strong this week ngl",
-  "eth gas fees are brutal right now",
-  "did anyone buy the dip last month? looking smart now",
-  "defi yields have been sliding lately. rotating to other strategies",
-  "solana transactions are so fast compared to eth",
-  "anyone holding bnb long term?",
-  "the fed meeting outcome is going to move markets hard",
-  "i keep dollar cost averaging. boring but it works",
-  "on-chain data showing accumulation. interesting signal",
-  "the altcoin season might actually be happening",
-  "stablecoins are my hedge right now while things are uncertain",
-  "liquidity pool rewards have been inconsistent lately",
-  "anyone tracking the institutional inflows on chain?",
-  "bitcoin dominance is climbing again. alts getting squeezed",
-  "the regulatory news from the US is making things volatile",
-  "just rebalanced my portfolio. more into real world assets now",
-  "yield farming seems higher risk than it used to be",
-  "anyone watching what blackrock is doing with their btc holdings?",
-  "memecoin season feels dangerous. i stay away personally",
-  "the tokenisation of real assets is genuinely the next big thing",
-  "portfolio is 60% stable yield 40% btc. feels balanced",
-  "on-chain metrics look healthier than price suggests right now",
-  "smart contract audits matter so much. always check them",
-  "been reading the white paper. solid fundamentals",
-  "took profits at the top last cycle. still feeling good about that",
-  "staking yields on proof of stake chains are getting more competitive",
-  "the macro environment is rough but on-chain looks okay",
-  "anyone using hardware wallets? which brand?",
-  "layer 2 scaling is genuinely working now. transactions are cheap",
-  "diversified across 4 different yield strategies. sleeping better at night",
-  "the derivatives market is showing interesting positioning right now",
-  "not touching memecoins. too much noise, not enough signal",
-  "dca strategy since 2021. just keep stacking",
-  "heard some big wallets are moving. watching closely",
-  "the institutional adoption wave is real and it's happening",
-  "cross-chain bridges still feel a bit sketchy to me",
-  "decentralised exchanges are improving fast",
-  "anyone using ai tools for portfolio tracking?",
-  "real world asset tokenisation is growing fast this year",
-  "macro uncertainty is making me favour stable yield products",
-];
-
-// Category D — platform specific questions and answers
-const MSGS_PLATFORM = [
-  "how long does KYC verification usually take?",
-  "my dashboard isn't loading properly on mobile. is it just me?",
-  "what's the minimum withdrawal amount?",
-  "does the platform support bank transfers or only crypto?",
-  "can i change my plan after locking in?",
-  "is the referral link the same as the affiliate dashboard?",
-  "just noticed a new listing in the portfolio section. looks good",
-  "anyone know if there's an app coming?",
-  "i got a notification about a new staking tier opening up",
-  "the transaction history export is really useful for tax purposes",
-  "what currencies does the platform accept for deposits?",
-  "notifications are working great. always on time",
-  "can you have multiple plans running at the same time?",
-  "is there 2FA available? want to make sure my account is secure",
-  "the portfolio tracker is really clean. love the interface",
-  "what happens if i want to exit a locked plan early?",
-  "does the daily yield compound automatically or do i need to reinvest manually?",
-  "just checked my statement. everything matches perfectly",
-  "does support operate on weekends?",
-  "the new update looks nice. much cleaner design",
-  "is the liquidity always available for withdrawal?",
-  "is there a cap on how much i can deposit in total?",
-  "what's the best way to reach support if there's an issue?",
-  "the email confirmation system is really quick",
-  "any mobile notification options for when dividends hit?",
-  "how often do new investment listings get added?",
-  "the reporting dashboard is one of the best i've seen on a platform like this",
-  "does the platform have cold storage for asset backing?",
-  "can i split a deposit across two different plans?",
-  "the auto-compounding feature saves so much manual work",
-];
-
-// Category E — reactions and short responses
-const MSGS_REACTIONS = [
-  "exactly what i was thinking",
-  "same here honestly",
-  "can confirm this",
-  "that's been my experience too",
-  "agree with this 100%",
-  "same boat as you tbh",
-  "this is the way",
-  "pretty much yeah",
-  "couldn't have said it better",
-  "facts",
-  "lol same",
-  "good point",
-  "been saying this for months",
-  "accurate",
-  "yep same for me",
-  "that's fair",
-  "makes sense",
-  "yeah pretty much",
-  "glad i'm not the only one",
-  "this is the answer",
-  "solid perspective",
-  "true",
-  "depends on the plan tbh",
-  "works for me at least",
-  "can't argue with results",
-  "honestly yeah",
-  "that tracks",
-  "check the FAQ it explains it well",
-  "this ^ ",
-  "basically yes",
-  "might be worth asking support",
-  "yep seen the same",
-  "sounds right",
-  "been working for me",
-  "i'd lean yes on that",
-  "not always but usually",
-  "from what i've seen yeah",
-  "pretty confident that's correct",
-  "worth double checking with them",
-  "based on my experience yes",
-];
-
-// Category F — global current events / news reaction
-const MSGS_NEWS = [
-  "the oil price movement this week is going to shake markets",
-  "US interest rate decision is tomorrow. positioning carefully",
-  "the geopolitical situation in the middle east is affecting sentiment",
-  "china's property sector news is a big macro risk right now",
-  "the yen is all over the place. tricky for forex exposure",
-  "inflation data came in hotter than expected again",
-  "tech layoffs continuing but markets still up. weird dynamic",
-  "the IMF revised growth forecasts down again",
-  "central banks are all still hawkish. tough environment",
-  "the housing market is starting to soften in a lot of regions",
-  "us election uncertainty is going to be interesting for markets",
-  "the AI sector is still getting massive investment flows",
-  "semiconductor supply chain issues seem to be easing",
-  "sovereign debt levels globally are getting uncomfortable",
-  "the energy transition is creating real investment opportunities",
-  "commodity prices spiking again. inflation isn't done",
-  "the dollar strengthening is putting pressure on emerging markets",
-  "banking sector looks stable but people are watching closely",
-  "supply chain costs are coming down. good news for inflation",
-  "ESG investing is getting more complicated from a regulatory angle",
-  "bond yields rising again. equity valuations getting stretched",
-  "the job market data looks softer this month",
-  "infrastructure spending is a massive theme in developed markets",
-  "i think we're in for a volatile Q3 across the board",
-  "de-dollarisation discussions are picking up again",
-  "private equity still sitting on huge amounts of dry powder",
-  "gold is holding up really well as a hedge",
-  "the eu is tightening crypto regulation significantly",
-  "climate risk is actually moving institutional allocation decisions now",
-  "the yield curve inversion is still something to watch",
-];
-
-// Category G — peer help and advice exchange
-const MSGS_HELP = [
-  "has anyone done the tier upgrade process? how did it go?",
-  "what's your strategy for reinvesting? all at once or gradually?",
-  "any tips for someone just starting out here?",
-  "should i go for the fixed plan or the flexible one?",
-  "been on the platform 1 week. what should i know?",
-  "best way to track your total returns over time?",
-  "do you prefer daily withdrawals or letting it compound?",
-  "thinking about the 90 day plan. anyone have experience with it?",
-  "how much is a good starting amount for someone testing the waters?",
-  "what's the smart move right now given the market conditions?",
-  "is it better to diversify plans or go heavy on one?",
-  "anyone gone from starter to VIP? worth the jump?",
-  "how do you handle tax on these kinds of returns?",
-  "how often do you log in and check your account?",
-  "do you reinvest immediately or wait for better market conditions?",
-  "what's the most you'd put into a single plan personally?",
-  "any red flags i should watch out for on investment platforms generally?",
-  "how do you decide between the real estate and staking options?",
-  "is there a sweet spot for deposit size versus yield rate?",
-  "what's the exit strategy if you need liquidity urgently?",
-];
-
-// Category H — motivational / community vibes
-const MSGS_VIBE = [
-  "love this community. people actually share useful stuff here",
-  "we're all going to make it 💪",
-  "shoutout to everyone who's been patient and consistent. paying off",
-  "this time last year i was broke. now i'm actually building something",
-  "passive income is the goal. slowly getting there",
-  "keep going guys. slow and steady wins",
-  "the best time to start was yesterday. second best time is now",
-  "long term thinking is underrated",
-  "compounding is genuinely one of the most powerful forces in finance",
-  "stay consistent. small wins stack up faster than you think",
-  "financial freedom is the goal and we're all moving toward it",
-  "grateful for a platform that actually pays out on time",
-  "just keep stacking. the numbers add up",
-  "anyone else feel like they're getting smarter about money by being in this chat?",
-  "real wealth is built slowly. trying to remember that daily",
-  "this group is actually wholesome. rare on the internet",
-  "consistency beats intensity every time",
-  "remind yourself why you started when it feels slow",
-  "thanks to everyone who shares their experience here. actually helpful",
-  "another dividend, another day closer to the goal",
-];
-
-// Category I — mild frustration / questions (keeps it real)
-const MSGS_FRICTION = [
-  "anyone else having trouble with the dashboard loading?",
-  "my verification email didn't come through. need to try again",
-  "asked support yesterday, still waiting on a reply",
-  "the mobile version has a few bugs. hope they fix it soon",
-  "withdrawal is taking a bit longer than usual today",
-  "can't seem to find the referral section anymore",
-  "my notification didn't fire when the dividend hit",
-  "the chart for my plan isn't loading properly",
-  "think there might be a small glitch in the calculator",
-  "asked three times about the tier upgrade. still no clear answer",
-  "the email verification link expired before i could click it",
-  "not getting sms alerts even though i enabled them",
-  "the transaction export isn't working on my browser",
-  "had a brief delay in my last withdrawal but it did go through eventually",
-  "anyone else find the plan comparison page a bit confusing?",
-  "can't update my bank details. keeps erroring out",
-  "the live chat button isn't showing up for me on mobile",
-  "2FA keeps failing. think it's a time sync issue with my phone",
-  "the referral earnings aren't showing up in my dashboard",
-  "hoping the next update fixes the mobile performance",
-];
-
-// Category J — peer success stories
-const MSGS_SUCCESS = [
-  "just crossed $10,000 in total earnings. feeling amazing",
-  "paid for my holiday entirely from dividends this month",
-  "my wife quit her part time job because of the passive income from here",
-  "made back my initial investment in 6 weeks. still going",
-  "just bought my first car using returns from this platform",
-  "this is the first investment i've had where the returns actually showed up",
-  "put my kids school fees on autopilot with the monthly dividends",
-  "turned $3,000 into over $6,500 in four months",
-  "crossed 100 days on the platform. not a single payment missed",
-  "finally feel like i'm in control of my finances",
-  "just hit my 6 month anniversary here. best financial decision i made",
-  "first platform where the numbers actually match what was promised",
-  "my emergency fund is fully funded now from dividends alone",
-  "booked a trip to bali using just this month's yield",
-  "the weekly compounding has been absolutely life changing for me",
-  "started with $1000. now at $3,200. eight months in",
-  "completely changed how i think about money since joining",
-  "paid off a credit card using one month's dividend payout",
-  "been telling everyone i know about this. the results speak for themselves",
-  "never thought passive income was real until this",
-];
-
-// Flat pool for O(1) random pick — all 50 per category × 10 categories = 500 core messages
-// We also generate combinatorial replies so the pool effectively exceeds 50k unique outputs
-const ALL_MSGS = [
-  ...MSGS_INVEST, ...MSGS_CASUAL, ...MSGS_CRYPTO, ...MSGS_PLATFORM,
-  ...MSGS_REACTIONS, ...MSGS_NEWS, ...MSGS_HELP, ...MSGS_VIBE,
-  ...MSGS_FRICTION, ...MSGS_SUCCESS,
-];
-
-// Natural reply starters that sound like a real person responding in chat
 const REPLY_STARTERS = [
   "yeah,", "honestly,", "same here,", "true,", "lol,", "ngl,", "wait,",
   "fr though,", "exactly,", "right?", "hmm,", "fair,", "yeah ngl,", "oof,",
@@ -524,20 +169,10 @@ const REPLY_STARTERS = [
   "@{name} agreed,", "@{name} lol same,", "@{name} ngl,", "@{name} fair point,",
 ];
 
-const generateRandomMessage = (replyToName?: string, _customTopic?: string): string => {
-  const base = ALL_MSGS[Math.floor(Math.random() * ALL_MSGS.length)];
-  
-  if (replyToName && Math.random() > 0.3) {
-    // Natural reply: pick a starter and weave into the base message
-    const starterTemplate = REPLY_STARTERS[Math.floor(Math.random() * REPLY_STARTERS.length)];
-    const starter = starterTemplate.replace('{name}', replyToName);
-    // Lowercase base to flow naturally after the starter
-    const lowerBase = base.charAt(0).toLowerCase() + base.slice(1);
-    return `${starter} ${lowerBase}`;
-  }
-  
-  return base;
-};
+// Sentence shapes used when a topic is actively selected by an admin — these
+// weave the exact topic name (a property, staking plan, or current event) into
+// the message so the simulated room actually looks like it's discussing it.
+const TOPIC_TEMPLATES = HUMAN_TOPIC_TEMPLATES;
 
 // Helper to get active topic string
 const getActiveTopic = (topicSetting: string, topics: string[]): string | undefined => {
@@ -595,11 +230,28 @@ export default function InvestorChat() {
   useEffect(() => {
     const loadSystemTopics = async () => {
       const topics: string[] = [
+        // platform-specific topics
         "VIP Staking Compound Yields",
         "Commercial Office Listing #12",
         "Solana Wallet Funding",
+        "Platform Withdrawal Payout Speed",
+        "New Referral Bonus Tier",
+        "Auto-Reinvest Feature Rollout",
+        // current events / world news topics
         "World Cup Tournament Qualifiers",
-        "Platform Withdrawal Payout Speed"
+        "US Federal Reserve Interest Rate Decision",
+        "Bitcoin ETF Inflows",
+        "Global Inflation Report",
+        "Tech Earnings Season",
+        "Oil Price Volatility",
+        "Gold Price Surge",
+        "US Election Coverage",
+        "Stock Market Correction Fears",
+        "Housing Market Slowdown",
+        "AI Sector Investment Boom",
+        "Cryptocurrency Regulation News",
+        "Holiday Shopping Season Retail Sales",
+        "Major Bank Interest Rate Changes",
       ];
       try {
         const { data: props } = await supabase.from('properties').select('title');
@@ -677,10 +329,10 @@ export default function InvestorChat() {
     return localStorage.getItem('rpm_chat_scheduled_until');
   });
   const [simCustomTopic, setSimCustomTopic] = useState<string>(() => {
-    return localStorage.getItem('rpm_chat_custom_topic') || '';
+    return localStorage.getItem('rpm_chat_custom_topic') || 'World Cup Tournament Qualifiers';
   });
   const [simTopicDraft, setSimTopicDraft] = useState<string>(() => {
-    return localStorage.getItem('rpm_chat_custom_topic') || '';
+    return localStorage.getItem('rpm_chat_custom_topic') || 'World Cup Tournament Qualifiers';
   });
   const [showOfflineNotice, setShowOfflineNotice] = useState(true);
 
@@ -720,7 +372,140 @@ export default function InvestorChat() {
     }
     shuffledUsersRef.current = copy;
   }
-  
+
+  // Shuffled message pool — walking this sequentially (instead of striding
+  // through the original template-ordered ALL_MSGS) avoids long runs of the
+  // same template family showing up back-to-back in scrollback history.
+  // Shuffled message pool index
+  const shuffledMsgsRef = useRef<string[]>([]);
+  const simMsgIndexRef = useRef(0);
+
+  if (shuffledMsgsRef.current.length === 0) {
+    const copy = [...ALL_MSGS];
+    for (let i = copy.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [copy[i], copy[j]] = [copy[j], copy[i]];
+    }
+    shuffledMsgsRef.current = copy;
+  }
+
+  // Shuffled topic templates pool
+  const shuffledTopicTemplatesRef = useRef<string[]>([]);
+  const simTopicTemplateIndexRef = useRef(0);
+
+  if (shuffledTopicTemplatesRef.current.length === 0) {
+    const copy = [...TOPIC_TEMPLATES];
+    for (let i = copy.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [copy[i], copy[j]] = [copy[j], copy[i]];
+    }
+    shuffledTopicTemplatesRef.current = copy;
+  }
+
+  // Track topic messages count to rotate topic after it runs its course
+  const topicMessageCountRef = useRef(0);
+  const topicThresholdRef = useRef(Math.floor(Math.random() * 16) + 15); // 15 to 30 messages
+
+  // Helper to draw sequentially from message shuffle bag
+  const drawNextBaseMessage = (): string => {
+    if (shuffledMsgsRef.current.length === 0) {
+      const copy = [...ALL_MSGS];
+      for (let i = copy.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [copy[i], copy[j]] = [copy[j], copy[i]];
+      }
+      shuffledMsgsRef.current = copy;
+      simMsgIndexRef.current = 0;
+    }
+    
+    let msg = shuffledMsgsRef.current[simMsgIndexRef.current];
+    simMsgIndexRef.current++;
+    
+    // Seamlessly reshuffle and reset when we reach the end
+    if (simMsgIndexRef.current >= shuffledMsgsRef.current.length) {
+      const copy = [...ALL_MSGS];
+      for (let i = copy.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [copy[i], copy[j]] = [copy[j], copy[i]];
+      }
+      shuffledMsgsRef.current = copy;
+      simMsgIndexRef.current = 0;
+    }
+    return msg;
+  };
+
+  // Helper to draw sequentially from topic template shuffle bag
+  const drawNextTopicTemplate = (): string => {
+    if (shuffledTopicTemplatesRef.current.length === 0) {
+      const copy = [...TOPIC_TEMPLATES];
+      for (let i = copy.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [copy[i], copy[j]] = [copy[j], copy[i]];
+      }
+      shuffledTopicTemplatesRef.current = copy;
+      simTopicTemplateIndexRef.current = 0;
+    }
+    
+    let template = shuffledTopicTemplatesRef.current[simTopicTemplateIndexRef.current];
+    simTopicTemplateIndexRef.current++;
+    
+    if (simTopicTemplateIndexRef.current >= shuffledTopicTemplatesRef.current.length) {
+      const copy = [...TOPIC_TEMPLATES];
+      for (let i = copy.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [copy[i], copy[j]] = [copy[j], copy[i]];
+      }
+      shuffledTopicTemplatesRef.current = copy;
+      simTopicTemplateIndexRef.current = 0;
+    }
+    return template;
+  };
+
+  const generateRandomMessage = (
+    replyToName?: string,
+    activeTopic?: string,
+    isLive = false
+  ): string => {
+    let base: string;
+    if (activeTopic && Math.random() < 0.7) {
+      if (isLive) {
+        const template = drawNextTopicTemplate();
+        base = template.replace('{topic}', activeTopic);
+      } else {
+        const template = TOPIC_TEMPLATES[Math.floor(Math.random() * TOPIC_TEMPLATES.length)];
+        base = template.replace('{topic}', activeTopic);
+      }
+    } else {
+      if (isLive) {
+        base = drawNextBaseMessage();
+      } else {
+        base = ALL_MSGS[Math.floor(Math.random() * ALL_MSGS.length)];
+      }
+    }
+
+    if (replyToName && Math.random() > 0.3) {
+      const starterTemplate = REPLY_STARTERS[Math.floor(Math.random() * REPLY_STARTERS.length)];
+      const starter = starterTemplate.replace('{name}', replyToName);
+      const lowerBase = base.charAt(0).toLowerCase() + base.slice(1);
+      return `${starter} ${lowerBase}`;
+    }
+    return base;
+  };
+
+  const rotateTopic = (currentTopic: string, sysTopics: string[]) => {
+    if (sysTopics.length === 0) return;
+    const candidates = sysTopics.filter(t => t.toLowerCase() !== currentTopic.toLowerCase());
+    const nextTopic = candidates.length > 0
+      ? candidates[Math.floor(Math.random() * candidates.length)]
+      : sysTopics[Math.floor(Math.random() * sysTopics.length)];
+    
+    setSimCustomTopic(nextTopic);
+    setSimTopicDraft(nextTopic);
+    topicMessageCountRef.current = 0;
+    topicThresholdRef.current = Math.floor(Math.random() * 16) + 15;
+    toast.info(`Topic rotated: "${currentTopic}" ended. Now discussing "${nextTopic}".`);
+  };
+
   // Reply target message state
   const [replyTarget, setReplyTarget] = useState<InvestorChatMessage | null>(null);
 
@@ -783,18 +568,6 @@ export default function InvestorChat() {
   const [virtualHistoryCount, setVirtualHistoryCount] = useState(40);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
-
-  // Generate dynamic online count fluctuations
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setOnlineCount(prev => {
-        const offset = Math.floor(Math.random() * 501) - 250; // -250 to +250
-        const nextVal = prev + offset;
-        return Math.max(1000000, Math.min(2000000, nextVal));
-      });
-    }, 4000);
-    return () => clearInterval(interval);
-  }, []);
 
   // Fetch initial db entries and setup real-time channels
   useEffect(() => {
@@ -919,15 +692,33 @@ export default function InvestorChat() {
         .order('created_at', { ascending: true });
 
       if (error) throw error;
-      
-      let dbMsgs = (data || []) as any[];
-      
+
+      const dbMsgs = (data || []) as any[];
+
       // Map profile emails to messages
       dbMsgs.forEach((m) => {
         m.sender_email = m.profiles?.email || undefined;
       });
 
-      setMessages(dbMsgs);
+      // Ephemeral room: real messages are NOT replayed as history every time
+      // someone opens the chat. Once a message scrolls out of a live session
+      // it's gone — the "Resuming Chat Session" banner tells users exactly this.
+      // The ONLY real messages we reload are:
+      //   • pinned messages (a deliberate, persistent admin action), and
+      //   • messages that are part of a reply thread — i.e. a message that was
+      //     responded to, or the reply itself ("gone, unless responded to").
+      // Everything else is dropped on load and only ever appears live via the
+      // realtime subscription while the user is actually present.
+      const repliedToIds = new Set(
+        dbMsgs.map(m => m.reply_to_id).filter(Boolean)
+      );
+      const persistent = dbMsgs.filter(m =>
+        m.is_pinned ||
+        !!m.reply_to_id ||        // this message is itself a reply
+        repliedToIds.has(m.id)    // this message was replied to
+      );
+
+      setMessages(persistent);
       const pinned = dbMsgs.find(m => m.is_pinned);
       if (pinned) setPinnedMessage(pinned);
 
@@ -942,22 +733,43 @@ export default function InvestorChat() {
   const virtualScrollbackMessages = useMemo(() => {
     const history: InvestorChatMessage[] = [];
     const baseTime = Date.now() - 24 * 60 * 60 * 1000; // 1 day ago
-    
+    const activeTopic = getActiveTopic(simCustomTopic, systemTopics);
+
+    // Walk the pre-shuffled pools sequentially (instead of striding through
+    // the original template/name-ordered arrays) and skip anything used in
+    // the last RECENT_WINDOW slots, so no name or message clusters together.
+    const RECENT_WINDOW = 8;
+    const recentNames: string[] = [];
+    const recentBodies: string[] = [];
+    const users = shuffledUsersRef.current;
+    const msgs = shuffledMsgsRef.current;
+
     for (let i = 0; i < virtualHistoryCount; i++) {
       const timeOffset = (virtualHistoryCount - i) * 8 * 60 * 1000; // ~8 mins apart
       const msgTime = new Date(baseTime + timeOffset).toISOString();
-      const userIdx = (i * 7) % SIMULATED_USERS.length;
-      const user = SIMULATED_USERS[userIdx];
-      // Deterministic generation to keep the same messages per index on rerender
-      let body = "";
-      const activeTopic = getActiveTopic(simCustomTopic, systemTopics);
+
+      let user = users[i % users.length];
+      for (let probe = 1; probe <= 20 && recentNames.includes(user.name); probe++) {
+        user = users[(i + probe) % users.length];
+      }
+      recentNames.push(user.name);
+      if (recentNames.length > RECENT_WINDOW) recentNames.shift();
+
+      let body: string;
       if (activeTopic) {
         body = generateRandomMessage(undefined, activeTopic);
+        for (let attempt = 0; attempt < 5 && recentBodies.includes(body); attempt++) {
+          body = generateRandomMessage(undefined, activeTopic);
+        }
       } else {
-        // Deterministic pick from ALL_MSGS so the same virtual slot always shows the same message
-        body = ALL_MSGS[(i * 17) % ALL_MSGS.length];
+        body = msgs[i % msgs.length];
+        for (let probe = 1; probe <= 20 && recentBodies.includes(body); probe++) {
+          body = msgs[(i + probe) % msgs.length];
+        }
       }
-      
+      recentBodies.push(body);
+      if (recentBodies.length > RECENT_WINDOW) recentBodies.shift();
+
       history.push({
         id: `virtual-${i}`,
         sender_id: null,
@@ -1005,6 +817,12 @@ export default function InvestorChat() {
   const bannedUsersRef = useRef(bannedUsers);
   useEffect(() => { bannedUsersRef.current = bannedUsers; }, [bannedUsers]);
 
+  // Rolling recent-history windows so the live simulation never lets the same
+  // bot post twice in a row (or a handful of messages apart), and never
+  // repeats the same message text within a short stretch.
+  const recentPosterNamesRef = useRef<string[]>([]);
+  const recentBodiesRef = useRef<string[]>([]);
+
   // Simulated live message additions (recursive timeout for dynamic, human-like speed)
   useEffect(() => {
     if (loading) return;
@@ -1025,18 +843,30 @@ export default function InvestorChat() {
         currentCountryLimit = schedC;
       }
 
-      // Filter users based on scheduling
-      let candidates = shuffledUsersRef.current;
+      // Filter users based on scheduling — banned bots never get to post again
+      const bannedNamesLower = new Set(bannedUsersRef.current.map(b => b.user_name.toLowerCase()));
+      let candidates = shuffledUsersRef.current.filter(u => !bannedNamesLower.has(u.name.toLowerCase()));
       if (currentCountryLimit) {
         candidates = candidates.filter(u => u.country === currentCountryLimit);
       } else if (actC.length > 0) {
         candidates = candidates.filter(u => actC.includes(u.country));
+      }
+      if (candidates.length === 0) {
+        candidates = shuffledUsersRef.current.filter(u => !bannedNamesLower.has(u.name.toLowerCase()));
       }
 
       // Filter by daily post limits (max 2 per day)
       let eligibleCandidates = candidates.filter(u => canUserPost(u.name));
       if (eligibleCandidates.length === 0) {
         eligibleCandidates = candidates;
+      }
+
+      // Avoid the same handful of names dominating a short stretch of chat —
+      // skip anyone who posted in the last few messages if other options exist
+      const recentNames = recentPosterNamesRef.current;
+      const notRecentlyPosted = eligibleCandidates.filter(u => !recentNames.includes(u.name));
+      if (notRecentlyPosted.length > 0) {
+        eligibleCandidates = notRecentlyPosted;
       }
 
       // Fallback if filter left empty
@@ -1047,41 +877,45 @@ export default function InvestorChat() {
       // Pick sequential user from candidates to ensure rotating variety
       const user = eligibleCandidates[simUserIndexRef.current % eligibleCandidates.length];
       simUserIndexRef.current = (simUserIndexRef.current + 1) % eligibleCandidates.length;
-      
+
+      recentPosterNamesRef.current = [...recentPosterNamesRef.current, user.name].slice(-6);
+
       const decider = Math.random();
-      if (decider < 0.05) {
-        // User joined
+      if (decider < 0.08) {
+        // Online-count change — explained by batch joins/leaves, which looks
+        // much more realistic for a room of ~3M users than single joins/leaves.
+        const isJoin = decider < 0.05;
+        const waveRoll = Math.random();
+        
+        let amount = 1;
+        if (waveRoll > 0.02) {
+          amount = waveRoll < 0.70
+            ? Math.floor(Math.random() * 80) + 10       // 10–90 users
+            : waveRoll < 0.95
+            ? Math.floor(Math.random() * 350) + 100     // 100–450 users
+            : Math.floor(Math.random() * 2500) + 500;    // 500–3000 users
+        }
+
         const flag = COUNTRY_FLAGS[user.country] || '🌐';
+        const label = amount === 1
+          ? `${flag} @${user.name} ${isJoin ? 'joined' : 'left'} the room`
+          : `👥 ${amount.toLocaleString()} users just ${isJoin ? 'joined' : 'left'} the room`;
+
         const simulatedMsg: InvestorChatMessage = {
           id: `sim-sys-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
           sender_id: null,
           sender_name: 'System',
           sender_country: user.country,
-          body: `${flag} @${user.name} joined the room`,
+          body: label,
           is_pinned: false,
           reply_to_id: null,
           created_at: new Date().toISOString()
         };
         setMessages(prev => [...prev, simulatedMsg]);
-        // Each join adds 1 person
-        setOnlineCount(prev => Math.min(4_000_000, prev + 1));
-        scrollToBottom();
-      } else if (decider < 0.08) {
-        // User left
-        const flag = COUNTRY_FLAGS[user.country] || '🌐';
-        const simulatedMsg: InvestorChatMessage = {
-          id: `sim-sys-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-          sender_id: null,
-          sender_name: 'System',
-          sender_country: user.country,
-          body: `${flag} @${user.name} left the room`,
-          is_pinned: false,
-          reply_to_id: null,
-          created_at: new Date().toISOString()
-        };
-        setMessages(prev => [...prev, simulatedMsg]);
-        // Each leave removes 1 person
-        setOnlineCount(prev => Math.max(1_000_000, prev - 1));
+        setOnlineCount(prev => {
+          const next = isJoin ? prev + amount : prev - amount;
+          return Math.max(1_000_000, Math.min(4_000_000, next));
+        });
         scrollToBottom();
       } else {
         // Decider to reply to last msg or post a new topic
@@ -1090,7 +924,14 @@ export default function InvestorChat() {
         const shouldReply = Math.random() > 0.65 && lastMsg && lastMsg.sender_name !== 'System';
         
         const activeTopic = getActiveTopic(customTopicVal, sysTopicsVal);
-        const body = generateRandomMessage(shouldReply ? lastMsg.sender_name : undefined, activeTopic);
+        const body = generateRandomMessage(shouldReply ? lastMsg.sender_name : undefined, activeTopic, true);
+
+        if (activeTopic && body.toLowerCase().includes(activeTopic.toLowerCase())) {
+          topicMessageCountRef.current++;
+          if (topicMessageCountRef.current >= topicThresholdRef.current) {
+            rotateTopic(activeTopic, sysTopicsVal);
+          }
+        }
         
         const simulatedMsg: InvestorChatMessage = {
           id: `sim-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
@@ -1108,31 +949,35 @@ export default function InvestorChat() {
         // Record simulated post frequency
         recordUserPost(user.name);
 
-        setMessages(prev => {
-          // Prevent adjacent identical messages
-          if (prev.length > 0 && prev[prev.length - 1].body === body) return prev;
-          return [...prev, simulatedMsg];
-        });
-        scrollToBottom();
+        // Only post if this exact text wasn't already said in the last few
+        // messages — but never bail out of the loop itself, or the whole
+        // simulation (and the online-count updates riding along with it)
+        // would freeze the moment one collision happened.
+        if (!recentBodiesRef.current.includes(body)) {
+          recentBodiesRef.current = [...recentBodiesRef.current, body].slice(-6);
 
-        // Check if current user is tagged or responded to
-        checkAndAlertMentions(simulatedMsg);
+          setMessages(prev => [...prev, simulatedMsg]);
+          scrollToBottom();
 
-        // Check if followed user posted (Admin alert)
-        if (profile?.is_admin) {
-          const isFollowed = followedUsersVal.some(f => f.target_name.toLowerCase() === user.name.toLowerCase());
-          if (isFollowed) {
-            toast(`Followed User Alert`, {
-              description: `${user.name} posted: "${body.substring(0, 40)}..."`,
-              action: {
-                label: "View",
-                onClick: () => {
-                  const el = document.getElementById(`msg-${simulatedMsg.id}`);
-                  el?.scrollIntoView({ behavior: 'smooth' });
+          // Check if current user is tagged or responded to
+          checkAndAlertMentions(simulatedMsg);
+
+          // Check if followed user posted (Admin alert)
+          if (profile?.is_admin) {
+            const isFollowed = followedUsersVal.some(f => f.target_name.toLowerCase() === user.name.toLowerCase());
+            if (isFollowed) {
+              toast(`Followed User Alert`, {
+                description: `${user.name} posted: "${body.substring(0, 40)}..."`,
+                action: {
+                  label: "View",
+                  onClick: () => {
+                    const el = document.getElementById(`msg-${simulatedMsg.id}`);
+                    el?.scrollIntoView({ behavior: 'smooth' });
+                  }
                 }
-              }
-            });
-            setFollowAlerts(prev => [...prev, { id: simulatedMsg.id, msg: simulatedMsg }]);
+              });
+              setFollowAlerts(prev => [...prev, { id: simulatedMsg.id, msg: simulatedMsg }]);
+            }
           }
         }
       }
@@ -1150,20 +995,6 @@ export default function InvestorChat() {
 
     return () => clearTimeout(timeoutId);
   }, [loading, simSpeedMs]);
-
-  // Background drift: every 8–30 seconds nudge the online count ±50–800
-  // to simulate real crowd fluctuation between explicit join/leave events
-  useEffect(() => {
-    if (loading) return;
-    let driftTimeout: ReturnType<typeof setTimeout>;
-    const drift = () => {
-      const delta = Math.floor((Math.random() - 0.48) * 1200); // slight upward bias
-      setOnlineCount(prev => Math.min(4_000_000, Math.max(1_000_000, prev + delta)));
-      driftTimeout = setTimeout(drift, 8_000 + Math.random() * 22_000);
-    };
-    driftTimeout = setTimeout(drift, 8_000 + Math.random() * 22_000);
-    return () => clearTimeout(driftTimeout);
-  }, [loading]);
 
   // Handle scroll to top to load more virtual history
   const handleScroll = () => {
@@ -1985,7 +1816,7 @@ export default function InvestorChat() {
                             const selectedList = simTopicDraft.split(',').map(s => s.trim());
                             const isSelected = selectedList.includes(t);
                             return (
-                              <label key={t} className="flex items-center gap-2 text-[10px] font-semibold text-gray-650 hover:text-gray-900 cursor-pointer select-none">
+                              <label key={t} className="flex items-center gap-2.5 py-2 px-1.5 rounded-lg text-[10px] font-semibold text-gray-650 hover:text-gray-900 hover:bg-white cursor-pointer select-none touch-manipulation">
                                 <input
                                   type="checkbox"
                                   checked={isSelected}
@@ -2002,7 +1833,7 @@ export default function InvestorChat() {
                                       setSimTopicDraft(nextList.join(', '));
                                     }
                                   }}
-                                  className="rounded text-brand focus:ring-brand w-3.5 h-3.5 border-gray-200"
+                                  className="rounded text-brand focus:ring-brand w-4 h-4 border-gray-200 shrink-0"
                                 />
                                 <span>{t}</span>
                               </label>

@@ -94,6 +94,8 @@ export default function AdminUsers() {
   const [emailSubject, setEmailSubject] = useState('');
   const [emailMessage, setEmailMessage] = useState('');
   const [sendingEmail, setSendingEmail] = useState(false);
+  const [tempPassword, setTempPassword] = useState('');
+  const [settingPassword, setSettingPassword] = useState(false);
   const navigate = useNavigate();
 
   // Email templates state
@@ -725,6 +727,49 @@ export default function AdminUsers() {
       }
     } catch (err: any) {
       toast.error('Failed to generate magic link: ' + err.message, { id: 'magic-link' });
+    }
+  };
+
+  // Build a readable but strong temporary password (letters + digits, no
+  // ambiguous chars) that an admin can hand to a user to log in with right away.
+  const generateTempPassword = () => {
+    const chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+    let out = '';
+    const rand = new Uint32Array(10);
+    crypto.getRandomValues(rand);
+    for (let i = 0; i < 10; i++) out += chars[rand[i] % chars.length];
+    // Guarantee it clears Supabase's 6-char minimum and reads as a temp pass.
+    return `Rpm-${out}`;
+  };
+
+  const setUserPassword = async () => {
+    if (!selectedUser) return;
+    const pwd = (tempPassword.trim() || generateTempPassword());
+    if (pwd.length < 6) {
+      toast.error('Password must be at least 6 characters');
+      return;
+    }
+    if (!confirm(`Set a temporary password for ${selectedUser.name || selectedUser.email}?\n\nThey can log in with it immediately and change it later.\n\nPassword: ${pwd}`)) {
+      return;
+    }
+    setSettingPassword(true);
+    try {
+      toast.loading('Setting temporary password...', { id: 'set-pwd' });
+      const { error } = await supabase.functions.invoke('admin-action', {
+        body: {
+          action: 'set-password',
+          userId: selectedUser.id,
+          password: pwd,
+        }
+      });
+      if (error) throw error;
+      setTempPassword(pwd);
+      try { await navigator.clipboard.writeText(pwd); } catch { /* clipboard may be blocked */ }
+      toast.success(`Temp password set & copied: ${pwd}`, { id: 'set-pwd', duration: 12000 });
+    } catch (err: any) {
+      toast.error('Failed to set password: ' + err.message, { id: 'set-pwd' });
+    } finally {
+      setSettingPassword(false);
     }
   };
 
@@ -1569,7 +1614,32 @@ export default function AdminUsers() {
                         <Ban size={18} /> Delete Account
                       </button>
                     </div>
+                    <div className="flex flex-wrap items-center gap-2 bg-gray-50 border border-gray-100 rounded-xl p-3">
+                      <input
+                        type="text"
+                        value={tempPassword}
+                        onChange={(e) => setTempPassword(e.target.value)}
+                        placeholder="Auto-generate or type a temp password"
+                        className="flex-1 min-w-[180px] px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setTempPassword(generateTempPassword())}
+                        className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-2 rounded-lg text-sm flex items-center gap-1"
+                      >
+                        <Key size={16} /> Generate
+                      </button>
+                      <button
+                        type="button"
+                        onClick={setUserPassword}
+                        disabled={settingPassword}
+                        className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm flex items-center gap-2 disabled:opacity-70"
+                      >
+                        <Lock size={16} /> {settingPassword ? 'Setting...' : 'Set Temp Password'}
+                      </button>
+                    </div>
                     <div className="space-y-1">
+                      <p className="text-[10px] text-gray-400 font-medium"><strong className="text-green-600">Set Temp Password:</strong> Directly sets a working password for this user (copied to clipboard). They can log in with it right away and change it later in Settings.</p>
                       <p className="text-[10px] text-gray-400 font-medium"><strong className="text-amber-600">Reset Password:</strong> Securely generates and copies a password recovery link to the clipboard.</p>
                       <p className="text-[10px] text-gray-400 font-medium"><strong className="text-blue-600">Magic Link:</strong> Generates and copies a direct, passwordless login link to the clipboard.</p>
                       <p className="text-[10px] text-gray-400 font-medium"><strong className="text-red-600">Delete Account:</strong> Permanently and irreversibly removes the user and profile database records.</p>

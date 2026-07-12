@@ -1,6 +1,7 @@
 // supabase/functions/admin-action/index.ts
 // Handles administrative Auth actions that require the service role key,
-// such as deleting a user account, sending reset password emails, and generating magic links.
+// such as deleting a user account, sending reset password emails, generating
+// magic links, and setting a temporary password an admin can hand to a user.
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -59,7 +60,7 @@ serve(async (req: Request) => {
     }
 
     // 2. Parse request payload
-    const { action, userId, email, redirectTo } = await req.json();
+    const { action, userId, email, redirectTo, password } = await req.json();
 
     if (!action) {
       return new Response(
@@ -127,6 +128,34 @@ serve(async (req: Request) => {
 
       return new Response(
         JSON.stringify({ success: true, link: linkData.properties.action_link }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+
+    } else if (action === 'set-password') {
+      // Directly set a temporary password the admin can hand to the user.
+      // The user can log in with it immediately and change it later.
+      if (!userId || !password) {
+        return new Response(
+          JSON.stringify({ error: 'userId and password are required for set-password' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      if (typeof password !== 'string' || password.length < 6) {
+        return new Response(
+          JSON.stringify({ error: 'Password must be at least 6 characters' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const { error: pwErr } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+        password,
+      });
+
+      if (pwErr) throw pwErr;
+
+      return new Response(
+        JSON.stringify({ success: true, message: 'Temporary password set successfully' }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
 
