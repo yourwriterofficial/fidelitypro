@@ -1,18 +1,19 @@
 // Edge function: send a Web Push notification to one or more users.
 // Payload: { user_ids: string[], title: string, body: string, url?: string, tag?: string, notification_type?: 'info'|'warning'|'success'|'alert' }
+//
+// VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY must be set as Supabase Edge Function
+// secrets (Dashboard -> Edge Functions -> Secrets, or `supabase secrets set`).
+// No hardcoded fallback on purpose: a real private key baked into source is
+// permanently readable by anyone with repo access, including in git history.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const SUPABASE_URL        = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
-let VAPID_PUBLIC_KEY = Deno.env.get('VAPID_PUBLIC_KEY')!;
-if (!VAPID_PUBLIC_KEY || VAPID_PUBLIC_KEY.length !== 87) {
-  VAPID_PUBLIC_KEY = 'BA8RM3ej0pbVl5vx_DBKyv7GECKHji3F6oCCbzUjola1Uf0tLuh8nuDqwURDkJ_cgK8zhhNM-kq_-pAkLYtS3Y4';
-}
-
-let VAPID_PRIVATE_KEY = Deno.env.get('VAPID_PRIVATE_KEY')!;
-if (!VAPID_PRIVATE_KEY || VAPID_PRIVATE_KEY.length < 100) {
-  VAPID_PRIVATE_KEY = 'MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQg8LRAd6aBCe4TBl561gE5dvTYdanVgaWL-wj8wGmN83GhRANCAAQPETN3o9KW1Zeb8fwwSsr-xhAih44txeqAgm81I6JWtVH9LS7ofJ7g6sFEQ5Cf3ICvM4YTTPpKv_qQJC2LUt2O';
+const VAPID_PUBLIC_KEY = Deno.env.get('VAPID_PUBLIC_KEY');
+const VAPID_PRIVATE_KEY = Deno.env.get('VAPID_PRIVATE_KEY');
+if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
+  throw new Error('VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY must be set as Supabase Edge Function secrets.');
 }
 
 const VAPID_SUBJECT       = 'mailto:noreply@remaprofitmachine.com';
@@ -195,7 +196,20 @@ Deno.serve(async (req) => {
     .select('id, user_id, endpoint, p256dh, auth')
     .in('user_id', filteredIds);
 
-  if (!subs?.length) return new Response(JSON.stringify({ sent: 0 }), { status: 200, headers: cors });
+  // Delivery log: lets an admin diagnose "push isn't arriving" from a table
+  // instead of re-investigating the whole notification pipeline each time.
+  const deliveries: { notification_title: string; user_id: string; channel: string; status: string; error: string | null }[] = [];
+  const subscribedUserIds = new Set((subs || []).map((s) => s.user_id));
+  for (const id of filteredIds) {
+    if (!subscribedUserIds.has(id)) {
+      deliveries.push({ notification_title: title, user_id: id, channel: 'push', status: 'no_subscription', error: null });
+    }
+  }
+
+  if (!subs?.length) {
+    if (deliveries.length) await adminClient.from('notification_deliveries').insert(deliveries);
+    return new Response(JSON.stringify({ sent: 0 }), { status: 200, headers: cors });
+  }
 
   const payload = JSON.stringify({ title, body, url, tag });
   let sent = 0;
@@ -207,13 +221,25 @@ Deno.serve(async (req) => {
       const { ok, gone } = await sendOne({ endpoint: s.endpoint, p256dh: s.p256dh, auth: s.auth }, encBody);
       if (ok) sent++;
       if (gone) toDelete.push(s.id);
+      deliveries.push({
+        notification_title: title,
+        user_id: s.user_id,
+        channel: 'push',
+        status: ok ? 'sent' : 'failed',
+        error: ok ? null : 'Push service rejected the request',
+      });
     } catch (e) {
       console.error('Push send error', e);
+      deliveries.push({ notification_title: title, user_id: s.user_id, channel: 'push', status: 'failed', error: String(e) });
     }
   }));
 
   if (toDelete.length) {
     await adminClient.from('push_subscriptions').delete().in('id', toDelete);
+  }
+
+  if (deliveries.length) {
+    await adminClient.from('notification_deliveries').insert(deliveries);
   }
 
   return new Response(JSON.stringify({ sent }), { status: 200, headers: cors });
