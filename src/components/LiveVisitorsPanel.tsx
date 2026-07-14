@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { useAuthStore } from '../store/authStore';
 import { toast } from 'sonner';
-import { notifyUser } from '../lib/notify';
 import { Bell, BellRing, Clock, ChevronDown, ChevronUp } from 'lucide-react';
 import type { OnlineVisitor } from './Layout';
 
@@ -190,15 +189,9 @@ export default function LiveVisitorsPanel({ onlineUsers, onInspectUser }: { onli
       toast(`${displayName} just came online`, {
         description: `Now viewing ${ou.current_page || 'the site'}`,
       });
-      if (user?.id) {
-        notifyUser({
-          userId: user.id,
-          title: 'Watched user online',
-          message: `${displayName} just came online (viewing ${ou.current_page || 'the site'}).`,
-          type: 'alert',
-          link: '/admin/users',
-        });
-      }
+      // Persisted notification + push is dispatched server-side (a Postgres
+      // trigger on profiles.last_seen), independent of any admin tab being
+      // open; this toast is just for immediate feedback on this page.
     });
     previousOnlineIdsRef.current = newOnlineIds;
   }, [onlineUsers, watchedUserIds, user?.id]);

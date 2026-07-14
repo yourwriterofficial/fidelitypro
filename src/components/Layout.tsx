@@ -176,38 +176,52 @@ export default function Layout() {
     // Live Visitors) read this via <Outlet context> instead of opening
     // their own competing subscription to the same 'online_users' topic
     // (which would race this effect's own subscribe/track callback).
-    presenceChannel.on('presence', { event: 'sync' }, () => {
-      const state = presenceChannel.presenceState();
-      const list: OnlineVisitor[] = [];
-      Object.values(state).forEach((presenceList: any) => {
-        if (!presenceList?.length) return;
-        // Defense in depth: if more than one entry ever ends up under the
-        // same key, prefer the most recently active one.
-        const latest = presenceList.reduce((a: any, b: any) =>
-          new Date(b.last_active || 0).getTime() > new Date(a.last_active || 0).getTime() ? b : a
-        );
-        list.push({
-          user_id: latest.user_id,
-          name: latest.name || 'User',
-          email: latest.email || '',
-          current_page: latest.current_page || '',
-          last_active: latest.last_active || '',
+    //
+    // `supabase.channel(topic)` returns the EXISTING channel object if one
+    // is already registered for that topic instead of creating a new one —
+    // and `removeChannel()` tears it down asynchronously (it awaits an
+    // unsubscribe round-trip before deregistering it). Under React Strict
+    // Mode's dev-only mount→cleanup→mount double-invoke, the remount's
+    // `channel()` call can therefore get back the previous mount's
+    // still-subscribed channel before its teardown lands, and calling
+    // `.on()` on an already-subscribed channel throws. Only wire up
+    // listeners/subscribe when the channel is genuinely fresh ('closed');
+    // an already-joining/joined channel is the still-live previous
+    // instance doing the same job, so there's nothing to (re-)do.
+    if (presenceChannel.state === 'closed') {
+      presenceChannel.on('presence', { event: 'sync' }, () => {
+        const state = presenceChannel.presenceState();
+        const list: OnlineVisitor[] = [];
+        Object.values(state).forEach((presenceList: any) => {
+          if (!presenceList?.length) return;
+          // Defense in depth: if more than one entry ever ends up under the
+          // same key, prefer the most recently active one.
+          const latest = presenceList.reduce((a: any, b: any) =>
+            new Date(b.last_active || 0).getTime() > new Date(a.last_active || 0).getTime() ? b : a
+          );
+          list.push({
+            user_id: latest.user_id,
+            name: latest.name || 'User',
+            email: latest.email || '',
+            current_page: latest.current_page || '',
+            last_active: latest.last_active || '',
+          });
         });
+        setOnlineUsers(list);
       });
-      setOnlineUsers(list);
-    });
 
-    presenceChannel.subscribe(async (status) => {
-      if (status === 'SUBSCRIBED') {
-        await presenceChannel.track({
-          user_id: profile.id,
-          name: profile.name || 'User',
-          email: profile.email,
-          current_page: location.pathname,
-          last_active: new Date().toISOString()
-        });
-      }
-    });
+      presenceChannel.subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') {
+          await presenceChannel.track({
+            user_id: profile.id,
+            name: profile.name || 'User',
+            email: profile.email,
+            current_page: location.pathname,
+            last_active: new Date().toISOString()
+          });
+        }
+      });
+    }
 
     return () => {
       supabase.removeChannel(presenceChannel);

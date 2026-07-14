@@ -67,7 +67,11 @@ export async function isNotificationEnabled(
 
 /**
  * Simple client-side rate limiter for outbound notification triggers.
- * Limit: 5 dispatches per 60 seconds per client browser.
+ * Limit: 5 dispatches per 60 seconds per client browser. This guards
+ * against a single-recipient call site looping/misfiring — it must NOT be
+ * applied per-recipient inside a bulk fan-out (see notifyUsers/notifyAdmins
+ * below), or broadcasting to more than 5 users silently drops everyone
+ * past the 5th.
  */
 function checkRateLimit(): boolean {
   if (typeof window === 'undefined' || !window.localStorage) {
@@ -98,14 +102,12 @@ function checkRateLimit(): boolean {
 }
 
 /**
- * Sends a notification: inserts the in-app notification in Supabase
- * and invokes the send-push edge function to dispatch web push.
+ * Inserts the in-app notification in Supabase and invokes the send-push
+ * edge function to dispatch web push, with no rate limiting — callers
+ * (notifyUser for single-recipient call sites, notifyUsers/notifyAdmins for
+ * bulk fan-out) are responsible for their own rate-limit policy.
  */
-export async function notifyUser(params: NotifyParams): Promise<void> {
-  if (!checkRateLimit()) {
-    toast.error('Notification rate limit reached. Please wait a moment.');
-    return;
-  }
+async function dispatchNotification(params: NotifyParams): Promise<void> {
   const { userId, title, message, type, link } = params;
 
   // 1. Write to database notifications table
@@ -128,7 +130,7 @@ export async function notifyUser(params: NotifyParams): Promise<void> {
   try {
     const key = `push_${type}` as const;
     const pushEnabled = await isNotificationEnabled(userId, key);
-    
+
     if (pushEnabled) {
       await supabase.functions.invoke('send-push', {
         body: {
@@ -144,6 +146,17 @@ export async function notifyUser(params: NotifyParams): Promise<void> {
   } catch (e) {
     console.warn('[notify] Push notification invoke failed (non-fatal):', e);
   }
+}
+
+/**
+ * Sends a notification to a single recipient, rate-limited per browser.
+ */
+export async function notifyUser(params: NotifyParams): Promise<void> {
+  if (!checkRateLimit()) {
+    toast.error('Notification rate limit reached. Please wait a moment.');
+    return;
+  }
+  await dispatchNotification(params);
 }
 
 /** Sends an email to a user, respecting their notification preferences & admin locks */
@@ -185,9 +198,9 @@ export async function sendEmailToUser(
   }
 }
 
-/** Sends a notification to multiple users */
+/** Sends a notification to multiple users (bulk broadcast — not subject to the per-recipient rate limit) */
 export async function notifyUsers(userIds: string[], params: Omit<NotifyParams, 'userId'>): Promise<void> {
-  await Promise.all(userIds.map(userId => notifyUser({ ...params, userId })));
+  await Promise.all(userIds.map(userId => dispatchNotification({ ...params, userId })));
 }
 
 /** Sends an in-app and web-push notification to all admin profiles */
@@ -206,6 +219,7 @@ export async function notifyAdmins(params: Omit<NotifyParams, 'userId'>): Promis
     const adminIds = admins.map(a => a.id);
 
     // 2. Write in-app notifications
+    // Bulk fan-out to admins — not subject to the per-recipient rate limit.
     const inserts = adminIds.map(adminId => ({
       user_id: adminId,
       title,

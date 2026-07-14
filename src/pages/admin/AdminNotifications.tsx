@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { toast } from 'sonner';
-import { Send, Trash, RefreshCw, ShieldAlert } from 'lucide-react';
+import { Send, Trash, RefreshCw, ShieldAlert, CheckCircle2, XCircle, BellOff } from 'lucide-react';
 import { notifyUsers } from '../../lib/notify';
 
 interface UserProfile {
@@ -12,6 +12,16 @@ interface UserProfile {
   wallet_balance: number;
   banned: boolean;
   is_admin: boolean;
+}
+
+interface DeliveryRow {
+  id: string;
+  notification_title: string | null;
+  channel: string;
+  status: 'sent' | 'failed' | 'no_subscription';
+  error: string | null;
+  created_at: string;
+  profiles: { name: string; email: string } | null;
 }
 
 export default function AdminNotifications() {
@@ -28,8 +38,32 @@ export default function AdminNotifications() {
   const [ordersUserIds, setOrdersUserIds] = useState<Set<string>>(new Set());
   const [inactivityHours, setInactivityHours] = useState(24);
 
+  // Delivery log — lets an admin see whether push actually went out for a
+  // given notification (sent / failed / no subscription registered) instead
+  // of having to guess why a recipient says they never got an alert.
+  const [deliveries, setDeliveries] = useState<DeliveryRow[]>([]);
+  const [loadingDeliveries, setLoadingDeliveries] = useState(false);
+
+  const fetchDeliveries = async () => {
+    setLoadingDeliveries(true);
+    try {
+      const { data, error } = await supabase
+        .from('notification_deliveries')
+        .select('id, notification_title, channel, status, error, created_at, profiles(name, email)')
+        .order('created_at', { ascending: false })
+        .limit(50);
+      if (error) throw error;
+      setDeliveries((data || []) as any);
+    } catch (err: any) {
+      toast.error('Failed to load delivery log: ' + err.message);
+    } finally {
+      setLoadingDeliveries(false);
+    }
+  };
+
   useEffect(() => {
     fetchData();
+    fetchDeliveries();
   }, []);
 
   const fetchData = async () => {
@@ -270,6 +304,54 @@ export default function AdminNotifications() {
             </button>
           </div>
         </form>
+      </div>
+
+      <div className="bg-white rounded-2xl shadow-sm border overflow-hidden">
+        <div className="flex items-center justify-between gap-3 px-6 py-4 border-b bg-gray-50/50">
+          <div>
+            <h2 className="font-semibold text-gray-900 text-sm">Delivery Log</h2>
+            <p className="text-xs text-gray-400">Last 50 push attempts — whether it actually sent, and why not if it didn't.</p>
+          </div>
+          <button
+            onClick={fetchDeliveries}
+            disabled={loadingDeliveries}
+            className="p-2 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition shrink-0 flex items-center gap-2 text-sm text-gray-600 font-semibold disabled:opacity-50"
+          >
+            <RefreshCw size={15} className={loadingDeliveries ? 'animate-spin' : ''} /> Refresh
+          </button>
+        </div>
+        <div className="max-h-96 overflow-y-auto">
+          {deliveries.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-8">No delivery attempts logged yet.</p>
+          ) : (
+            <table className="w-full text-sm">
+              <tbody className="divide-y divide-gray-100">
+                {deliveries.map((d) => (
+                  <tr key={d.id} className="hover:bg-gray-50/50">
+                    <td className="px-6 py-3 align-top">
+                      <p className="font-semibold text-gray-900">{d.notification_title || 'Untitled'}</p>
+                      <p className="text-xs text-gray-400">
+                        {d.profiles?.name || d.profiles?.email || 'Unknown recipient'} · {new Date(d.created_at).toLocaleString()}
+                      </p>
+                      {d.error && <p className="text-xs text-red-500 mt-0.5">{d.error}</p>}
+                    </td>
+                    <td className="px-6 py-3 align-top text-right whitespace-nowrap">
+                      {d.status === 'sent' && (
+                        <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full"><CheckCircle2 size={12} /> Sent</span>
+                      )}
+                      {d.status === 'failed' && (
+                        <span className="inline-flex items-center gap-1 text-xs font-bold text-red-600 bg-red-50 px-2 py-1 rounded-full"><XCircle size={12} /> Failed</span>
+                      )}
+                      {d.status === 'no_subscription' && (
+                        <span className="inline-flex items-center gap-1 text-xs font-bold text-gray-500 bg-gray-100 px-2 py-1 rounded-full"><BellOff size={12} /> No Subscription</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
       </div>
 
       <div className="flex justify-end pt-2">

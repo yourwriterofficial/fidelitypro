@@ -153,9 +153,19 @@ export default function AdminChat() {
         setFollowedInvestors(prev => prev.filter(name => name !== targetName.toLowerCase()));
         toast.success(`Stopped following @${targetName}`);
       } else {
+        // Best-effort resolve to a real profile id — lets the server-side
+        // "followed user posted" alert match by id (rename-proof) instead of
+        // only the display name. Bot personas (no matching profile) fall
+        // back to name-only matching.
+        const { data: matchedProfile } = await supabase
+          .from('profiles')
+          .select('id')
+          .ilike('name', targetName.replace(/_/g, ' '))
+          .maybeSingle();
+
         const { error } = await supabase
           .from('investor_chat_follows')
-          .insert({ admin_id: profile.id, target_name: targetName });
+          .insert({ admin_id: profile.id, target_name: targetName, target_user_id: matchedProfile?.id ?? null });
         if (error) throw error;
         setFollowedInvestors(prev => [...prev, targetName.toLowerCase()]);
         toast.success(`Following @${targetName}. You will be notified when they post in Investor Chat.`);

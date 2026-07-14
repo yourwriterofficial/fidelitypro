@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { notifyUser, sendEmailToUser } from '../lib/notify';
-import { HUMAN_MSGS, HUMAN_TOPIC_TEMPLATES } from './investorChatCorpus';
+import { HUMAN_MSGS, HUMAN_TOPIC_TEMPLATES, CURATED_TOPICS, PROCEDURAL_TOPICS } from './investorChatCorpus';
 
 interface InvestorChatMessage {
   id: string;
@@ -169,6 +169,17 @@ const REPLY_STARTERS = [
   "@{name} agreed,", "@{name} lol same,", "@{name} ngl,", "@{name} fair point,",
 ];
 
+// Fisher-Yates shuffle, used to build the rotating "no repeats for a while"
+// draw pools for simulated posters/messages/topic templates.
+const shuffleArray = <T,>(arr: T[]): T[] => {
+  const copy = [...arr];
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
+};
+
 // Sentence shapes used when a topic is actively selected by an admin — these
 // weave the exact topic name (a property, staking plan, or current event) into
 // the message so the simulated room actually looks like it's discussing it.
@@ -229,30 +240,7 @@ export default function InvestorChat() {
 
   useEffect(() => {
     const loadSystemTopics = async () => {
-      const topics: string[] = [
-        // platform-specific topics
-        "VIP Staking Compound Yields",
-        "Commercial Office Listing #12",
-        "Solana Wallet Funding",
-        "Platform Withdrawal Payout Speed",
-        "New Referral Bonus Tier",
-        "Auto-Reinvest Feature Rollout",
-        // current events / world news topics
-        "World Cup Tournament Qualifiers",
-        "US Federal Reserve Interest Rate Decision",
-        "Bitcoin ETF Inflows",
-        "Global Inflation Report",
-        "Tech Earnings Season",
-        "Oil Price Volatility",
-        "Gold Price Surge",
-        "US Election Coverage",
-        "Stock Market Correction Fears",
-        "Housing Market Slowdown",
-        "AI Sector Investment Boom",
-        "Cryptocurrency Regulation News",
-        "Holiday Shopping Season Retail Sales",
-        "Major Bank Interest Rate Changes",
-      ];
+      const topics: string[] = [...CURATED_TOPICS];
       try {
         const { data: props } = await supabase.from('properties').select('title');
         if (props) {
@@ -328,12 +316,13 @@ export default function InvestorChat() {
   const [scheduledUntil, setScheduledUntil] = useState<string | null>(() => {
     return localStorage.getItem('rpm_chat_scheduled_until');
   });
-  const [simCustomTopic, setSimCustomTopic] = useState<string>(() => {
-    return localStorage.getItem('rpm_chat_custom_topic') || 'World Cup Tournament Qualifiers';
-  });
-  const [simTopicDraft, setSimTopicDraft] = useState<string>(() => {
-    return localStorage.getItem('rpm_chat_custom_topic') || 'World Cup Tournament Qualifiers';
-  });
+  // The active discussion topic is a shared, platform-wide setting (stored in
+  // the `settings` table, key 'investor_chat_topic') rather than a per-browser
+  // localStorage value — otherwise it only ever affected the one browser that
+  // set it (never what real investors actually saw), and any other admin
+  // session/device/incognito window would show the hardcoded default.
+  const [simCustomTopic, setSimCustomTopic] = useState<string>('');
+  const [simTopicDraft, setSimTopicDraft] = useState<string>('');
   const [showOfflineNotice, setShowOfflineNotice] = useState(true);
 
   // Persist scheduling settings in localStorage
@@ -348,9 +337,29 @@ export default function InvestorChat() {
     if (scheduledUntil) localStorage.setItem('rpm_chat_scheduled_until', scheduledUntil);
     else localStorage.removeItem('rpm_chat_scheduled_until');
   }, [scheduledUntil]);
+  // Load the shared discussion-topic setting and stay in sync with it live,
+  // so every viewer (admin or investor) sees whatever an admin last applied.
   useEffect(() => {
-    localStorage.setItem('rpm_chat_custom_topic', simCustomTopic);
-  }, [simCustomTopic]);
+    const applyRow = (value: string | null | undefined) => {
+      const topic = value || '';
+      setSimCustomTopic(topic);
+      setSimTopicDraft(topic);
+    };
+
+    supabase.from('settings').select('value').eq('key', 'investor_chat_topic').maybeSingle()
+      .then(({ data }) => applyRow(data?.value));
+
+    const channel = supabase
+      .channel('investor_chat_topic_setting')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'settings', filter: `key=eq.investor_chat_topic` }, (payload: any) => {
+        applyRow(payload.new?.value);
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
 
   // Controlled state for admin panel uncontrolled inputs (prevents reset on re-render)
   const [schedCountrySelect, setSchedCountrySelect] = useState<string>(Object.keys({
@@ -360,75 +369,44 @@ export default function InvestorChat() {
   const [impersonateNameInput, setImpersonateNameInput] = useState('');
   const [impersonateCountryInput, setImpersonateCountryInput] = useState('US');
 
-  // Shuffled sequence list ref for rotating posters
-  const shuffledUsersRef = useRef<{ name: string; country: string }[]>([]);
+  // Shuffled sequence list ref for rotating posters. The random shuffle runs
+  // inside a useState lazy initializer (React's sanctioned one-time-only
+  // execution point) rather than directly in the render body, since the
+  // render body itself must stay a pure function of props/state.
+  const [initialShuffledUsers] = useState(() => shuffleArray(SIMULATED_USERS));
+  const shuffledUsersRef = useRef(initialShuffledUsers);
   const simUserIndexRef = useRef(0);
-
-  if (shuffledUsersRef.current.length === 0) {
-    const copy = [...SIMULATED_USERS];
-    for (let i = copy.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [copy[i], copy[j]] = [copy[j], copy[i]];
-    }
-    shuffledUsersRef.current = copy;
-  }
 
   // Shuffled message pool — walking this sequentially (instead of striding
   // through the original template-ordered ALL_MSGS) avoids long runs of the
   // same template family showing up back-to-back in scrollback history.
-  // Shuffled message pool index
-  const shuffledMsgsRef = useRef<string[]>([]);
+  const [initialShuffledMsgs] = useState(() => shuffleArray(ALL_MSGS));
+  const shuffledMsgsRef = useRef<string[] | null>(initialShuffledMsgs);
   const simMsgIndexRef = useRef(0);
 
-  if (shuffledMsgsRef.current.length === 0) {
-    const copy = [...ALL_MSGS];
-    for (let i = copy.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [copy[i], copy[j]] = [copy[j], copy[i]];
-    }
-    shuffledMsgsRef.current = copy;
-  }
-
   // Shuffled topic templates pool
-  const shuffledTopicTemplatesRef = useRef<string[]>([]);
+  const [initialShuffledTopicTemplates] = useState(() => shuffleArray(TOPIC_TEMPLATES));
+  const shuffledTopicTemplatesRef = useRef<string[] | null>(initialShuffledTopicTemplates);
   const simTopicTemplateIndexRef = useRef(0);
-
-  if (shuffledTopicTemplatesRef.current.length === 0) {
-    const copy = [...TOPIC_TEMPLATES];
-    for (let i = copy.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [copy[i], copy[j]] = [copy[j], copy[i]];
-    }
-    shuffledTopicTemplatesRef.current = copy;
-  }
 
   // Track topic messages count to rotate topic after it runs its course
   const topicMessageCountRef = useRef(0);
-  const topicThresholdRef = useRef(Math.floor(Math.random() * 16) + 15); // 15 to 30 messages
+  const [initialTopicThreshold] = useState(() => Math.floor(Math.random() * 16) + 15); // 15 to 30 messages
+  const topicThresholdRef = useRef(initialTopicThreshold);
 
   // Helper to draw sequentially from message shuffle bag
   const drawNextBaseMessage = (): string => {
-    if (shuffledMsgsRef.current.length === 0) {
-      const copy = [...ALL_MSGS];
-      for (let i = copy.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [copy[i], copy[j]] = [copy[j], copy[i]];
-      }
-      shuffledMsgsRef.current = copy;
+    if (!shuffledMsgsRef.current || shuffledMsgsRef.current.length === 0) {
+      shuffledMsgsRef.current = shuffleArray(ALL_MSGS);
       simMsgIndexRef.current = 0;
     }
-    
-    let msg = shuffledMsgsRef.current[simMsgIndexRef.current];
+
+    const msg = shuffledMsgsRef.current[simMsgIndexRef.current];
     simMsgIndexRef.current++;
-    
+
     // Seamlessly reshuffle and reset when we reach the end
     if (simMsgIndexRef.current >= shuffledMsgsRef.current.length) {
-      const copy = [...ALL_MSGS];
-      for (let i = copy.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [copy[i], copy[j]] = [copy[j], copy[i]];
-      }
-      shuffledMsgsRef.current = copy;
+      shuffledMsgsRef.current = shuffleArray(ALL_MSGS);
       simMsgIndexRef.current = 0;
     }
     return msg;
@@ -436,26 +414,16 @@ export default function InvestorChat() {
 
   // Helper to draw sequentially from topic template shuffle bag
   const drawNextTopicTemplate = (): string => {
-    if (shuffledTopicTemplatesRef.current.length === 0) {
-      const copy = [...TOPIC_TEMPLATES];
-      for (let i = copy.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [copy[i], copy[j]] = [copy[j], copy[i]];
-      }
-      shuffledTopicTemplatesRef.current = copy;
+    if (!shuffledTopicTemplatesRef.current || shuffledTopicTemplatesRef.current.length === 0) {
+      shuffledTopicTemplatesRef.current = shuffleArray(TOPIC_TEMPLATES);
       simTopicTemplateIndexRef.current = 0;
     }
-    
-    let template = shuffledTopicTemplatesRef.current[simTopicTemplateIndexRef.current];
+
+    const template = shuffledTopicTemplatesRef.current[simTopicTemplateIndexRef.current];
     simTopicTemplateIndexRef.current++;
-    
+
     if (simTopicTemplateIndexRef.current >= shuffledTopicTemplatesRef.current.length) {
-      const copy = [...TOPIC_TEMPLATES];
-      for (let i = copy.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [copy[i], copy[j]] = [copy[j], copy[i]];
-      }
-      shuffledTopicTemplatesRef.current = copy;
+      shuffledTopicTemplatesRef.current = shuffleArray(TOPIC_TEMPLATES);
       simTopicTemplateIndexRef.current = 0;
     }
     return template;
@@ -492,18 +460,15 @@ export default function InvestorChat() {
     return base;
   };
 
-  const rotateTopic = (currentTopic: string, sysTopics: string[]) => {
-    if (sysTopics.length === 0) return;
-    const candidates = sysTopics.filter(t => t.toLowerCase() !== currentTopic.toLowerCase());
-    const nextTopic = candidates.length > 0
-      ? candidates[Math.floor(Math.random() * candidates.length)]
-      : sysTopics[Math.floor(Math.random() * sysTopics.length)];
-    
-    setSimCustomTopic(nextTopic);
-    setSimTopicDraft(nextTopic);
+  // Resets the "how long has this topic been running" counter once it hits
+  // its threshold. This used to also silently overwrite simCustomTopic with
+  // a random pick — which meant a topic an admin explicitly set (or "discuss
+  // random"/a curated multi-topic list, which already vary per-message via
+  // getActiveTopic) would get clobbered on its own a few messages later.
+  // Whatever the admin set now stays exactly as set until they change it.
+  const resetTopicCounter = () => {
     topicMessageCountRef.current = 0;
     topicThresholdRef.current = Math.floor(Math.random() * 16) + 15;
-    toast.info(`Topic rotated: "${currentTopic}" ended. Now discussing "${nextTopic}".`);
   };
 
   // Reply target message state
@@ -632,14 +597,10 @@ export default function InvestorChat() {
                   }
                 }
               });
-              // Log local alert
-              notifyUser({
-                userId: profile.id,
-                title: `Followed user posted`,
-                message: `${newMsg.sender_name} posted a new update in Investor Chat.`,
-                type: 'info',
-                link: '/app/investor-chat'
-              });
+              // Persisted notification + push is dispatched server-side (a
+              // Postgres trigger on investor_chat_messages insert),
+              // independent of any admin tab being open; this toast is just
+              // for immediate feedback while this page happens to be open.
               // Append to follow alerts log
               setFollowAlerts(prev => [...prev, { id: newMsg.id, msg: newMsg }]);
             }
@@ -745,10 +706,15 @@ export default function InvestorChat() {
     }
   };
 
-  const virtualScrollbackMessages = useMemo(() => {
+  // This pool is randomized and reads mutable ref state, so it's computed in
+  // an effect (side effects are expected there) rather than a useMemo factory
+  // (which React requires to be a pure function of its dependencies).
+  const [virtualScrollbackMessages, setVirtualScrollbackMessages] = useState<InvestorChatMessage[]>([]);
+
+  useEffect(() => {
     const history: InvestorChatMessage[] = [];
     const baseTime = Date.now() - 24 * 60 * 60 * 1000; // 1 day ago
-    const activeTopic = getActiveTopic(simCustomTopic, systemTopics);
+    const activeTopic = getActiveTopic(simCustomTopic, PROCEDURAL_TOPICS);
 
     // Walk the pre-shuffled pools sequentially (instead of striding through
     // the original template/name-ordered arrays) and skip anything used in
@@ -758,6 +724,7 @@ export default function InvestorChat() {
     const recentBodies: string[] = [];
     const users = shuffledUsersRef.current;
     const msgs = shuffledMsgsRef.current;
+    if (!users || !msgs) return;
 
     for (let i = 0; i < virtualHistoryCount; i++) {
       const timeOffset = (virtualHistoryCount - i) * 8 * 60 * 1000; // ~8 mins apart
@@ -796,7 +763,8 @@ export default function InvestorChat() {
         created_at: msgTime
       });
     }
-    return history;
+    setVirtualScrollbackMessages(history);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [virtualHistoryCount, simCustomTopic, systemTopics]);
 
   // Combine virtual scrollback history with actual database messages
@@ -823,9 +791,6 @@ export default function InvestorChat() {
   const simCustomTopicRef = useRef(simCustomTopic);
   useEffect(() => { simCustomTopicRef.current = simCustomTopic; }, [simCustomTopic]);
 
-  const systemTopicsRef = useRef(systemTopics);
-  useEffect(() => { systemTopicsRef.current = systemTopics; }, [systemTopics]);
-
   const followedUsersRef = useRef(followedUsers);
   useEffect(() => { followedUsersRef.current = followedUsers; }, [followedUsers]);
 
@@ -845,13 +810,13 @@ export default function InvestorChat() {
     let timeoutId: any;
 
     const runSimulation = () => {
+      if (!shuffledUsersRef.current) return;
       const now = new Date();
       let currentCountryLimit: string | null = null;
       const schedC = scheduledCountryRef.current;
       const schedU = scheduledUntilRef.current;
       const actC = activeSimCountriesRef.current;
       const customTopicVal = simCustomTopicRef.current;
-      const sysTopicsVal = systemTopicsRef.current;
       const followedUsersVal = followedUsersRef.current;
 
       if (schedC && schedU && now < new Date(schedU)) {
@@ -938,13 +903,13 @@ export default function InvestorChat() {
         const lastMsg = list[list.length - 1];
         const shouldReply = Math.random() > 0.65 && lastMsg && lastMsg.sender_name !== 'System';
         
-        const activeTopic = getActiveTopic(customTopicVal, sysTopicsVal);
+        const activeTopic = getActiveTopic(customTopicVal, PROCEDURAL_TOPICS);
         const body = generateRandomMessage(shouldReply ? lastMsg.sender_name : undefined, activeTopic, true);
 
         if (activeTopic && body.toLowerCase().includes(activeTopic.toLowerCase())) {
           topicMessageCountRef.current++;
           if (topicMessageCountRef.current >= topicThresholdRef.current) {
-            rotateTopic(activeTopic, sysTopicsVal);
+            resetTopicCounter();
           }
         }
         
@@ -1047,7 +1012,7 @@ export default function InvestorChat() {
   const isCurrentBanned = useMemo(() => {
     if (!profile?.name) return false;
     return bannedUsers.some(b => b.user_name.toLowerCase() === profile.name.toLowerCase());
-  }, [profile?.name, bannedUsers]);
+  }, [profile, bannedUsers]);
 
   // Handle posting message
   const handleSubmit = async (e: React.FormEvent) => {
@@ -1248,9 +1213,20 @@ export default function InvestorChat() {
   const handleFollowUser = async (userName: string) => {
     if (!profile?.is_admin) return;
     try {
+      // Best-effort resolve to a real profile id — lets the server-side
+      // "followed user posted" alert match by id (rename-proof) instead of
+      // only the display name, which silently breaks if they rename. Bot
+      // personas (no matching profile) fall back to name-only matching.
+      const { data: matchedProfile } = await supabase
+        .from('profiles')
+        .select('id')
+        .ilike('name', userName.replace(/_/g, ' '))
+        .maybeSingle();
+
       const { error } = await supabase.from('investor_chat_follows').insert({
         admin_id: profile.id,
-        target_name: userName
+        target_name: userName,
+        target_user_id: matchedProfile?.id ?? null,
       });
       if (error) throw error;
       toast.success(`Following @${userName}. You will be alerted when they post.`);
@@ -1881,9 +1857,16 @@ export default function InvestorChat() {
                       {/* Confirmation Apply Button */}
                       <button
                         type="button"
-                        onClick={() => {
+                        onClick={async () => {
                           setSimCustomTopic(simTopicDraft);
-                          toast.success("Simulation topics applied successfully!");
+                          const { error } = await supabase
+                            .from('settings')
+                            .upsert({ key: 'investor_chat_topic', value: simTopicDraft }, { onConflict: 'key' });
+                          if (error) {
+                            toast.error('Failed to save topic setting: ' + error.message);
+                          } else {
+                            toast.success("Simulation topics applied for everyone!");
+                          }
                         }}
                         className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition shadow-sm"
                       >

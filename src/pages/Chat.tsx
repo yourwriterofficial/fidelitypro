@@ -29,10 +29,6 @@ const SMART_SUGGESTIONS = [
 export default function Chat() {
   const { profile } = useAuthStore();
 
-  if (profile?.is_admin) {
-    return <AdminChat />;
-  }
-
   const { subscribed, subscribe, unsubscribe } = usePushNotifications(profile?.id);
   const [messages, setMessages] = useState<Message[]>([]);
   const [text, setText] = useState('');
@@ -291,6 +287,13 @@ export default function Chat() {
   const formatMessageTime = (dateStr: string) => {
     return new Date(dateStr).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
+
+  // Admin accounts get the admin support-desk view instead — checked after
+  // all hooks above so hook call order stays identical on every render
+  // regardless of profile.is_admin (see react-hooks/rules-of-hooks).
+  if (profile?.is_admin) {
+    return <AdminChat />;
+  }
 
   if (loading) {
     return (

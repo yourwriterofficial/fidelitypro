@@ -1216,3 +1216,124 @@ export const HUMAN_TOPIC_TEMPLATES: string[] = [
   "{topic} either genius or a trap, no in between",
   "did {topic} move or is it just me",
 ];
+
+// Curated, admin-facing topic shortlist (rendered as checkboxes in the
+// investor chat admin panel — keep this small enough to stay usable as a
+// scrollable checklist). For "discuss random" mode, PROCEDURAL_TOPICS below
+// (~30k combinations) is used instead so the simulated room doesn't loop
+// through the same ~30 subjects forever.
+export const CURATED_TOPICS: string[] = [
+  "VIP Staking Compound Yields",
+  "Commercial Office Listing #12",
+  "Solana Wallet Funding",
+  "Platform Withdrawal Payout Speed",
+  "New Referral Bonus Tier",
+  "Auto-Reinvest Feature Rollout",
+  "Wallet Security Upgrade",
+  "Mobile App Update",
+  "KYC Verification Process",
+  "Deposit Bonus Promotion",
+  "Property Investment Returns",
+  "Staking Lock Period Options",
+  "US Federal Reserve Interest Rate Decision",
+  "Bitcoin ETF Inflows",
+  "Global Inflation Report",
+  "Tech Earnings Season",
+  "Oil Price Volatility",
+  "Gold Price Surge",
+  "Stock Market Correction Fears",
+  "Housing Market Slowdown",
+  "AI Sector Investment Boom",
+  "Cryptocurrency Regulation News",
+  "Holiday Shopping Season Retail Sales",
+  "Major Bank Interest Rate Changes",
+  "DeFi Yield Farming",
+  "NFT Market Trends",
+  "Ethereum Gas Fees",
+  "Recession Risk Indicators",
+  "Financial Freedom Journey",
+  "Passive Income Streams",
+];
+
+// Procedural topic pool: TOPIC_SUBJECTS crossed with a set of angle
+// prefixes/suffixes, the same technique used for PROCEDURAL_USERNAMES in
+// InvestorChat.tsx. Used only for "discuss random" mode so the room can
+// range across roughly 30,000 distinct topic labels instead of repeating a
+// small fixed set.
+const TOPIC_SUBJECTS: string[] = [
+  // Platform features
+  "VIP Staking Compound Yields", "Commercial Office Listing", "Solana Wallet Funding",
+  "Platform Withdrawal Payout Speed", "New Referral Bonus Tier", "Auto-Reinvest Feature",
+  "Wallet Security Upgrade", "Mobile App Update", "KYC Verification Process",
+  "Deposit Bonus Promotion", "Property Investment Returns", "Staking Lock Period Options",
+  "Referral Commission Structure", "Withdrawal Processing Time", "Customer Support Response Time",
+  "Two-Factor Authentication", "Portfolio Dashboard Redesign", "Minimum Investment Threshold",
+  "Daily Payout Schedule", "Compound Interest Calculator", "Investor Chat Room Rules",
+  "Live Visitors Feature", "Property Listing Photos", "Staking Plan Comparison",
+  "Referral Leaderboard", "Wallet Backup Phrase", "Account Verification Tier",
+  // Crypto / DeFi
+  "Bitcoin ETF Inflows", "Ethereum Gas Fees", "Solana Network Upgrade", "USDT Peg Stability",
+  "DeFi Yield Farming", "NFT Market Trends", "Layer 2 Scaling Solutions", "Stablecoin Regulation",
+  "Crypto Exchange Listings", "Altcoin Season", "Bitcoin Halving Cycle", "Smart Contract Audits",
+  "Web3 Wallet Security", "Cross-Chain Bridges", "Tokenomics Design", "Bitcoin Dominance",
+  "Crypto Custody Solutions", "On-Chain Analytics", "Mining Difficulty Adjustment",
+  "Proof of Stake Rewards", "Decentralized Exchange Volume", "Wrapped Token Liquidity",
+  "Crypto Tax Reporting", "Cold Storage Best Practices", "Blockchain Interoperability",
+  // Macro / finance news
+  "US Federal Reserve Interest Rate Decision", "Global Inflation Report", "Tech Earnings Season",
+  "Oil Price Volatility", "Gold Price Surge", "US Election Coverage", "Stock Market Correction Fears",
+  "Housing Market Slowdown", "AI Sector Investment Boom", "Cryptocurrency Regulation News",
+  "Holiday Shopping Season Retail Sales", "Major Bank Interest Rate Changes", "Recession Risk Indicators",
+  "Trade Tariff Negotiations", "Currency Exchange Rate Swings", "Bond Market Yields",
+  "Emerging Market Debt", "Supply Chain Disruptions", "Labor Market Jobs Report",
+  "Consumer Confidence Index", "Global GDP Growth Forecast", "Central Bank Policy Meetings",
+  "Sovereign Wealth Fund Moves", "Commodity Price Index", "Semiconductor Industry Outlook",
+  "Renewable Energy Investment", "Real Estate Interest Rates", "Corporate Earnings Guidance",
+  "Venture Capital Funding Rounds", "IPO Market Activity", "Mergers and Acquisitions News",
+  "Pension Fund Allocations", "Insurance Industry Trends", "Banking Sector Stability",
+  "Credit Rating Downgrades", "Sovereign Debt Concerns", "Global Trade Balance",
+  "Manufacturing Sector Data", "Retail Sales Figures", "Consumer Price Index",
+  "Producer Price Index", "Unemployment Rate Trends", "Wage Growth Statistics",
+  "Small Business Optimism Index", "Housing Starts Data", "Existing Home Sales",
+  "New Home Construction", "Mortgage Rate Trends", "Rental Market Prices",
+  "Commercial Real Estate Vacancy", "Stock Buyback Announcements", "Dividend Yield Trends",
+  "Index Fund Rebalancing", "Options Market Volatility", "Futures Market Activity",
+  "Foreign Direct Investment", "Currency Devaluation Risk", "Sanctions Impact on Markets",
+  "Energy Sector Earnings", "Airline Industry Recovery", "Shipping Freight Rates",
+  "Agricultural Commodity Prices", "Precious Metals Demand", "Rare Earth Minerals Supply",
+  // Lifestyle / personal finance
+  "Financial Freedom Journey", "Early Retirement Planning", "Side Hustle Income Ideas",
+  "Budgeting Tips and Tricks", "Credit Score Improvement", "Emergency Fund Savings",
+  "Debt Payoff Strategies", "Passive Income Streams", "Frugal Living Habits",
+  "Investment Diversification Strategy", "Risk Tolerance Assessment", "Tax Season Planning",
+  "Retirement Account Contributions", "College Savings Plans", "Estate Planning Basics",
+  "Insurance Coverage Review", "Financial Literacy Education", "Money Mindset Shifts",
+  "Wealth Building Habits", "Financial Goal Setting", "Compound Growth Mindset",
+  "Side Income from Freelancing", "Digital Nomad Finances", "Minimalist Spending Habits",
+  "Family Budget Planning", "First-Time Investor Mistakes", "Long-Term Wealth Strategy",
+  "Financial Independence Milestones", "Building Multiple Income Streams", "Saving for a Home Down Payment",
+];
+
+const TOPIC_ANGLE_PREFIXES: string[] = [
+  "", "Latest on ", "This Week's ", "Breaking: ", "Deep Dive: ", "Talking ",
+  "Debate: ", "Poll: ", "Spotlight: ", "Update: ", "Analysis: ", "Recap: ",
+  "Watch: ", "Alert: ", "Community Take: ", "Hot Take: ", "Quick Take: ",
+  "Roundup: ", "Explainer: ", "Digest: ",
+];
+
+const TOPIC_ANGLE_SUFFIXES: string[] = [
+  "", " Update", " Discussion", " Trends", " News", " Q&A", " Outlook",
+  " Breakdown", " Recap", " Talk",
+];
+
+export const PROCEDURAL_TOPICS: string[] = (() => {
+  const topics: string[] = [];
+  for (const subject of TOPIC_SUBJECTS) {
+    for (const prefix of TOPIC_ANGLE_PREFIXES) {
+      for (const suffix of TOPIC_ANGLE_SUFFIXES) {
+        topics.push(`${prefix}${subject}${suffix}`);
+      }
+    }
+  }
+  return topics;
+})();

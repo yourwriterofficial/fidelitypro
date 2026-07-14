@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import {
   Ban, UserCheck, Eye, Edit, Plus, Minus, Save, X, Mail, Lock, Key, Check, CheckCheck, Trash2, Bell, BellRing, Clock, ChevronDown, ChevronUp
 } from 'lucide-react';
-import { sendEmailAndLog, notifyUser } from '../../lib/notify';
+import { sendEmailAndLog } from '../../lib/notify';
 
 interface User {
   id: string;
@@ -212,74 +212,76 @@ export default function AdminUsers() {
     fetchTemplates();
     fetchWatchedUsers();
 
-    // 1. Subscribe to presence tracking channel
+    // 1. Subscribe to presence tracking channel. `supabase.channel(topic)`
+    // returns the EXISTING channel object for a topic that's already
+    // registered rather than creating a new one, and `removeChannel()` tears
+    // one down asynchronously — so under React Strict Mode's dev-only
+    // mount→cleanup→mount double-invoke, this remount's `channel()` call can
+    // get back the previous mount's still-subscribed channel before its
+    // teardown lands, and calling `.on()` on an already-subscribed channel
+    // throws (see the equivalent guard in Layout.tsx). Only wire up
+    // listeners/subscribe when it's genuinely fresh ('closed').
     const presenceChannel = supabase.channel('online_users');
-    presenceChannel
-      .on('presence', { event: 'sync' }, () => {
-        const state = presenceChannel.presenceState();
-        const list: OnlineUser[] = [];
-        Object.keys(state).forEach((key) => {
-          const presenceList = state[key] as any[];
-          if (presenceList && presenceList.length > 0) {
-            // Prefer the most recently active entry rather than assuming
-            // index 0 — presence.track() can leave more than one entry
-            // under the same key (see the note on the equivalent code in
-            // Layout.tsx), and current_page here is only used as an initial
-            // fallback anyway; the realtime_page_visits subscription below
-            // is what actually keeps it live.
-            const latest = presenceList.reduce((a: any, b: any) =>
-              new Date(b.last_active || 0).getTime() > new Date(a.last_active || 0).getTime() ? b : a
-            );
-            list.push({
-              user_id: key,
-              name: latest.name || 'User',
-              email: latest.email || '',
-              current_page: latest.current_page || '',
-              last_active: latest.last_active || '',
-            });
-          }
-        });
-        setOnlineUsers(prev => list.map(u => {
-          // Carry forward a fresher current_page already learned from the
-          // page-visits feed if presence's own snapshot is older.
-          const existing = prev.find(p => p.user_id === u.user_id);
-          return existing && new Date(existing.last_active) > new Date(u.last_active || 0)
-            ? { ...u, current_page: existing.current_page, last_active: existing.last_active }
-            : u;
-        }));
-
-        // Detect users who just transitioned offline -> online and alert any
-        // admin watching them (push + in-app + toast). A 5-minute per-user
-        // cooldown absorbs brief presence flicker from page navigation so a
-        // watched user browsing around doesn't spam repeat alerts.
-        const newOnlineIds = new Set(list.map(l => l.user_id));
-        const prevOnlineIds = previousOnlineIdsRef.current;
-        const watched = watchedUserIdsRef.current;
-        const now = Date.now();
-        list.forEach(ou => {
-          if (prevOnlineIds.has(ou.user_id)) return;
-          if (!watched.has(ou.user_id)) return;
-          const lastAlerted = lastAlertedAtRef.current[ou.user_id] || 0;
-          if (now - lastAlerted < 5 * 60 * 1000) return;
-          lastAlertedAtRef.current[ou.user_id] = now;
-
-          const displayName = ou.name || ou.email || 'A watched user';
-          toast(`${displayName} just came online`, {
-            description: `Now viewing ${ou.current_page || 'the site'}`,
+    if (presenceChannel.state === 'closed') {
+      presenceChannel
+        .on('presence', { event: 'sync' }, () => {
+          const state = presenceChannel.presenceState();
+          const list: OnlineUser[] = [];
+          Object.keys(state).forEach((key) => {
+            const presenceList = state[key] as any[];
+            if (presenceList && presenceList.length > 0) {
+              // Prefer the most recently active entry rather than assuming
+              // index 0 — presence.track() can leave more than one entry
+              // under the same key (see the note on the equivalent code in
+              // Layout.tsx), and current_page here is only used as an initial
+              // fallback anyway; the realtime_page_visits subscription below
+              // is what actually keeps it live.
+              const latest = presenceList.reduce((a: any, b: any) =>
+                new Date(b.last_active || 0).getTime() > new Date(a.last_active || 0).getTime() ? b : a
+              );
+              list.push({
+                user_id: key,
+                name: latest.name || 'User',
+                email: latest.email || '',
+                current_page: latest.current_page || '',
+                last_active: latest.last_active || '',
+              });
+            }
           });
-          if (user?.id) {
-            notifyUser({
-              userId: user.id,
-              title: 'Watched user online',
-              message: `${displayName} just came online (viewing ${ou.current_page || 'the site'}).`,
-              type: 'alert',
-              link: '/admin/users',
+          setOnlineUsers(prev => list.map(u => {
+            // Carry forward a fresher current_page already learned from the
+            // page-visits feed if presence's own snapshot is older.
+            const existing = prev.find(p => p.user_id === u.user_id);
+            return existing && new Date(existing.last_active) > new Date(u.last_active || 0)
+              ? { ...u, current_page: existing.current_page, last_active: existing.last_active }
+              : u;
+          }));
+
+          // Detect users who just transitioned offline -> online and give
+          // any admin watching them an immediate toast if they happen to be
+          // looking at this page. The persisted notification + push is
+          // dispatched server-side (a Postgres trigger on profiles.last_seen),
+          // independent of any admin having a tab open.
+          const newOnlineIds = new Set(list.map(l => l.user_id));
+          const prevOnlineIds = previousOnlineIdsRef.current;
+          const watched = watchedUserIdsRef.current;
+          const now = Date.now();
+          list.forEach(ou => {
+            if (prevOnlineIds.has(ou.user_id)) return;
+            if (!watched.has(ou.user_id)) return;
+            const lastAlerted = lastAlertedAtRef.current[ou.user_id] || 0;
+            if (now - lastAlerted < 5 * 60 * 1000) return;
+            lastAlertedAtRef.current[ou.user_id] = now;
+
+            const displayName = ou.name || ou.email || 'A watched user';
+            toast(`${displayName} just came online`, {
+              description: `Now viewing ${ou.current_page || 'the site'}`,
             });
-          }
-        });
-        previousOnlineIdsRef.current = newOnlineIds;
-      })
-      .subscribe();
+          });
+          previousOnlineIdsRef.current = newOnlineIds;
+        })
+        .subscribe();
+    }
 
     // 2. Live-refresh current_page for every online visitor the moment they
     // navigate, and refresh the expanded visitor's page history too. This
