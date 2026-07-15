@@ -272,7 +272,7 @@ export default function Dashboard() {
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         <div className="flex items-center justify-between p-5 border-b border-gray-100">
           <h2 className="font-semibold text-gray-900">Active Investments</h2>
-          <Link to="/app/portfolio" className="text-brand text-sm font-medium hover:underline flex items-center gap-1">
+          <Link to="/app/my-portfolio" className="text-brand text-sm font-medium hover:underline flex items-center gap-1">
             View all <ArrowRight size={14} />
           </Link>
         </div>

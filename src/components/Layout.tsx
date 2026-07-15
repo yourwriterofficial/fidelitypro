@@ -359,7 +359,7 @@ export default function Layout() {
     path === '/app' ? location.pathname === '/app' : location.pathname.startsWith(path);
 
   return (
-    <div className="h-screen bg-gray-50 flex flex-col md:flex-row overflow-hidden">
+    <div className="h-screen h-[100dvh] bg-gray-50 flex flex-col md:flex-row overflow-hidden">
 
       {/* ===== DESKTOP SIDEBAR (collapsible) ===== */}
       <aside className={`bg-white border-r border-gray-100 hidden md:flex md:flex-col md:fixed md:inset-y-0 md:left-0 md:z-30 transition-[width] duration-200 ${collapsed ? 'md:w-20' : 'md:w-64'}`}>
@@ -512,7 +512,10 @@ export default function Layout() {
         </header>
 
         {/* Page content */}
-        <div className="flex-1 flex flex-col min-h-0 overflow-y-auto overflow-x-hidden p-4 md:p-6 pb-20 md:pb-6 w-full min-w-0">
+        <div 
+          className="flex-1 flex flex-col min-h-0 overflow-y-auto overflow-x-hidden p-4 md:p-6 w-full min-w-0"
+          style={{ paddingBottom: 'var(--page-pb)' }}
+        >
           {(restricted || withdrawRestricted || investRestricted || stakeRestricted || propertyRestricted) && (
             <div className="mb-5 rounded-2xl border border-amber-200 bg-amber-50 flex items-start gap-3 px-4 py-3.5 shadow-sm shrink-0">
               <div className="p-1.5 rounded-lg bg-amber-100 shrink-0 mt-0.5">
@@ -547,7 +550,10 @@ export default function Layout() {
         </div>
 
         {/* Mobile Bottom Navigation */}
-        <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 flex items-center justify-around px-2 py-2 z-30 shadow-[0_-1px_12px_rgba(0,0,0,0.06)]">
+        <nav 
+          className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 flex items-center justify-around px-2 py-2 z-30 shadow-[0_-1px_12px_rgba(0,0,0,0.06)]"
+          style={{ paddingBottom: 'calc(8px + env(safe-area-inset-bottom, 0px))' }}
+        >
           {visibleBottomNavItems.map(({ path, icon: Icon, label }) => {
             const active = isActive(path);
             return (
@@ -587,7 +593,10 @@ export default function Layout() {
               </button>
             </div>
 
-            <div className="overflow-y-auto px-3 pb-6 space-y-0.5">
+            <div 
+              className="overflow-y-auto px-3 pb-6 space-y-0.5"
+              style={{ paddingBottom: 'calc(24px + env(safe-area-inset-bottom, 0px))' }}
+            >
               {profile && (
                 <div className="flex items-center gap-2.5 px-3 py-2.5 mb-2 bg-gray-50 rounded-xl">
                   <div className="w-8 h-8 bg-brand/10 rounded-full flex items-center justify-center text-brand font-bold text-sm shrink-0">
