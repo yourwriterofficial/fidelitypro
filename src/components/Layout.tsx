@@ -112,7 +112,7 @@ export default function Layout() {
         .select('title')
         .eq('user_id', profile.id)
         .eq('read', false)
-        .eq('link', '/app/investor-chat');
+        .ilike('link', '/app/investor-chat%');
 
       if (error || !data) return;
       let personal = 0;

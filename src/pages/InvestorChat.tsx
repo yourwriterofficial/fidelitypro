@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { supabase } from '../lib/supabaseClient';
 import { 
@@ -285,6 +286,9 @@ export default function InvestorChat() {
   // Followed users state (Admin only, synced with DB)
   const [followedUsers, setFollowedUsers] = useState<FollowedUser[]>([]);
   const [showAdminPanel, setShowAdminPanel] = useState(false);
+  const [showFollowedFeed, setShowFollowedFeed] = useState(true);
+  const [searchParams] = useSearchParams();
+  const msgIdParam = searchParams.get('msgId');
   const [simSpeedMs, setSimSpeedMs] = useState<number>(() => Number(localStorage.getItem('rpm_chat_sim_speed') || '5000'));
 
   useEffect(() => {
@@ -552,7 +556,7 @@ export default function InvestorChat() {
       .from('notifications')
       .update({ read: true })
       .eq('user_id', profile.id)
-      .eq('link', '/app/investor-chat')
+      .ilike('link', '/app/investor-chat%')
       .eq('read', false)
       .then(() => {});
   }, [profile?.id]);
@@ -796,6 +800,59 @@ export default function InvestorChat() {
 
   const bannedUsersRef = useRef(bannedUsers);
   useEffect(() => { bannedUsersRef.current = bannedUsers; }, [bannedUsers]);
+
+  // Followed Members Feed - Memoized list of messages posted by followed users
+  const followedMessages = useMemo(() => {
+    return allMessagesList.filter(msg => 
+      followedUsers.some(f => f.target_name.toLowerCase() === msg.sender_name.toLowerCase())
+    );
+  }, [allMessagesList, followedUsers]);
+
+  // Effect to load and scroll to message from URL query params
+  useEffect(() => {
+    if (!msgIdParam) return;
+    
+    const handleScrollToMessage = async () => {
+      // 1. Check if the message is already in allMessagesList
+      let exists = allMessagesList.find(m => m.id === msgIdParam);
+      
+      if (!exists) {
+        // Fetch from DB
+        try {
+          const { data, error } = await supabase
+            .from('investor_chat_messages')
+            .select('*, profiles(email)')
+            .eq('id', msgIdParam)
+            .maybeSingle();
+            
+          if (data && !error) {
+            const fetchedMsg: InvestorChatMessage = {
+              ...data,
+              sender_email: data.profiles?.email || undefined
+            };
+            setMessages(prev => {
+              if (prev.some(m => m.id === fetchedMsg.id)) return prev;
+              return [...prev, fetchedMsg];
+            });
+          }
+        } catch (err) {
+          console.error("Error loading message from URL:", err);
+        }
+      }
+      
+      // Wait for rendering
+      setTimeout(() => {
+        const el = document.getElementById(`msg-${msgIdParam}`);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          el.classList.add('!bg-blue-500/10', 'rounded-2xl', 'transition-colors', 'duration-500');
+          setTimeout(() => el.classList.remove('!bg-blue-500/10'), 3000);
+        }
+      }, 500);
+    };
+
+    handleScrollToMessage();
+  }, [msgIdParam, allMessagesList.length]);
 
   // Rolling recent-history windows so the live simulation never lets the same
   // bot post twice in a row (or a handful of messages apart), and never
@@ -1369,6 +1426,22 @@ export default function InvestorChat() {
               />
             </div>
 
+            {/* Followed Feed toggle button for Admin */}
+            {profile?.is_admin && (
+              <button
+                type="button"
+                onClick={() => setShowFollowedFeed(!showFollowedFeed)}
+                className={`flex items-center justify-center p-2 rounded-xl transition shadow shrink-0 ${
+                  showFollowedFeed
+                    ? 'bg-blue-500 text-white hover:bg-blue-600'
+                    : 'bg-[#242f3d] text-[#6c8fa8] hover:text-white border border-[#2b3d4f]'
+                }`}
+                title={showFollowedFeed ? "Hide Followed Feed" : "Show Followed Feed"}
+              >
+                <Bell size={13} />
+              </button>
+            )}
+
             {/* Admin control panel toggle button on mobile */}
             {profile?.is_admin && (
               <button
@@ -1747,6 +1820,151 @@ export default function InvestorChat() {
           )}
         </div>
       </div>
+
+      {/* Followed Members Feed Pane (Admin only) */}
+      {profile?.is_admin && showFollowedFeed && (
+        <div className="w-full md:w-96 flex flex-col bg-white dark:bg-[#17212b] rounded-3xl shadow-sm overflow-hidden h-full border border-gray-200 dark:border-[#2b3d4f] shrink-0">
+          
+          {/* Header */}
+          <div className="px-4 py-3 bg-[#0d141a] border-b border-gray-200 dark:border-[#2b3d4f] flex items-center justify-between shrink-0">
+            <div className="flex items-center gap-2">
+              <div className="p-1.5 bg-blue-500/10 text-blue-500 rounded-lg">
+                <Bell size={16} className="animate-bounce" />
+              </div>
+              <div>
+                <h3 className="font-bold text-white text-xs leading-none">Followed Members Feed</h3>
+                <span className="text-[9px] text-gray-450 dark:text-[#6c8fa8] font-semibold block mt-0.5">
+                  {followedMessages.length} updates from followed users
+                </span>
+              </div>
+            </div>
+            <button 
+              onClick={() => setShowFollowedFeed(false)} 
+              className="p-1.5 hover:bg-slate-800 rounded-lg text-gray-400 dark:text-[#6c8fa8] hover:text-white transition shrink-0"
+              title="Hide Feed"
+            >
+              <X size={15} />
+            </button>
+          </div>
+
+          {/* Messages list */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50/50 dark:bg-[#0e1621]">
+            {followedMessages.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full text-center p-6 space-y-2">
+                <div className="p-3 bg-gray-100 dark:bg-[#1c2733] rounded-full text-gray-400 dark:text-[#4a6a80]">
+                  <Users size={24} />
+                </div>
+                <p className="text-xs font-bold text-gray-800 dark:text-gray-200">No followed posts yet</p>
+                <p className="text-[10px] text-gray-400 dark:text-[#6c8fa8] leading-normal max-w-[200px]">
+                  Use the bell icon next to investor names in the group chat to start following them.
+                </p>
+              </div>
+            ) : (
+              followedMessages.map((msg) => {
+                const flag = COUNTRY_FLAGS[msg.sender_country] || '🌐';
+                return (
+                  <div 
+                    key={`feed-${msg.id}`} 
+                    className="p-3.5 bg-white dark:bg-[#182533] border border-gray-100 dark:border-[#24303f] rounded-2xl shadow-sm space-y-2.5 transition hover:border-blue-500/30"
+                  >
+                    {/* Top Info */}
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <div className="w-5 h-5 rounded-full bg-blue-500 text-white font-extrabold flex items-center justify-center text-[10px] shrink-0">
+                          {msg.sender_name.charAt(0).toUpperCase()}
+                        </div>
+                        <span className="font-bold text-xs text-gray-900 dark:text-white truncate">
+                          @{msg.sender_name}
+                        </span>
+                        <span className="text-xs shrink-0">{flag}</span>
+                      </div>
+                      <span className="text-[9px] text-gray-400 dark:text-[#6c8fa8] font-medium tabular-nums">
+                        {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
+
+                    {/* Reply Context if any */}
+                    {msg.reply_to_name && (
+                      <div className="pl-2 border-l-2 border-blue-500/50 py-0.5 text-[10px] bg-gray-50 dark:bg-black/20 rounded">
+                        <span className="font-bold text-blue-600 dark:text-blue-400">Reply to @{msg.reply_to_name}</span>
+                        <p className="text-gray-500 dark:text-[#8aa2b5] truncate mt-0.5">{msg.reply_to_body}</p>
+                      </div>
+                    )}
+
+                    {/* Message Body */}
+                    <p className="text-xs text-gray-700 dark:text-gray-200 leading-relaxed whitespace-pre-wrap break-words">
+                      {msg.body}
+                    </p>
+
+                    {/* Action buttons */}
+                    <div className="flex flex-wrap items-center justify-between gap-1 pt-1.5 border-t border-gray-100 dark:border-[#24303f]">
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => {
+                            const el = document.getElementById(`msg-${msg.id}`);
+                            if (el) {
+                              el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                              el.classList.add('!bg-blue-500/10', 'rounded-2xl', 'transition-colors', 'duration-500');
+                              setTimeout(() => el.classList.remove('!bg-blue-500/10'), 3000);
+                            } else {
+                              toast.error("Message not found in main chat history.");
+                            }
+                          }}
+                          className="px-2 py-1 bg-gray-50 hover:bg-gray-100 dark:bg-[#202b36] dark:hover:bg-[#2b3947] border border-gray-100 dark:border-[#24303f] rounded-lg text-[9px] font-bold text-gray-600 dark:text-[#8aa2b5] hover:text-blue-500 dark:hover:text-blue-400 transition"
+                          title="Locate message in the group chat"
+                        >
+                          View
+                        </button>
+                        <button
+                          onClick={() => {
+                            setReplyTarget(msg);
+                            toast.success(`Replying to @${msg.sender_name}`);
+                            document.getElementById('chat-input-field')?.focus();
+                          }}
+                          className="px-2 py-1 bg-gray-50 hover:bg-gray-100 dark:bg-[#202b36] dark:hover:bg-[#2b3947] border border-gray-100 dark:border-[#24303f] rounded-lg text-[9px] font-bold text-gray-650 dark:text-[#8aa2b5] hover:text-blue-500 dark:hover:text-blue-400 transition"
+                          title="Reply to message"
+                        >
+                          Reply
+                        </button>
+                        <button
+                          onClick={() => {
+                            setImpersonatedUser({ name: msg.sender_name, country: msg.sender_country });
+                            toast.success(`Now posting as @${msg.sender_name}`);
+                            document.getElementById('chat-input-field')?.focus();
+                          }}
+                          className="px-2 py-1 bg-purple-50 hover:bg-purple-100 dark:bg-purple-950/20 dark:hover:bg-purple-900/30 border border-purple-100/50 dark:border-purple-900/40 rounded-lg text-[9px] font-bold text-purple-600 dark:text-purple-400 transition"
+                          title="Post as this user"
+                        >
+                          Post As
+                        </button>
+                        <button
+                          onClick={() => {
+                            setImpersonatedUser({ name: msg.sender_name, country: msg.sender_country });
+                            setReplyTarget(msg);
+                            toast.success(`Replying to @${msg.sender_name} as themselves`);
+                            document.getElementById('chat-input-field')?.focus();
+                          }}
+                          className="px-2 py-1 bg-purple-50 hover:bg-purple-100 dark:bg-purple-950/20 dark:hover:bg-purple-900/30 border border-purple-100/50 dark:border-purple-900/40 rounded-lg text-[9px] font-bold text-purple-600 dark:text-purple-400 transition"
+                          title="Reply as this user"
+                        >
+                          Reply As
+                        </button>
+                      </div>
+                      <button
+                        onClick={() => handleUnfollowUser(msg.sender_name)}
+                        className="px-1.5 py-1 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-lg text-[9px] font-bold transition"
+                        title="Stop following this user"
+                      >
+                        Unfollow
+                      </button>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Admin Sliding Modal Panel */}
       {showAdminPanel && profile?.is_admin && (
