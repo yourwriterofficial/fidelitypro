@@ -359,7 +359,10 @@ export default function Layout() {
     path === '/app' ? location.pathname === '/app' : location.pathname.startsWith(path);
 
   return (
-    <div className="h-screen h-[100dvh] bg-gray-50 flex flex-col md:flex-row overflow-hidden">
+    <div 
+      className="h-screen bg-gray-50 flex flex-col md:flex-row overflow-hidden"
+      style={{ height: '100dvh' }}
+    >
 
       {/* ===== DESKTOP SIDEBAR (collapsible) ===== */}
       <aside className={`bg-white border-r border-gray-100 hidden md:flex md:flex-col md:fixed md:inset-y-0 md:left-0 md:z-30 transition-[width] duration-200 ${collapsed ? 'md:w-20' : 'md:w-64'}`}>
@@ -469,7 +472,7 @@ export default function Layout() {
       </aside>
 
       {/* ===== MAIN CONTENT ===== */}
-      <main className={`flex-1 flex flex-col min-h-0 min-w-0 max-w-full md:overflow-hidden transition-[margin] duration-200 ${collapsed ? 'md:ml-20' : 'md:ml-64'}`}>
+      <main className={`flex-1 flex flex-col min-h-0 min-w-0 max-w-full overflow-hidden transition-[margin] duration-200 ${collapsed ? 'md:ml-20' : 'md:ml-64'}`}>
 
         {/* Mobile Header */}
         <header className="md:hidden bg-white border-b border-gray-100 px-4 py-3 flex items-center justify-between sticky top-0 z-20 shadow-sm">
