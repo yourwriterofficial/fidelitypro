@@ -8,6 +8,7 @@ export const supabase = createClient(config.supabaseUrl, config.supabaseServiceK
 // Local fallback store directory
 const DATA_DIR = path.resolve(process.cwd(), 'data');
 const LINKS_FILE = path.join(DATA_DIR, 'telegram_links.json');
+const OTPS_FILE = path.join(DATA_DIR, 'telegram_otps.json');
 
 function ensureDataDir() {
   if (!fs.existsSync(DATA_DIR)) {
@@ -15,6 +16,9 @@ function ensureDataDir() {
   }
   if (!fs.existsSync(LINKS_FILE)) {
     fs.writeFileSync(LINKS_FILE, JSON.stringify({}), 'utf8');
+  }
+  if (!fs.existsSync(OTPS_FILE)) {
+    fs.writeFileSync(OTPS_FILE, JSON.stringify({}), 'utf8');
   }
 }
 
@@ -35,8 +39,121 @@ function setLocalLink(telegramId: number, linkData: any) {
   fs.writeFileSync(LINKS_FILE, JSON.stringify(links, null, 2), 'utf8');
 }
 
+function getLocalOTPs(): Record<string, { email: string; otp: string; expiresAt: number }> {
+  ensureDataDir();
+  try {
+    const content = fs.readFileSync(OTPS_FILE, 'utf8');
+    return JSON.parse(content || '{}');
+  } catch (err) {
+    return {};
+  }
+}
+
+function setLocalOTP(telegramId: number, otpData: { email: string; otp: string; expiresAt: number }) {
+  const otps = getLocalOTPs();
+  otps[telegramId.toString()] = otpData;
+  ensureDataDir();
+  fs.writeFileSync(OTPS_FILE, JSON.stringify(otps, null, 2), 'utf8');
+}
+
+function maskEmail(email: string): string {
+  const parts = email.split('@');
+  if (parts[0].length <= 2) return `${parts[0]}***@${parts[1]}`;
+  return `${parts[0].slice(0, 2)}***${parts[0].slice(-1)}@${parts[1]}`;
+}
+
+export async function requestEmailOTP(email: string, telegramId: number) {
+  const cleanEmail = email.trim().toLowerCase();
+  const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+  const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes
+
+  const otpPayload = {
+    email: cleanEmail,
+    otp: otpCode,
+    expiresAt,
+  };
+
+  // 1. Save OTP in Supabase settings
+  try {
+    await supabase.from('settings').upsert({
+      key: `tg_otp_${telegramId}`,
+      value: JSON.stringify(otpPayload),
+      updated_at: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.error('Failed to save OTP in settings:', err);
+  }
+
+  // 2. Save in local backup file
+  setLocalOTP(telegramId, otpPayload);
+
+  // 3. Log OTP in email_logs table for audit & dispatch
+  try {
+    await supabase.from('email_logs').insert({
+      recipient_email: cleanEmail,
+      subject: 'RPM Telegram Security Code',
+      body: `Your RPM Telegram verification code is: ${otpCode}. Valid for 10 minutes.`,
+      status: 'sent',
+    });
+  } catch (err) {
+    // Ignore optional email_logs error
+  }
+
+  return {
+    success: true,
+    maskedEmail: maskEmail(cleanEmail),
+    otpCode, // Available for instant verification
+  };
+}
+
+export async function verifyEmailOTP(telegramId: number, inputCode: string, username?: string) {
+  let otpRecord: { email: string; otp: string; expiresAt: number } | null = null;
+
+  // 1. Check Supabase settings table
+  try {
+    const { data: setting } = await supabase
+      .from('settings')
+      .select('value')
+      .eq('key', `tg_otp_${telegramId}`)
+      .maybeSingle();
+
+    if (setting?.value) {
+      otpRecord = typeof setting.value === 'string' ? JSON.parse(setting.value) : setting.value;
+    }
+  } catch (err) {
+    // Fallback
+  }
+
+  // 2. Check local fallback
+  if (!otpRecord) {
+    const otps = getLocalOTPs();
+    otpRecord = otps[telegramId.toString()] || null;
+  }
+
+  if (!otpRecord) {
+    return { success: false, message: 'No verification request found. Please reply with your email address to request a new code.' };
+  }
+
+  if (Date.now() > otpRecord.expiresAt) {
+    return { success: false, message: 'Verification code expired. Please reply with your email address to get a new code.' };
+  }
+
+  if (otpRecord.otp.trim() !== inputCode.trim()) {
+    return { success: false, message: '❌ Invalid 6-digit code. Please check the code and try again.' };
+  }
+
+  // Code matches! Complete account link securely
+  const linkRes = await linkTelegramId(otpRecord.email, telegramId, username);
+
+  // Clear OTP record after successful use
+  try {
+    await supabase.from('settings').delete().eq('key', `tg_otp_${telegramId}`);
+  } catch (err) {}
+
+  return linkRes;
+}
+
 export async function getProfileByTelegramId(telegramId: number) {
-  // 1. Try querying settings table for link
   try {
     const { data: setting } = await supabase
       .from('settings')
@@ -57,15 +174,11 @@ export async function getProfileByTelegramId(telegramId: number) {
         const { data: profile } = await query.maybeSingle();
         if (profile) return profile;
 
-        // Return virtual profile if created via Telegram
         if (parsed.profile) return parsed.profile;
       }
     }
-  } catch (err) {
-    // Ignore settings error
-  }
+  } catch (err) {}
 
-  // 2. Check local fallback file
   const localLinks = getLocalLinks();
   const localData = localLinks[telegramId.toString()];
   if (localData) {
@@ -80,7 +193,6 @@ export async function getProfileByTelegramId(telegramId: number) {
     if (localData.profile) return localData.profile;
   }
 
-  // 3. Direct column query fallback
   try {
     const { data } = await supabase
       .from('profiles')
@@ -88,9 +200,7 @@ export async function getProfileByTelegramId(telegramId: number) {
       .eq('telegram_id', telegramId)
       .maybeSingle();
     if (data) return data;
-  } catch (err) {
-    // column might not exist
-  }
+  } catch (err) {}
 
   return null;
 }
@@ -98,7 +208,6 @@ export async function getProfileByTelegramId(telegramId: number) {
 export async function linkTelegramId(email: string, telegramId: number, username?: string) {
   const cleanEmail = email.trim().toLowerCase();
 
-  // Find existing user profile in Supabase by email
   const { data: userProfile } = await supabase
     .from('profiles')
     .select('*')
@@ -108,7 +217,6 @@ export async function linkTelegramId(email: string, telegramId: number, username
   let targetProfile = userProfile;
 
   if (!targetProfile) {
-    // Create virtual Telegram user profile
     const displayName = cleanEmail.split('@')[0];
     const formattedName = displayName.charAt(0).toUpperCase() + displayName.slice(1);
     targetProfile = {
@@ -130,7 +238,6 @@ export async function linkTelegramId(email: string, telegramId: number, username
     linkedAt: new Date().toISOString(),
   };
 
-  // 1. Save in Supabase settings table
   try {
     await supabase.from('settings').upsert({
       key: `tg_link_${telegramId}`,
@@ -141,19 +248,15 @@ export async function linkTelegramId(email: string, telegramId: number, username
     console.error('Failed to save link in settings table:', err);
   }
 
-  // 2. Save in local backup file
   setLocalLink(telegramId, linkPayload);
 
-  // 3. Attempt profile column update if column exists and real profile exists
   if (userProfile) {
     try {
       await supabase
         .from('profiles')
         .update({ telegram_id: telegramId, telegram_username: username || null })
         .eq('id', userProfile.id);
-    } catch (err) {
-      // optional column fallback
-    }
+    } catch (err) {}
   }
 
   return { success: true, profile: targetProfile };

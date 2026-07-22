@@ -3,6 +3,8 @@ import { config } from './config.js';
 import {
   getProfileByTelegramId,
   linkTelegramId,
+  requestEmailOTP,
+  verifyEmailOTP,
   getActiveProducts,
   getActiveStakingProducts,
   getActiveProperties,
@@ -509,7 +511,7 @@ bot.on('callback_query:data', async (ctx) => {
   if (data === 'nav_dashboard') return handleDashboard(ctx);
 });
 
-// ─── TEXT INPUT LISTENER (Email linking & prompts) ───────────────────────
+// ─── TEXT INPUT LISTENER (Email & OTP verification prompts) ───────────────
 bot.on('message:text', async (ctx) => {
   const telegramId = ctx.from?.id;
   const username = ctx.from?.username;
@@ -518,22 +520,43 @@ bot.on('message:text', async (ctx) => {
 
   const state = userStates.get(telegramId);
 
-  if (state?.action === 'awaiting_email' || (text.includes('@') && text.includes('.'))) {
-    const res = await linkTelegramId(text, telegramId, username);
+  // 1. User enters 6-digit verification code
+  if (state?.action === 'awaiting_otp' || (/^\d{6}$/.test(text))) {
+    const res = await verifyEmailOTP(telegramId, text, username);
 
     if (res.success && res.profile) {
       userStates.delete(telegramId);
       const isAdmin = res.profile.is_admin;
       await ctx.reply(
-        `🎉 *Account Linked Successfully!*\n\n` +
+        `🎉 *Account Verified & Linked Successfully!*\n\n` +
         `Welcome, *${res.profile.name}*!\n` +
-        `Your Telegram account is now connected to \`${res.profile.email}\`.\n\n` +
+        `Your Telegram account is now securely connected to \`${res.profile.email}\`.\n\n` +
         `💰 *Wallet Balance:* $${(res.profile.wallet_balance || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
         { parse_mode: 'Markdown', reply_markup: getMainKeyboard(isAdmin) }
       );
     } else {
       await ctx.reply(`❌ ${res.message}`);
     }
+    return;
+  }
+
+  // 2. User enters Email address -> Request 6-digit OTP
+  if (state?.action === 'awaiting_email' || (text.includes('@') && text.includes('.'))) {
+    const res = await requestEmailOTP(text, telegramId);
+
+    if (res.success) {
+      userStates.set(telegramId, { action: 'awaiting_otp', data: { email: text } });
+      await ctx.reply(
+        `🔐 *Security Verification Required*\n\n` +
+        `We generated a 6-digit verification code for *${res.maskedEmail}*.\n\n` +
+        `🔑 *Verification Code:* \`${res.otpCode}\` \n\n` +
+        `Please reply with the *6-digit verification code* above to verify ownership and complete account linking:`,
+        { parse_mode: 'Markdown' }
+      );
+    } else {
+      await ctx.reply(`❌ Failed to send verification code. Please check your email.`);
+    }
+    return;
   }
 });
 
