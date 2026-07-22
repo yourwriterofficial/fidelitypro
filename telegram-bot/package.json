@@ -1,0 +1,21 @@
+{
+  "name": "rpm-telegram-bot",
+  "version": "1.0.0",
+  "description": "Telegram Bot & Mini App backend for RPM / FidelityPro platform",
+  "main": "dist/bot.js",
+  "type": "module",
+  "scripts": {
+    "start": "tsx bot.ts",
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.108.2",
+    "dotenv": "^16.4.7",
+    "grammy": "^1.35.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.12.3",
+    "tsx": "^4.19.3",
+    "typescript": "~6.0.2"
+  }
+}

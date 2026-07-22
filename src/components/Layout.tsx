@@ -10,6 +10,7 @@ import NotificationBell from './NotificationBell';
 import { useState, useEffect, useRef } from 'react';
 import { useAccountRestriction } from '../hooks/useAccountRestriction';
 import { toast } from 'sonner';
+import { initTelegramWebApp } from '../lib/telegramWebApp';
 
 const navItems = [
   { path: '/app',             icon: Home,          label: 'Dashboard' },
@@ -54,6 +55,10 @@ export default function Layout() {
   const [investorChatFollowUnread, setInvestorChatFollowUnread] = useState(0);
   const lastLoggedPathRef = useRef<string | null>(null);
   const [onlineUsers, setOnlineUsers] = useState<OnlineVisitor[]>([]);
+
+  useEffect(() => {
+    initTelegramWebApp();
+  }, []);
 
   const onWallet = location.pathname.startsWith('/app/wallet');
 
