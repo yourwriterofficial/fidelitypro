@@ -362,17 +362,17 @@ export default function WalletPage() {
                       </div>
                     </div>
 
-                    <form onSubmit={handleDepositConfirm} className="flex gap-2">
+                    <form onSubmit={handleDepositConfirm} className="flex flex-col sm:flex-row gap-2.5 sm:gap-2">
                       <input
                         type="number" step="0.01" min={selectedMethod?.min || 0}
                         value={depositAmount} onChange={e => setDepositAmount(e.target.value)}
-                        className="flex-1 border border-gray-300 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brand focus:border-transparent"
+                        className="w-full sm:flex-1 min-w-0 border border-gray-300 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brand focus:border-transparent"
                         placeholder={`Amount in USD (min $${selectedMethod?.min || 0})`}
                         required
                       />
                       <button
                         type="submit" disabled={loading}
-                        className="bg-brand hover:bg-brand-dark text-white px-5 py-3 rounded-xl flex items-center gap-2 text-sm font-semibold transition shadow-sm hover:shadow-md disabled:opacity-60"
+                        className="w-full sm:w-auto shrink-0 bg-brand hover:bg-brand-dark text-white px-6 py-3 rounded-xl flex items-center justify-center gap-2 text-sm font-semibold transition shadow-sm hover:shadow-md disabled:opacity-60"
                       >
                         {loading ? <RefreshCw size={16} className="animate-spin" /> : <Send size={16} />}
                         Confirm

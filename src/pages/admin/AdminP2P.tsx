@@ -500,17 +500,17 @@ export default function AdminP2P() {
                 </div>
               </div>
 
-              <div className="flex gap-3 pt-2">
+              <div className="flex flex-col sm:flex-row gap-2.5 sm:gap-3 pt-2">
                 <button
                   type="submit"
-                  className="flex-1 bg-brand hover:bg-brand-dark text-white font-bold py-2.5 rounded-xl text-xs transition"
+                  className="w-full sm:flex-1 bg-brand hover:bg-brand-dark text-white font-bold py-2.5 rounded-xl text-xs transition flex items-center justify-center"
                 >
                   Save Merchant
                 </button>
                 <button
                   type="button"
                   onClick={() => setShowMerchantModal(false)}
-                  className="px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl text-xs transition"
+                  className="w-full sm:w-auto px-5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl text-xs transition text-center"
                 >
                   Cancel
                 </button>

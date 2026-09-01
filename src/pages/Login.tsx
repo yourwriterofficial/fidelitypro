@@ -137,21 +137,21 @@ export default function Login() {
           <button
             type="button"
             onClick={() => { setMethod('password'); setError(''); }}
-            className={`flex-1 pb-3 text-sm font-semibold border-b-2 transition-all ${method === 'password' ? 'border-brand text-brand' : 'border-transparent text-gray-400'}`}
+            className={`flex-1 pb-3 text-xs sm:text-sm font-semibold border-b-2 transition-all ${method === 'password' ? 'border-brand text-brand' : 'border-transparent text-gray-400'}`}
           >
             Password
           </button>
           <button
             type="button"
             onClick={() => { setMethod('otp'); setError(''); }}
-            className={`flex-1 pb-3 text-sm font-semibold border-b-2 transition-all ${method === 'otp' ? 'border-brand text-brand' : 'border-transparent text-gray-400'}`}
+            className={`flex-1 pb-3 text-xs sm:text-sm font-semibold border-b-2 transition-all ${method === 'otp' ? 'border-brand text-brand' : 'border-transparent text-gray-400'}`}
           >
-            Email OTP Code
+            Email OTP
           </button>
           <button
             type="button"
             onClick={() => { setMethod('magic'); setError(''); }}
-            className={`flex-1 pb-3 text-sm font-semibold border-b-2 transition-all ${method === 'magic' ? 'border-brand text-brand' : 'border-transparent text-gray-400'}`}
+            className={`flex-1 pb-3 text-xs sm:text-sm font-semibold border-b-2 transition-all ${method === 'magic' ? 'border-brand text-brand' : 'border-transparent text-gray-400'}`}
           >
             Magic Link
           </button>

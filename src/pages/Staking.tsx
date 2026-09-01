@@ -423,15 +423,15 @@ export default function Staking() {
                   <div className="flex justify-between pt-2 border-t border-gray-200"><span className="font-semibold">You receive</span><span className="font-bold text-emerald-600">{fmt(order.returnAmount)}</span></div>
                 </div>
               )}
-              <div className="flex gap-3">
+              <div className="flex flex-col sm:flex-row gap-2.5 sm:gap-3">
                 <button
                   onClick={() => { if (isClaim) { handleClaim(confirmModal.orderId!); } else { handleWithdrawEarly(confirmModal.orderId!); } }}
                   disabled={processing}
-                  className="flex-1 bg-brand hover:bg-brand-dark text-white font-semibold py-3 rounded-xl transition disabled:opacity-60">
+                  className="w-full sm:flex-1 bg-brand hover:bg-brand-dark text-white font-semibold py-3 rounded-xl transition disabled:opacity-60 flex items-center justify-center">
                   {processing ? 'Processing...' : 'Confirm'}
                 </button>
                 <button onClick={() => setConfirmModal({ open: false, orderId: null, action: null })}
-                  className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 py-3 rounded-xl text-sm transition">Cancel</button>
+                  className="w-full sm:flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 py-3 rounded-xl text-sm transition font-semibold text-center">Cancel</button>
               </div>
             </div>
           </div>

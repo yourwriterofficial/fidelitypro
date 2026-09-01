@@ -963,13 +963,13 @@ export default function Properties() {
                   </div>
                 )}
 
-                <div className="flex gap-3">
+                <div className="flex flex-col sm:flex-row gap-2.5 sm:gap-3">
                   <button type="submit" disabled={submitting}
-                    className="flex-1 bg-brand hover:bg-brand-dark text-white font-semibold py-3 rounded-xl transition disabled:opacity-60 flex items-center justify-center gap-2 text-sm shadow-sm">
+                    className="w-full sm:flex-1 bg-brand hover:bg-brand-dark text-white font-semibold py-3 rounded-xl transition disabled:opacity-60 flex items-center justify-center gap-2 text-sm shadow-sm">
                     {submitting ? 'Processing...' : 'Submit Payment'}
                   </button>
                   <button type="button" onClick={() => setModalOpen(false)}
-                    className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 py-3 rounded-xl text-sm transition font-semibold">Cancel</button>
+                    className="w-full sm:flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 py-3 rounded-xl text-sm transition font-semibold">Cancel</button>
                 </div>
               </form>
               )}
@@ -1286,25 +1286,25 @@ export default function Properties() {
                           </div>
 
                           {!hasSufficient && (
-                            <div className="flex flex-wrap gap-2 pt-2 border-t border-white/10">
+                            <div className="flex flex-col sm:flex-row flex-wrap gap-2 pt-2 border-t border-white/10">
                               <Link
                                 to="/app/wallet"
                                 onClick={() => setCustomModalOpen(false)}
-                                className="px-3 py-1.5 bg-brand hover:bg-brand-dark text-white rounded-xl font-bold text-[11px] shadow-sm transition flex items-center gap-1.5"
+                                className="w-full sm:w-auto px-3 py-2 bg-brand hover:bg-brand-dark text-white rounded-xl font-bold text-[11px] shadow-sm transition flex items-center justify-center gap-1.5"
                               >
                                 <Plus size={13} /> Deposit & Save Towards Target
                               </Link>
                               <Link
                                 to="/app/staking"
                                 onClick={() => setCustomModalOpen(false)}
-                                className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-[11px] shadow-sm transition flex items-center gap-1.5"
+                                className="w-full sm:w-auto px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-[11px] shadow-sm transition flex items-center justify-center gap-1.5"
                               >
                                 <TrendingUp size={13} /> Stake & Multiply Yield
                               </Link>
                               <Link
                                 to="/app/settings"
                                 onClick={() => setCustomModalOpen(false)}
-                                className="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-slate-200 rounded-xl font-bold text-[11px] transition flex items-center gap-1.5"
+                                className="w-full sm:w-auto px-3 py-2 bg-white/10 hover:bg-white/20 text-slate-200 rounded-xl font-bold text-[11px] transition flex items-center justify-center gap-1.5"
                               >
                                 <ShieldCheck size={13} /> Upload KYC in Settings
                               </Link>
@@ -1395,18 +1395,18 @@ export default function Properties() {
                     </select>
                   </div>
 
-                  <div className="flex gap-3 pt-2">
+                  <div className="flex flex-col sm:flex-row gap-2.5 sm:gap-3 pt-2">
                     <button
                       type="submit"
                       disabled={customSubmitting}
-                      className="flex-1 bg-brand hover:bg-brand-dark text-white font-bold py-3.5 rounded-xl shadow-md transition disabled:opacity-60 text-sm"
+                      className="w-full sm:flex-1 bg-brand hover:bg-brand-dark text-white font-bold py-3.5 rounded-xl shadow-md transition disabled:opacity-60 text-sm flex items-center justify-center"
                     >
                       {customSubmitting ? 'Submitting Request...' : 'Submit Acquisition Request'}
                     </button>
                     <button
                       type="button"
                       onClick={() => setCustomModalOpen(false)}
-                      className="px-5 py-3.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-bold text-sm transition"
+                      className="w-full sm:w-auto px-6 py-3.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-bold text-sm transition text-center"
                     >
                       Cancel
                     </button>
