@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Mail, Lock, User, UserPlus } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '../lib/supabaseClient';
+import { notifyAdminsWithEmail } from '../lib/notify';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -115,6 +116,27 @@ export default function Signup() {
       }
 
       toast.success('Account created successfully!');
+
+      // Notify admins via email (in addition to the DB push trigger)
+      try {
+        notifyAdminsWithEmail(
+          `[RPM] New User Registered: ${cleanName} (${cleanEmail})`,
+          `
+            <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #f0f0f0; border-radius: 8px;">
+              <h2 style="color: #00674F; margin-bottom: 16px;">New User Registration</h2>
+              <p><strong>Name:</strong> ${cleanName}</p>
+              <p><strong>Email:</strong> ${cleanEmail}</p>
+              ${refCode ? `<p><strong>Referred By Code:</strong> ${refCode}</p>` : ''}
+              <p style="margin-top: 24px;">
+                <a href="${window.location.origin}/admin/users" 
+                   style="background: #00674F; color: #ffffff; padding: 10px 18px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
+                   View User Management
+                </a>
+              </p>
+            </div>
+          `
+        );
+      } catch (_) {}
 
       // 3. Attempt immediate sign-in for seamless onboarding
       try {

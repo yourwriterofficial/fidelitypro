@@ -249,8 +249,19 @@ export async function notifyAdmins(params: Omit<NotifyParams, 'userId'>): Promis
   }
 }
 
-/** Sends an email notification to all admin profiles */
+/** 
+ * Admin Notification Configuration
+ * Push notifications and in-app alerts remain active.
+ * Email dispatch to admins is disabled by default.
+ */
+export const ADMIN_EMAIL_NOTIFICATIONS_ENABLED = false;
+
+/** Sends an email notification to all admin profiles (toggled off per admin preference) */
 export async function notifyAdminsWithEmail(subject: string, htmlContent: string): Promise<void> {
+  if (!ADMIN_EMAIL_NOTIFICATIONS_ENABLED) {
+    // Admin email notifications are toggled off. Push and in-app alerts handle real-time dispatch.
+    return;
+  }
   try {
     // 1. Fetch all admin emails
     const { data: admins, error: fetchError } = await supabase

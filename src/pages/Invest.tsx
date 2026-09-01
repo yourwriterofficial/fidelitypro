@@ -1,13 +1,12 @@
 import { useEffect, useState, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 import { useAuthStore } from '../store/authStore';
-import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useAccountRestriction } from '../hooks/useAccountRestriction';
 import {
-  Wallet, AlertCircle, Calculator, ArrowRight, ChevronDown, ChevronUp,
-  TrendingUp, Clock, Shield, Zap,
+  AlertCircle, Calculator, ArrowRight, ChevronUp,
+  TrendingUp, Clock, Shield, Home, Layers, ArrowLeftRight
 } from 'lucide-react';
 import InvestmentModal from '../components/InvestmentModal';
 import { useDepositAddress } from '../hooks/useDepositAddress';
@@ -18,8 +17,6 @@ interface Plan {
   daily_return: number; duration_days: number; status: string;
 }
 
-const PLAN_ACCENT = ['from-blue-500 to-indigo-600', 'from-brand to-emerald-600', 'from-purple-500 to-pink-500', 'from-amber-400 to-orange-500'];
-
 export default function Invest() {
   const { user, profile, refreshProfile } = useAuthStore();
   const { investRestricted } = useAccountRestriction();
@@ -28,7 +25,7 @@ export default function Invest() {
   const [plans, setPlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null);
-  const [calculatorAmount, setCalculatorAmount] = useState<number>(100);
+  const [calculatorAmount, setCalculatorAmount] = useState<number>(1000);
   const [selectedCalcPlan, setSelectedCalcPlan] = useState<Plan | null>(null);
   const [showCalc, setShowCalc] = useState(false);
   const [walletWarning, setWalletWarning] = useState(false);
@@ -96,7 +93,7 @@ export default function Invest() {
   };
 
   const handleInvestmentSuccess = () => {
-    toast.success('Investment created!');
+    toast.success('Investment plan initiated successfully!');
     refreshProfile(); fetchPlans(); checkWalletBalance();
   };
 
@@ -104,182 +101,282 @@ export default function Invest() {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {[1, 2, 3].map(i => <div key={i} className="animate-pulse bg-gray-200 rounded-2xl h-64" />)}
+          {[1, 2, 3].map(i => <div key={i} className="animate-pulse bg-gray-200 rounded-3xl h-64" />)}
         </div>
       </div>
     );
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 pb-10">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 pb-12 space-y-8">
+      {/* Header Banner */}
+      <div className="bg-white rounded-3xl border border-gray-200/90 p-6 sm:p-7 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-5">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Investment Plans</h1>
-          <p className="text-gray-500 text-sm mt-0.5">Choose a plan that fits your goals and start earning daily.</p>
+          <span className="text-[11px] font-bold text-brand uppercase tracking-wider block mb-1">
+            Yield Portfolios
+          </span>
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">
+            Managed Investment Plans
+          </h1>
+          <p className="text-xs sm:text-sm text-gray-500 mt-1">
+            Select capital allocation tiers with daily compounding interest and capital preservation.
+          </p>
         </div>
-        <div className="flex flex-col items-end gap-2">
+
+        <div className="flex flex-wrap items-center gap-3">
           {walletWarning && (
-            <div className="flex items-center gap-2 text-xs bg-red-50 px-4 py-2 rounded-full border border-red-200 text-red-700 animate-pulse">
-              <AlertCircle size={14} /> Balance below $100 — top up to keep account active
+            <div className="flex items-center gap-2 text-xs bg-amber-50 px-3.5 py-2 rounded-xl border border-amber-200 text-amber-800">
+              <AlertCircle size={14} className="shrink-0" /> Low balance warning
             </div>
           )}
-          <div className="flex items-center gap-2 text-sm bg-emerald-50 px-4 py-2 rounded-full border border-emerald-200">
-            <Wallet size={16} className="text-emerald-600" />
-            <span className="text-emerald-800">Balance: <strong>{fmt(profile?.wallet_balance || 0)}</strong></span>
+          <div className="bg-gray-50 border border-gray-200/80 rounded-2xl px-4 py-2 text-right">
+            <span className="text-[10px] text-gray-400 uppercase font-bold block">Available Wallet</span>
+            <span className="text-base font-extrabold text-brand tabular-nums">{fmt(profile?.wallet_balance || 0)}</span>
+          </div>
+          <button
+            onClick={() => setShowCalc(!showCalc)}
+            className="flex items-center gap-2 bg-gray-900 hover:bg-brand text-white font-bold text-xs px-4 py-3 rounded-2xl transition shadow-sm"
+          >
+            <Calculator size={15} /> Return Calculator
+          </button>
+        </div>
+      </div>
+
+      {/* Benefits Strip */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="bg-white border border-gray-200/80 rounded-2xl p-4 flex items-center gap-3.5 shadow-sm">
+          <div className="p-2.5 bg-brand/10 text-brand rounded-xl">
+            <TrendingUp size={18} />
+          </div>
+          <div>
+            <p className="text-xs font-bold text-gray-900">Daily Payout Settlement</p>
+            <p className="text-[11px] text-gray-400">Credited automatically every 24 hours</p>
+          </div>
+        </div>
+
+        <div className="bg-white border border-gray-200/80 rounded-2xl p-4 flex items-center gap-3.5 shadow-sm">
+          <div className="p-2.5 bg-indigo-50 text-indigo-700 rounded-xl">
+            <Shield size={18} />
+          </div>
+          <div>
+            <p className="text-xs font-bold text-gray-900">Capital Preservation</p>
+            <p className="text-[11px] text-gray-400">Principal returned at term maturity</p>
+          </div>
+        </div>
+
+        <div className="bg-white border border-gray-200/80 rounded-2xl p-4 flex items-center gap-3.5 shadow-sm">
+          <div className="p-2.5 bg-amber-50 text-amber-700 rounded-xl">
+            <Clock size={18} />
+          </div>
+          <div>
+            <p className="text-xs font-bold text-gray-900">Immediate Activation</p>
+            <p className="text-[11px] text-gray-400">Yield generation starts on first settlement</p>
           </div>
         </div>
       </div>
 
-      {/* Benefits strip */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-        {[
-          { icon: <TrendingUp size={18} className="text-blue-600" />, label: 'Daily Payouts', sub: 'Every 24 hours' },
-          { icon: <Shield     size={18} className="text-emerald-600" />, label: 'Principal Safe', sub: 'Capital protected' },
-          { icon: <Zap        size={18} className="text-amber-600"  />, label: 'Instant Start',  sub: 'Earn from day 1' },
-        ].map(({ icon, label, sub }) => (
-          <div key={label} className="bg-white border border-gray-100 rounded-2xl p-4 flex items-center gap-3 shadow-sm">
-            <div className="p-2 bg-gray-50 rounded-xl">{icon}</div>
-            <div>
-              <p className="text-sm font-semibold text-gray-900">{label}</p>
-              <p className="text-xs text-gray-400">{sub}</p>
+      {/* Return Calculator */}
+      {showCalc && (
+        <div className="bg-white rounded-3xl border border-gray-200 shadow-md p-6 sm:p-8 animate-fade-in">
+          <div className="flex items-center justify-between mb-6 pb-4 border-b border-gray-100">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 bg-brand/10 text-brand rounded-xl">
+                <Calculator size={18} />
+              </div>
+              <h2 className="text-lg font-bold text-gray-900">Plan Yield Calculator</h2>
             </div>
+            <button onClick={() => setShowCalc(false)} className="text-gray-400 hover:text-gray-600 p-1">
+              <ChevronUp size={18} />
+            </button>
           </div>
-        ))}
-      </div>
 
-      {/* Calculator */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 mb-8 overflow-hidden">
-        <button
-          onClick={() => setShowCalc(!showCalc)}
-          className="flex items-center justify-between w-full px-6 py-4 hover:bg-gray-50/50 transition"
-        >
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-brand/10 rounded-xl"><Calculator size={18} className="text-brand" /></div>
-            <div className="text-left">
-              <p className="font-semibold text-gray-900 text-sm">Return Calculator</p>
-              <p className="text-xs text-gray-400">Estimate your profits before investing</p>
-            </div>
-          </div>
-          {showCalc ? <ChevronUp size={18} className="text-gray-400" /> : <ChevronDown size={18} className="text-gray-400" />}
-        </button>
-
-        {showCalc && (
-          <div className="border-t border-gray-100 p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Select Plan</label>
+                <label className="block text-xs font-bold uppercase tracking-wider text-gray-600 mb-1.5">Select Tier</label>
                 <select
                   value={selectedCalcPlan?.id || ''}
                   onChange={e => setSelectedCalcPlan(uniquePlans.find(p => p.id === e.target.value) || null)}
-                  className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-brand focus:border-transparent"
+                  className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brand focus:border-transparent font-medium"
                 >
-                  {uniquePlans.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  {uniquePlans.map(p => (
+                    <option key={p.id} value={p.id}>
+                      {p.name} — {p.daily_return}% / day ({p.duration_days} Days)
+                    </option>
+                  ))}
                 </select>
               </div>
+
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Investment Amount ($)</label>
-                <input
-                  type="number"
-                  min={selectedCalcPlan?.min_invest || 10}
-                  max={selectedCalcPlan?.max_invest || 100000}
-                  value={calculatorAmount}
-                  onChange={e => setCalculatorAmount(parseFloat(e.target.value) || 0)}
-                  className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-brand focus:border-transparent"
-                />
-                <p className="text-xs text-gray-400 mt-1">
-                  Min: ${selectedCalcPlan?.min_invest?.toLocaleString()} – Max: ${selectedCalcPlan?.max_invest?.toLocaleString()}
+                <label className="block text-xs font-bold uppercase tracking-wider text-gray-600 mb-1.5">Investment Amount (USD)</label>
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold">$</span>
+                  <input
+                    type="number"
+                    min={selectedCalcPlan?.min_invest || 10}
+                    max={selectedCalcPlan?.max_invest || 100000}
+                    value={calculatorAmount}
+                    onChange={e => setCalculatorAmount(parseFloat(e.target.value) || 0)}
+                    className="w-full pl-8 pr-4 py-3 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-brand focus:border-transparent font-bold"
+                  />
+                </div>
+                <p className="text-[11px] text-gray-400 mt-1.5">
+                  Tier Limits: ${selectedCalcPlan?.min_invest?.toLocaleString()} min — ${selectedCalcPlan?.max_invest?.toLocaleString()} max
                 </p>
               </div>
             </div>
+
             {calcResult && (
-              <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-xl p-5 text-white space-y-3">
-                <p className="text-xs text-gray-400 uppercase tracking-wider">Projected Return</p>
-                <p className="text-4xl font-extrabold tabular-nums tracking-tight text-emerald-400">{fmt(calcResult.totalReturn)}</p>
-                <div className="grid grid-cols-2 gap-3 pt-2 border-t border-white/10 text-sm">
-                  <div>
-                    <p className="text-gray-400 text-xs">Profit</p>
-                    <p className="font-bold text-emerald-400">{fmt(calcResult.profit)}</p>
-                  </div>
-                  <div>
-                    <p className="text-gray-400 text-xs">Daily Earnings</p>
-                    <p className="font-bold text-white">{fmt(calcResult.dailyProfit)}</p>
-                  </div>
-                  <div>
-                    <p className="text-gray-400 text-xs">Duration</p>
-                    <p className="font-bold text-white flex items-center gap-1"><Clock size={12} /> {selectedCalcPlan?.duration_days} days</p>
-                  </div>
-                  <div>
-                    <p className="text-gray-400 text-xs">Daily Rate</p>
-                    <p className="font-bold text-white">{selectedCalcPlan?.daily_return}%</p>
+              <div className="bg-gray-900 text-white rounded-2xl p-6 flex flex-col justify-between">
+                <div>
+                  <span className="text-[10px] uppercase font-bold tracking-wider text-gray-400 block">Total Payout at Completion</span>
+                  <p className="text-3xl sm:text-4xl font-extrabold text-emerald-400 tabular-nums mt-1">{fmt(calcResult.totalReturn)}</p>
+                  
+                  <div className="grid grid-cols-2 gap-3 mt-4 pt-4 border-t border-gray-800 text-xs">
+                    <div>
+                      <span className="text-gray-400 block">Total Profit</span>
+                      <span className="font-bold text-emerald-400 text-sm">+{fmt(calcResult.profit)}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-400 block">Daily Yield</span>
+                      <span className="font-bold text-white text-sm">+{fmt(calcResult.dailyProfit)}/day</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-400 block">Duration</span>
+                      <span className="font-bold text-white">{selectedCalcPlan?.duration_days} Days</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-400 block">Daily Rate</span>
+                      <span className="font-bold text-brand-light">{selectedCalcPlan?.daily_return}%</span>
+                    </div>
                   </div>
                 </div>
-                <p className="text-[10px] text-gray-500 pt-1">* Projections only. Actual returns vary by market conditions.</p>
+                <p className="text-[10px] text-gray-500 mt-4">
+                  * Daily returns settle automatically into your primary wallet balance.
+                </p>
               </div>
             )}
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Plans Grid */}
       {uniquePlans.length === 0 ? (
-        <div className="text-center py-16 bg-white rounded-2xl border border-gray-100">
-          <TrendingUp size={40} className="text-gray-200 mx-auto mb-3" />
-          <p className="text-gray-500 text-sm">No active plans available right now. Check back soon.</p>
+        <div className="text-center py-16 bg-white rounded-3xl border border-gray-200/80">
+          <TrendingUp size={40} className="text-gray-300 mx-auto mb-3" />
+          <p className="text-gray-600 font-bold text-sm">No investment plans currently active.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {uniquePlans.map((plan, index) => {
-            const accent = PLAN_ACCENT[index % PLAN_ACCENT.length];
+          {uniquePlans.map((plan) => {
             const totalReturn = plan.min_invest * (1 + plan.daily_return / 100 * plan.duration_days);
             return (
               <div
                 key={plan.id}
-                className="group bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 overflow-hidden flex flex-col"
+                className="bg-white rounded-3xl border border-gray-200/80 p-6 shadow-sm hover:shadow-xl hover:border-brand/40 transition-all duration-300 flex flex-col justify-between group"
               >
-                {/* Top accent bar */}
-                <div className={`h-1.5 bg-gradient-to-r ${accent}`} />
-                <div className="p-6 flex flex-col flex-1">
-                  <div className="flex items-start justify-between mb-1">
-                    <h3 className="text-lg font-bold text-gray-900 group-hover:text-brand transition-colors">{plan.name}</h3>
-                    <span className="text-2xl font-extrabold bg-gradient-to-r from-brand to-emerald-600 bg-clip-text text-transparent tabular-nums">
-                      {plan.daily_return}%
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-xs font-extrabold text-brand bg-brand/10 border border-brand/20 px-3 py-1 rounded-full">
+                      {plan.duration_days} Days Plan
                     </span>
-                  </div>
-                  <p className="text-xs text-gray-400 mb-1">daily return</p>
-                  <p className="text-gray-500 text-sm mt-1 mb-4">{plan.description}</p>
-
-                  <div className="space-y-2 text-sm flex-1">
-                    {[
-                      { label: 'Min Investment', value: fmt(plan.min_invest) },
-                      { label: 'Max Investment', value: fmt(plan.max_invest) },
-                      { label: 'Duration',        value: `${plan.duration_days} days` },
-                      { label: 'Est. Total (min)',  value: fmt(totalReturn), highlight: true },
-                    ].map(({ label, value, highlight }) => (
-                      <div key={label} className="flex justify-between items-center py-1.5 border-b border-gray-50 last:border-0">
-                        <span className="text-gray-500">{label}</span>
-                        <span className={`font-semibold ${highlight ? 'text-emerald-600' : 'text-gray-900'}`}>{value}</span>
-                      </div>
-                    ))}
+                    <span className="text-xs font-medium text-gray-400">Fixed Daily</span>
                   </div>
 
-                  <div className="mt-2 flex items-center gap-2">
-                    <input type="checkbox" id={`compound-${plan.id}`} className="w-4 h-4 accent-brand" />
-                    <label htmlFor={`compound-${plan.id}`} className="text-xs text-gray-500">Auto-reinvest daily returns</label>
+                  <h3 className="text-lg font-bold text-gray-900 mt-2">{plan.name}</h3>
+                  <div className="my-3">
+                    <span className="text-3xl font-extrabold text-brand tracking-tight">{plan.daily_return}%</span>
+                    <span className="text-xs text-gray-500 ml-1 font-semibold">/ day</span>
                   </div>
+                  <p className="text-xs text-gray-500 leading-relaxed mb-4">{plan.description}</p>
 
-                  <button
-                    onClick={() => handleInvest(plan)}
-                    className={`mt-5 w-full bg-gradient-to-r ${accent} hover:opacity-90 text-white font-semibold py-3 rounded-xl transition-all flex items-center justify-center gap-2 shadow-md hover:shadow-lg`}
-                  >
-                    Invest Now <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
-                  </button>
+                  <div className="space-y-2 text-xs border-t border-gray-100 pt-3">
+                    <div className="flex justify-between py-1 border-b border-gray-50">
+                      <span className="text-gray-400">Minimum Capital</span>
+                      <span className="font-bold text-gray-900">${plan.min_invest.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between py-1 border-b border-gray-50">
+                      <span className="text-gray-400">Maximum Limit</span>
+                      <span className="font-bold text-gray-900">${plan.max_invest ? plan.max_invest.toLocaleString() : 'Unlimited'}</span>
+                    </div>
+                    <div className="flex justify-between py-1">
+                      <span className="text-gray-400">Min Total Payout</span>
+                      <span className="font-bold text-emerald-700">{fmt(totalReturn)}</span>
+                    </div>
+                  </div>
                 </div>
+
+                <button
+                  onClick={() => handleInvest(plan)}
+                  className="mt-6 w-full bg-gray-900 group-hover:bg-brand text-white font-bold py-3.5 rounded-2xl text-xs transition shadow-sm flex items-center justify-center gap-2"
+                >
+                  Initiate Plan <ArrowRight size={14} />
+                </button>
               </div>
             );
           })}
         </div>
       )}
+
+      {/* Cross-Product Discovery Strip */}
+      <div className="bg-white rounded-3xl border border-gray-200/80 p-6 sm:p-8 shadow-sm">
+        <div className="mb-6">
+          <h2 className="text-lg font-bold text-gray-900">Explore Diversified Portfolios</h2>
+          <p className="text-xs text-gray-500">Discover other asset pillars across the ecosystem</p>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <Link
+            to="/app/properties"
+            className="flex items-start gap-3.5 p-4 rounded-2xl bg-amber-50/70 border border-amber-200/80 hover:shadow-md transition-all group"
+          >
+            <div className="p-2.5 rounded-xl bg-amber-600 text-white shadow-sm shrink-0">
+              <Home size={16} />
+            </div>
+            <div>
+              <span className="font-bold text-sm text-gray-900 group-hover:text-amber-700 transition-colors block">
+                Real Estate Properties
+              </span>
+              <span className="text-xs text-gray-500 block mt-0.5">
+                Fractional deeds from $500 with rental yields
+              </span>
+            </div>
+          </Link>
+
+          <Link
+            to="/app/staking"
+            className="flex items-start gap-3.5 p-4 rounded-2xl bg-indigo-50/70 border border-indigo-200/80 hover:shadow-md transition-all group"
+          >
+            <div className="p-2.5 rounded-xl bg-indigo-600 text-white shadow-sm shrink-0">
+              <Layers size={16} />
+            </div>
+            <div>
+              <span className="font-bold text-sm text-gray-900 group-hover:text-indigo-700 transition-colors block">
+                Locked Savings (Staking)
+              </span>
+              <span className="text-xs text-gray-500 block mt-0.5">
+                Earn fixed APY with 100% principal guarantee
+              </span>
+            </div>
+          </Link>
+
+          <Link
+            to="/app/p2p"
+            className="flex items-start gap-3.5 p-4 rounded-2xl bg-teal-50/70 border border-teal-200/80 hover:shadow-md transition-all group"
+          >
+            <div className="p-2.5 rounded-xl bg-teal-600 text-white shadow-sm shrink-0">
+              <ArrowLeftRight size={16} />
+            </div>
+            <div>
+              <span className="font-bold text-sm text-gray-900 group-hover:text-teal-700 transition-colors block">
+                P2P Escrow Market
+              </span>
+              <span className="text-xs text-gray-500 block mt-0.5">
+                0% fee multi-currency OTC exchange
+              </span>
+            </div>
+          </Link>
+        </div>
+      </div>
 
       {selectedPlan && (
         <InvestmentModal

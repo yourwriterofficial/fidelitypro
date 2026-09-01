@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabaseClient';
 import { useAuthStore } from '../store/authStore';
 import { toast } from 'sonner';
 import { X, Copy, Check } from 'lucide-react';
+import { notifyAdmins } from '../lib/notify';
 
 interface Plan {
   id: string;
@@ -97,10 +98,22 @@ export default function InvestmentModal({
       if (error) throw error;
 
       if (orderStatus === 'active') {
+        notifyAdmins({
+          title: 'New Investment Activated',
+          message: `${profile.name || profile.email} activated an investment of $${numAmount.toLocaleString()} in ${plan.name}.`,
+          type: 'success',
+          link: '/admin/orders'
+        });
         toast.success('Investment active!');
         onSuccess();
         onClose();
       } else {
+        notifyAdmins({
+          title: 'New Pending Investment Order',
+          message: `${profile.name || profile.email} created a pending order of $${numAmount.toLocaleString()} in ${plan.name}.`,
+          type: 'info',
+          link: '/admin/orders'
+        });
         setStep('deposit');
         toast.success('Investment order created! Please deposit to activate.');
       }

@@ -39,6 +39,7 @@ import AdminStaking from './pages/admin/AdminStaking';
 import AdminProperties from './pages/admin/AdminProperties';
 import AdminReferrals from './pages/admin/AdminReferrals';
 import AdminUsers from './pages/admin/AdminUsers';
+import AdminKYC from './pages/admin/AdminKYC';
 import AdminNotifications from './pages/admin/AdminNotifications';
 import EmailTemplates from './pages/admin/EmailTemplates';
 import AdminEmailLogs from './pages/admin/AdminEmailLogs';
@@ -131,6 +132,7 @@ function App() {
                 <Route path="properties" element={<AdminProperties />} />
                 <Route path="referrals" element={<AdminReferrals />} />
                 <Route path="users" element={<AdminUsers />} />
+                <Route path="kyc" element={<AdminKYC />} />
                 <Route path="notifications" element={<AdminNotifications />} />
                 <Route path="email-templates" element={<EmailTemplates />} />
                 <Route path="email-logs" element={<AdminEmailLogs />} />

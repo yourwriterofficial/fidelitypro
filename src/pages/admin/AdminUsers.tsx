@@ -22,6 +22,8 @@ interface User {
   can_property: boolean;
   restriction_reason: string;
   fee_required: number;
+  kyc_status?: string;
+  kyc_level?: number;
   created_at: string;
   last_seen?: string;
 }

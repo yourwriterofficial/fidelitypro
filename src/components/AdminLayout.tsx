@@ -4,7 +4,7 @@ import {
   LogOut, LayoutDashboard, Package, Users, DollarSign, ShoppingCart,
   Eye, Mail, CreditCard, Settings, Lock, Building, Gift, Bell,
   Menu, X, MoreHorizontal, Activity, Megaphone, ChevronRight, ArrowLeftRight,
-  ChevronsLeft, ChevronsRight, MessageSquare,
+  ChevronsLeft, ChevronsRight, MessageSquare, ShieldCheck,
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabaseClient';
@@ -39,6 +39,7 @@ const NAV_SECTIONS = [
     label: 'Users & Comms',
     items: [
       { path: '/admin/users',            icon: Users,       label: 'Users'          },
+      { path: '/admin/kyc',              icon: ShieldCheck, label: 'KYC Verifications' },
       { path: '/admin/chat',             icon: MessageSquare,label: 'Live Chat'        },
       { path: '/admin/notifications',    icon: Bell,        label: 'Notifications'  },
       { path: '/admin/announcements',    icon: Megaphone,   label: 'Announcements'  },
@@ -55,7 +56,15 @@ const NAV_SECTIONS = [
 ];
 
 const allNavItems = NAV_SECTIONS.flatMap(s => s.items);
-const bottomNavItems = allNavItems.slice(0, 5);
+
+// Hand-picked mobile bottom bar: Dashboard, Orders, Users, Live Chat, Settings
+const bottomNavItems = [
+  { path: '/admin',           icon: allNavItems.find(i => i.path === '/admin')!.icon,           label: 'Dashboard' },
+  { path: '/admin/orders',    icon: allNavItems.find(i => i.path === '/admin/orders')!.icon,    label: 'Orders'    },
+  { path: '/admin/users',     icon: allNavItems.find(i => i.path === '/admin/users')!.icon,     label: 'Users'     },
+  { path: '/admin/chat',      icon: allNavItems.find(i => i.path === '/admin/chat')!.icon,      label: 'Live Chat' },
+  { path: '/admin/settings',  icon: allNavItems.find(i => i.path === '/admin/settings')!.icon,  label: 'Settings'  },
+];
 
 export default function AdminLayout() {
   const { signOut, isImpersonating, clearImpersonation, profile } = useAuthStore();

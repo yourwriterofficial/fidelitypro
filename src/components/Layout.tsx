@@ -12,27 +12,30 @@ import { useAccountRestriction } from '../hooks/useAccountRestriction';
 import { toast } from 'sonner';
 import { initTelegramWebApp } from '../lib/telegramWebApp';
 
-const navItems = [
+const mainNavItems = [
   { path: '/app',             icon: Home,          label: 'Dashboard' },
+  { path: '/app/properties',  icon: Building,      label: 'Properties'},
+  { path: '/app/staking',     icon: Lock,          label: 'Staking'   },
+  { path: '/app/p2p',         icon: ArrowRightLeft, label: 'P2P Express' },
   { path: '/app/invest',      icon: Briefcase,     label: 'Invest'    },
   { path: '/app/my-portfolio',icon: Wallet,        label: 'Portfolio' },
   { path: '/app/wallet',      icon: LayoutDashboard, label: 'Wallet'  },
-  { path: '/app/p2p',         icon: ArrowRightLeft, label: 'P2P Express' },
-  { path: '/app/staking',     icon: Lock,          label: 'Staking'   },
-  { path: '/app/properties',  icon: Building,      label: 'Properties'},
-  { path: '/app/referral',    icon: Gift,          label: 'Referral'  },
   { path: '/app/chat',        icon: MessageSquare, label: 'Inbox' },
   { path: '/app/investor-chat',icon: Users,        label: 'Investor Chat' },
   { path: '/app/live-visitors',icon: Radio,        label: 'Live Visitors', adminOnly: true },
+];
+
+const secondaryNavItems = [
+  { path: '/app/referral',    icon: Gift,          label: 'Referral'  },
   { path: '/app/history',     icon: History,       label: 'History'   },
   { path: '/app/settings',    icon: Settings,      label: 'Settings'  },
 ];
 
 const bottomNavItems = [
   { path: '/app',             icon: Home,             label: 'Home'       },
-  { path: '/app/invest',      icon: Briefcase,        label: 'Invest'     },
-  { path: '/app/properties',  icon: Building,         label: 'Property'   },
+  { path: '/app/properties',  icon: Building,         label: 'Properties' },
   { path: '/app/staking',     icon: Lock,             label: 'Staking'    },
+  { path: '/app/p2p',         icon: ArrowRightLeft,   label: 'P2P'        },
   { path: '/app/wallet',      icon: LayoutDashboard,  label: 'Wallet'     },
 ];
 
@@ -357,10 +360,11 @@ export default function Layout() {
 
   // When restricted, only the Wallet entry is shown in navigation. Admin-only
   // items (e.g. Live Visitors) are hidden from non-admin accounts.
-  const visibleNavItems = restricted
-    ? navItems.filter(n => n.path === '/app/wallet')
-    : navItems.filter(n => !n.adminOnly || profile?.is_admin);
-  const visibleBottomNavItems = restricted ? visibleNavItems : bottomNavItems;
+  const visibleMainNavItems = restricted
+    ? mainNavItems.filter(n => n.path === '/app/wallet')
+    : mainNavItems.filter(n => !n.adminOnly || profile?.is_admin);
+  const visibleSecondaryNavItems = restricted ? [] : secondaryNavItems;
+  const visibleBottomNavItems = restricted ? visibleMainNavItems : bottomNavItems;
 
   const handleSignOut = async () => {
     await signOut();
@@ -411,7 +415,7 @@ export default function Layout() {
 
         {/* User pill */}
         {profile && !collapsed && (
-          <div className="mx-4 mt-4 p-3 bg-gray-50 rounded-xl flex items-center gap-2.5">
+          <div className="mx-4 mt-4 p-3 bg-gray-50 rounded-xl flex items-center gap-2.5 border border-gray-100">
             <div className="w-8 h-8 bg-brand/10 rounded-full flex items-center justify-center text-brand font-bold text-sm shrink-0">
               {profile.name?.charAt(0).toUpperCase() || 'U'}
             </div>
@@ -424,7 +428,7 @@ export default function Layout() {
 
         {/* Nav */}
         <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
-          {visibleNavItems.map(({ path, icon: Icon, label }) => {
+          {visibleMainNavItems.map(({ path, icon: Icon, label }) => {
             const active = isActive(path);
             const hasBadge = label === 'Inbox' || label === 'Investor Chat';
             return (
@@ -465,17 +469,35 @@ export default function Layout() {
           })}
         </nav>
 
-        {/* Footer actions */}
-        <div className="px-3 pb-4 space-y-0.5 border-t border-gray-100 pt-3">
+        {/* Bottom card: Referral, History, Settings, Sign Out */}
+        <div className="px-3 pb-4 space-y-2 border-t border-gray-100 pt-3">
+          {visibleSecondaryNavItems.length > 0 && (
+            <div className={`rounded-2xl bg-gray-50/90 border border-gray-100 p-1 space-y-0.5 ${collapsed ? 'py-1' : 'p-1'}`}>
+              {visibleSecondaryNavItems.map(({ path, icon: Icon, label }) => {
+                const active = isActive(path);
+                return (
+                  <Link key={path} to={path} title={collapsed ? label : undefined}
+                    className={`flex items-center gap-2.5 rounded-xl text-xs font-semibold transition ${
+                      collapsed ? 'justify-center py-2' : 'px-2.5 py-2'
+                    } ${active ? 'bg-white text-brand shadow-sm border border-gray-100' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100/70'}`}>
+                    <Icon size={15} className={active ? 'text-brand' : 'text-gray-400'} />
+                    {!collapsed && <span>{label}</span>}
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+
           {profile?.is_admin && (
             <Link to="/admin" title={collapsed ? 'Admin Panel' : undefined}
-              className={`flex items-center gap-3 rounded-xl text-sm font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition ${collapsed ? 'justify-center py-2.5' : 'px-3.5 py-2.5'}`}>
-              <Shield size={17} className="text-emerald-600" /> {!collapsed && 'Admin Panel'}
+              className={`flex items-center gap-3 rounded-xl text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition ${collapsed ? 'justify-center py-2.5' : 'px-3.5 py-2.5'}`}>
+              <Shield size={16} className="text-emerald-600" /> {!collapsed && 'Admin Panel'}
             </Link>
           )}
+
           <button onClick={handleSignOut} title={collapsed ? 'Sign Out' : undefined}
-            className={`w-full flex items-center gap-3 rounded-xl text-sm font-medium text-red-600 hover:bg-red-50 transition ${collapsed ? 'justify-center py-2.5' : 'px-3.5 py-2.5'}`}>
-            <LogOut size={17} /> {!collapsed && 'Sign Out'}
+            className={`w-full flex items-center gap-3 rounded-xl text-xs font-bold text-red-600 hover:bg-red-50 transition ${collapsed ? 'justify-center py-2.5' : 'px-3.5 py-2'}`}>
+            <LogOut size={16} /> {!collapsed && 'Sign Out'}
           </button>
         </div>
       </aside>
@@ -578,7 +600,7 @@ export default function Layout() {
         </nav>
       </main>
 
-      {/* ===== MOBILE MENU — fixed bottom sheet (renders in viewport, no scroll needed) ===== */}
+      {/* ===== MOBILE MENU — fixed bottom sheet ===== */}
       {mobileMenuOpen && (
         <div className="md:hidden fixed inset-0 z-50">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-fade-in" onClick={() => setMobileMenuOpen(false)} />
@@ -594,11 +616,11 @@ export default function Layout() {
             </div>
 
             <div 
-              className="overflow-y-auto px-3 pb-6 space-y-0.5"
+              className="overflow-y-auto px-3 pb-6 space-y-1"
               style={{ paddingBottom: 'calc(24px + env(safe-area-inset-bottom, 0px))' }}
             >
               {profile && (
-                <div className="flex items-center gap-2.5 px-3 py-2.5 mb-2 bg-gray-50 rounded-xl">
+                <div className="flex items-center gap-2.5 px-3 py-2.5 mb-2 bg-gray-50 rounded-2xl border border-gray-100">
                   <div className="w-8 h-8 bg-brand/10 rounded-full flex items-center justify-center text-brand font-bold text-sm shrink-0">
                     {profile.name?.charAt(0).toUpperCase() || 'U'}
                   </div>
@@ -608,7 +630,9 @@ export default function Layout() {
                   </div>
                 </div>
               )}
-              {visibleNavItems.map(({ path, icon: Icon, label }) => {
+
+              {/* Main Nav Items */}
+              {visibleMainNavItems.map(({ path, icon: Icon, label }) => {
                 const active = isActive(path);
                 return (
                   <Link key={path} to={path} onClick={() => setMobileMenuOpen(false)}
@@ -639,14 +663,36 @@ export default function Layout() {
                   </Link>
                 );
               })}
+
+              {/* Bottom Card for Referral, History, Settings */}
+              {visibleSecondaryNavItems.length > 0 && (
+                <div className="mt-2 pt-2 border-t border-gray-100">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400 px-3 mb-1">Account & Extras</p>
+                  <div className="bg-gray-50/80 rounded-2xl border border-gray-100 p-1.5 space-y-0.5">
+                    {visibleSecondaryNavItems.map(({ path, icon: Icon, label }) => {
+                      const active = isActive(path);
+                      return (
+                        <Link key={path} to={path} onClick={() => setMobileMenuOpen(false)}
+                          className={`flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold transition ${
+                            active ? 'bg-white text-brand shadow-sm border border-gray-100' : 'text-gray-600 hover:text-gray-900 hover:bg-white/60'
+                          }`}>
+                          <Icon size={15} className={active ? 'text-brand' : 'text-gray-400'} />
+                          <span>{label}</span>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               {profile?.is_admin && (
                 <Link to="/admin" onClick={() => setMobileMenuOpen(false)}
-                  className="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium text-emerald-700 bg-emerald-50">
+                  className="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold text-emerald-700 bg-emerald-50 mt-2">
                   <Shield size={16} /> Admin Panel
                 </Link>
               )}
               <button onClick={() => { handleSignOut(); setMobileMenuOpen(false); }}
-                className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium text-red-600 hover:bg-red-50 transition">
+                className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold text-red-600 hover:bg-red-50 transition mt-1">
                 <LogOut size={16} /> Sign Out
               </button>
             </div>

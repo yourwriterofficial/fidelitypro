@@ -9,6 +9,7 @@ import {
   Plus, ShieldCheck, CheckCircle2, Wallet, ArrowRight, Car, Briefcase, TrendingUp
 } from 'lucide-react';
 import { useAccountRestriction } from '../hooks/useAccountRestriction';
+import { notifyAdmins } from '../lib/notify';
 
 interface Property {
   id: string; title: string; description: string; price: number;
@@ -279,6 +280,13 @@ export default function Properties() {
         });
       } catch (_) {}
 
+      notifyAdmins({
+        title: 'New Custom Property Acquisition Request',
+        message: `${profile.name || profile.email} submitted a custom ${customCategory} request ($${price.toLocaleString()} total, $${upfrontDeposit.toLocaleString()} deposit).`,
+        type: 'alert',
+        link: '/admin/properties'
+      });
+
       toast.success('Custom Acquisition Request Received!', {
         description: 'Please deposit the 20% upfront sum into your RPM Wallet and upload KYC details in Settings.',
       });
@@ -353,6 +361,12 @@ export default function Properties() {
         monthly_payment: monthlyPaymentVal,
       });
       if (error) throw error;
+      notifyAdmins({
+        title: 'New Real Estate Deed Investment',
+        message: `${profile.name || profile.email} invested $${amount.toLocaleString()} in ${selectedProperty.title} (${selectedTerm} Months).`,
+        type: 'success',
+        link: '/admin/properties'
+      });
       toast.success('Investment recorded!');
       await fetchMyInvestments();
       setModalOpen(false); setPaymentAmount('');
@@ -1143,7 +1157,7 @@ export default function Properties() {
                       Go to Wallet & Deposit
                     </Link>
                     <Link
-                      to="/app/settings"
+                      to="/app/settings?tab=kyc"
                       onClick={() => setCustomModalOpen(false)}
                       className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold py-3 rounded-xl text-center text-sm transition"
                     >
@@ -1302,7 +1316,7 @@ export default function Properties() {
                                 <TrendingUp size={13} /> Stake & Multiply Yield
                               </Link>
                               <Link
-                                to="/app/settings"
+                                to="/app/settings?tab=kyc"
                                 onClick={() => setCustomModalOpen(false)}
                                 className="w-full sm:w-auto px-3 py-2 bg-white/10 hover:bg-white/20 text-slate-200 rounded-xl font-bold text-[11px] transition flex items-center justify-center gap-1.5"
                               >
