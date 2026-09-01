@@ -36,6 +36,7 @@ const bottomNavItems = [
   { path: '/app/properties',  icon: Building,         label: 'Properties' },
   { path: '/app/staking',     icon: Lock,             label: 'Staking'    },
   { path: '/app/p2p',         icon: ArrowRightLeft,   label: 'P2P'        },
+  { path: '/app/invest',      icon: Briefcase,        label: 'Invest'     },
   { path: '/app/wallet',      icon: LayoutDashboard,  label: 'Wallet'     },
 ];
 
@@ -573,29 +574,29 @@ export default function Layout() {
 
         {/* Mobile Bottom Navigation */}
         <nav 
-          className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 flex items-center justify-around px-2 py-2 z-30 shadow-[0_-1px_12px_rgba(0,0,0,0.06)]"
-          style={{ paddingBottom: 'calc(8px + env(safe-area-inset-bottom, 0px))' }}
+          className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 flex items-center justify-between px-1.5 py-1.5 z-30 shadow-[0_-1px_12px_rgba(0,0,0,0.06)]"
+          style={{ paddingBottom: 'calc(6px + env(safe-area-inset-bottom, 0px))' }}
         >
           {visibleBottomNavItems.map(({ path, icon: Icon, label }) => {
             const active = isActive(path);
             return (
               <Link key={path} to={path}
-                className={`flex flex-col items-center gap-0.5 px-2 py-1 rounded-xl transition-all ${
+                className={`flex flex-col items-center gap-0.5 px-1 py-0.5 rounded-xl transition-all ${
                   active ? 'text-brand' : 'text-gray-400 hover:text-gray-600'
                 }`}>
                 <div className={`p-1 rounded-lg ${active ? 'bg-brand/10' : ''}`}>
-                  <Icon size={20} />
+                  <Icon size={18} />
                 </div>
-                <span className="text-[10px] font-medium truncate max-w-[48px]">{label}</span>
+                <span className="text-[9.5px] font-medium truncate max-w-[44px]">{label}</span>
               </Link>
             );
           })}
           <button onClick={() => setMobileMenuOpen(true)}
-            className="flex flex-col items-center gap-0.5 px-2 py-1 rounded-xl text-gray-400 hover:text-gray-600 transition">
+            className="flex flex-col items-center gap-0.5 px-1 py-0.5 rounded-xl text-gray-400 hover:text-gray-600 transition">
             <div className="p-1 rounded-lg">
-              <MoreHorizontal size={20} />
+              <MoreHorizontal size={18} />
             </div>
-            <span className="text-[10px] font-medium">More</span>
+            <span className="text-[9.5px] font-medium">More</span>
           </button>
         </nav>
       </main>

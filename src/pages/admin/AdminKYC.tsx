@@ -56,16 +56,45 @@ export default function AdminKYC() {
   const fetchKYCRecords = async () => {
     setLoading(true);
     try {
+      // 1. Try relational query with explicit foreign key relationship hint
       const { data, error } = await supabase
         .from('kyc_verifications')
         .select(`
           *,
-          user:profiles(name, email, wallet_balance, kyc_status)
+          user:profiles!user_id(name, email, wallet_balance, kyc_status)
         `)
         .order('submitted_at', { ascending: false });
 
-      if (error) throw error;
-      setRecords((data as any) || []);
+      if (!error && data) {
+        setRecords((data as any) || []);
+        return;
+      }
+
+      // 2. Resilient batch fallback: fetch raw records + profiles in parallel
+      const { data: rawRecords, error: rawError } = await supabase
+        .from('kyc_verifications')
+        .select('*')
+        .order('submitted_at', { ascending: false });
+
+      if (rawError) throw rawError;
+      if (!rawRecords || rawRecords.length === 0) {
+        setRecords([]);
+        return;
+      }
+
+      const userIds = [...new Set(rawRecords.map(r => r.user_id).filter(Boolean))];
+      const { data: profilesData } = await supabase
+        .from('profiles')
+        .select('id, name, email, wallet_balance, kyc_status')
+        .in('id', userIds);
+
+      const profileMap = new Map((profilesData || []).map(p => [p.id, p]));
+      const enriched = rawRecords.map(r => ({
+        ...r,
+        user: profileMap.get(r.user_id) || { name: 'Investor', email: '', wallet_balance: 0 },
+      }));
+
+      setRecords(enriched as any);
     } catch (err: any) {
       console.error('Failed to load KYC records:', err);
       toast.error('Could not load KYC submissions');
