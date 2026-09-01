@@ -54,12 +54,16 @@ import HistoryPage from './pages/HistoryPage';
 import InvestorChat from './pages/InvestorChat';
 import LiveVisitors from './pages/LiveVisitors';
 import AdminChat from './pages/admin/AdminChat';
+import P2P from './pages/P2P';
+import AdminP2P from './pages/admin/AdminP2P';
+import { triggerPassiveHeartbeat } from './lib/heartbeat';
 
 function App() {
   const { initAuth, setLoading } = useAuthStore();
 
   useEffect(() => {
     initAuth();
+    triggerPassiveHeartbeat();
     const timeout = setTimeout(() => {
       setLoading(false);
     }, 5000);
@@ -99,6 +103,7 @@ function App() {
                 <Route path="invest" element={<Invest />} />
                 <Route path="my-portfolio" element={<MyPortfolio />} />
                 <Route path="wallet" element={<Wallet />} />
+                <Route path="p2p" element={<P2P />} />
                 <Route path="staking" element={<Staking />} />
                 <Route path="properties" element={<Properties />} />
                 <Route path="referral" element={<Referral />} />
@@ -120,6 +125,7 @@ function App() {
                 <Route path="orders" element={<AdminOrders />} />
                 <Route path="deposits" element={<AdminDeposits />} />
                 <Route path="withdrawals" element={<AdminWithdrawals />} />
+                <Route path="p2p" element={<AdminP2P />} />
                 <Route path="products" element={<AdminProducts />} />
                 <Route path="staking" element={<AdminStaking />} />
                 <Route path="properties" element={<AdminProperties />} />

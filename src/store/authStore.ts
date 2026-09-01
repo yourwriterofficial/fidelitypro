@@ -41,54 +41,121 @@ interface AuthState {
   clearImpersonation: () => void;
 }
 
-const fetchProfile = async (userId: string): Promise<Profile | null> => {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', userId)
-    .single();
-  if (error && error.code !== 'PGRST116') {
-    console.error('Profile fetch error:', error);
+const PROFILE_CACHE_KEY = 'rpm_cached_profile';
+const USER_CACHE_KEY = 'rpm_cached_user';
+
+const getCachedUser = (): User | null => {
+  try {
+    const raw = localStorage.getItem(USER_CACHE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
     return null;
   }
-  return data;
 };
 
+const getCachedProfile = (): Profile | null => {
+  try {
+    const raw = localStorage.getItem(PROFILE_CACHE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+};
+
+const saveCache = (user: User | null, profile: Profile | null) => {
+  try {
+    if (user) localStorage.setItem(USER_CACHE_KEY, JSON.stringify(user));
+    else localStorage.removeItem(USER_CACHE_KEY);
+
+    if (profile) localStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(profile));
+    else localStorage.removeItem(PROFILE_CACHE_KEY);
+  } catch {
+    // Ignore storage quota errors
+  }
+};
+
+const clearCache = () => {
+  try {
+    localStorage.removeItem(USER_CACHE_KEY);
+    localStorage.removeItem(PROFILE_CACHE_KEY);
+  } catch {
+    // Ignore
+  }
+};
+
+const fetchProfile = async (userId: string): Promise<Profile | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .single();
+    if (error) {
+      if (error.code !== 'PGRST116') {
+        console.error('Profile fetch error:', error);
+      }
+      return getCachedProfile();
+    }
+    return data;
+  } catch (err) {
+    console.error('Network profile fetch error:', err);
+    return getCachedProfile();
+  }
+};
+
+let authSubscription: { unsubscribe: () => void } | null = null;
+let isInitializing = false;
+
+const initialCachedUser = getCachedUser();
+const initialCachedProfile = getCachedProfile();
+
 export const useAuthStore = create<AuthState>((set, get) => ({
-  user: null,
-  profile: null,
-  loading: true,
-  isAdmin: false,
+  user: initialCachedUser,
+  profile: initialCachedProfile,
+  loading: !initialCachedUser,
+  isAdmin: initialCachedProfile?.is_admin || false,
   isImpersonating: false,
   originalUser: null,
   originalProfile: null,
 
   signIn: async (email, password) => {
     set({ loading: true });
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) throw error;
+    const cleanEmail = email.trim().toLowerCase();
+    const { data, error } = await supabase.auth.signInWithPassword({ email: cleanEmail, password });
+    if (error) {
+      set({ loading: false });
+      throw error;
+    }
     if (data.user) {
       const profile = await fetchProfile(data.user.id);
+      saveCache(data.user, profile);
       set({
         user: data.user,
         profile,
         isAdmin: profile?.is_admin || false,
         loading: false,
       });
+    } else {
+      set({ loading: false });
     }
   },
 
   signUp: async (email, password, name) => {
     set({ loading: true });
+    const cleanEmail = email.trim().toLowerCase();
     const { data, error } = await supabase.auth.signUp({
-      email,
+      email: cleanEmail,
       password,
-      options: { data: { name } },
+      options: { data: { name: name.trim() } },
     });
-    if (error) throw error;
+    if (error) {
+      set({ loading: false });
+      throw error;
+    }
     const needsEmailConfirm = data.user?.identities?.length === 0 || !data.session;
     if (!needsEmailConfirm && data.user) {
       const profile = await fetchProfile(data.user.id);
+      saveCache(data.user, profile);
       set({
         user: data.user,
         profile,
@@ -102,27 +169,34 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   signOut: async () => {
+    clearCache();
     await supabase.auth.signOut();
     set({ user: null, profile: null, isAdmin: false, loading: false, isImpersonating: false, originalUser: null, originalProfile: null });
   },
 
   resetPassword: async (email) => {
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    const cleanEmail = email.trim().toLowerCase();
+    const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
       redirectTo: `${window.location.origin}/reset-password`,
     });
     if (error) throw error;
   },
 
   initAuth: async () => {
-    // Prevent duplicate listeners if initAuth is called multiple times
-    // (e.g. React Strict Mode double-invocation in development)
-    const { data: { subscription: existingSub } } = supabase.auth.onAuthStateChange(() => {});
-    existingSub.unsubscribe();
+    if (isInitializing) return;
+    isInitializing = true;
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      // 1. Get initial session from Supabase
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError) {
+        console.warn('Session retrieval error:', sessionError);
+      }
+
       if (session?.user) {
         const profile = await fetchProfile(session.user.id);
+        saveCache(session.user, profile);
         set({
           user: session.user,
           profile,
@@ -130,38 +204,49 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           loading: false,
         });
       } else {
-        set({ loading: false });
+        // If no session exists from Supabase, only clear if we are not actively in an impersonation state
+        const { isImpersonating } = get();
+        if (!isImpersonating) {
+          clearCache();
+          set({ user: null, profile: null, isAdmin: false, loading: false });
+        }
       }
 
-      const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-        // Only clear the user on an explicit SIGNED_OUT — do NOT sign out on
-        // TOKEN_REFRESHED, PASSWORD_RECOVERY, USER_UPDATED or any other event
-        // that might arrive with a briefly-null session mid-cycle.
-        if (event === 'SIGNED_OUT') {
-          set({ user: null, profile: null, isAdmin: false, loading: false,
-                isImpersonating: false, originalUser: null, originalProfile: null });
-          return;
-        }
-        if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') && session?.user) {
+      // 2. Set up single persistent auth listener
+      if (!authSubscription) {
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
           const { isImpersonating } = get();
-          // Don't overwrite profile/user while actively impersonating
           if (isImpersonating) return;
-          const profile = await fetchProfile(session.user.id);
-          set({
-            user: session.user,
-            profile,
-            isAdmin: profile?.is_admin || false,
-            loading: false,
-          });
-        }
-      });
 
-      // Store subscription reference for potential cleanup
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (get as any)._authSubscription = subscription;
+          if (event === 'SIGNED_OUT') {
+            // Double-check session to prevent transient logout spikes
+            const { data: currentCheck } = await supabase.auth.getSession();
+            if (!currentCheck?.session) {
+              clearCache();
+              set({ user: null, profile: null, isAdmin: false, loading: false,
+                    isImpersonating: false, originalUser: null, originalProfile: null });
+            }
+            return;
+          }
+
+          if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') && session?.user) {
+            const profile = await fetchProfile(session.user.id);
+            saveCache(session.user, profile);
+            set({
+              user: session.user,
+              profile,
+              isAdmin: profile?.is_admin || false,
+              loading: false,
+            });
+          }
+        });
+        authSubscription = subscription;
+      }
     } catch (error) {
       console.error('Auth init error:', error);
       set({ loading: false });
+    } finally {
+      isInitializing = false;
     }
   },
 
@@ -171,6 +256,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     const { user } = get();
     if (user) {
       const profile = await fetchProfile(user.id);
+      saveCache(user, profile);
       set({ profile, isAdmin: profile?.is_admin || false });
     }
   },

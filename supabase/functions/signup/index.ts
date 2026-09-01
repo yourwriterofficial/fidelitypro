@@ -57,6 +57,55 @@ async function sendWelcomeEmail(to: string, name: string) {
   }
 }
 
+async function notifyAdminsOnSignup(user: { id: string; email: string; name: string }) {
+  try {
+    const { data: admins, error: adminErr } = await supabaseAdmin
+      .from("profiles")
+      .select("id")
+      .eq("is_admin", true);
+
+    if (adminErr || !admins || admins.length === 0) return;
+
+    const adminIds = admins.map((a: { id: string }) => a.id);
+    const title = "New User Registered";
+    const body = `${user.name || user.email} just joined the RPM platform.`;
+
+    // 1. Insert in-app notifications
+    const notifs = adminIds.map((adminId: string) => ({
+      user_id: adminId,
+      title,
+      message: body,
+      type: "alert",
+      link: "/admin/users",
+      read: false,
+    }));
+    await supabaseAdmin.from("notifications").insert(notifs);
+
+    // 2. Dispatch push notification to all admins
+    const pushRes = await fetch(`${SUPABASE_URL}/functions/v1/send-push`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "apikey": SERVICE_ROLE_KEY,
+        "Authorization": `Bearer ${SERVICE_ROLE_KEY}`,
+      },
+      body: JSON.stringify({
+        user_ids: adminIds,
+        title,
+        body,
+        url: "/admin/users",
+        tag: "new-user",
+        notification_type: "alert",
+      }),
+    });
+    if (!pushRes.ok) {
+      console.warn("send-push admin notification returned:", pushRes.status);
+    }
+  } catch (err: any) {
+    console.error("Failed to notify admins on signup:", err.message);
+  }
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders, status: 204 });
@@ -162,6 +211,9 @@ serve(async (req) => {
 
     // 4. Send welcome email (non-blocking — failure doesn't break signup)
     await sendWelcomeEmail(email, full_name);
+
+    // 5. Notify admins (push + in-app notification)
+    await notifyAdminsOnSignup({ id: user.id, email, name: full_name });
 
     return new Response(
       JSON.stringify({ user: { id: user.id, email: user.email }, message: "Signup successful" }),

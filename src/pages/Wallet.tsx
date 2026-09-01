@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { supabase } from '../lib/supabaseClient';
 import { useAccountRestriction } from '../hooks/useAccountRestriction';
@@ -7,6 +8,7 @@ import { toast } from 'sonner';
 import {
   Wallet, ArrowDown, ArrowUp, Copy, Check, Send, RefreshCw,
   History, AlertCircle, TrendingUp, DollarSign, ShieldCheck, Info,
+  ShieldAlert, ArrowRightLeft,
 } from 'lucide-react';
 
 interface DepositMethod { currency: string; network: string; address: string; min: number; }
@@ -232,7 +234,7 @@ export default function WalletPage() {
           <p className="text-5xl font-extrabold mt-2 tabular-nums tracking-tight">
             {fmt(profile?.wallet_balance || 0)}
           </p>
-          <div className="mt-4 flex gap-3">
+          <div className="mt-4 flex flex-wrap gap-3">
             <button
               onClick={() => setTab('deposit')}
               className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition ${tab === 'deposit' ? 'bg-brand text-white shadow-lg shadow-brand/30' : 'bg-white/10 hover:bg-white/20'}`}
@@ -245,6 +247,12 @@ export default function WalletPage() {
             >
               <ArrowUp size={15} /> Withdraw
             </button>
+            <Link
+              to="/app/p2p"
+              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white shadow-lg shadow-orange-500/25 transition"
+            >
+              <ArrowRightLeft size={15} /> P2P Express Desk ($100k+)
+            </Link>
           </div>
         </div>
       </div>
@@ -344,6 +352,16 @@ export default function WalletPage() {
                       <span className="w-5 h-5 bg-brand text-white text-xs font-bold rounded-full flex items-center justify-center">3</span>
                       <label className="text-sm font-semibold text-gray-700">Confirm Amount Sent</label>
                     </div>
+
+                    {/* Anti-Fraud Notice */}
+                    <div className="p-3.5 bg-red-50 border border-red-200 rounded-2xl text-xs text-red-900 flex items-start gap-2.5 shadow-xs mb-3">
+                      <ShieldAlert size={16} className="text-red-600 shrink-0 mt-0.5" />
+                      <div className="leading-relaxed">
+                        <strong className="font-bold text-red-950 block">CRITICAL ANTI-FRAUD SECURITY WARNING:</strong>
+                        Only click <span className="font-bold text-red-950">"Confirm"</span> after you have actually transferred and sent the funds from your personal exchange or wallet. Submitting false confirmations or fake deposit claims without transmitting funds is strictly prohibited and results in <strong className="font-extrabold text-red-950 underline">immediate and permanent account ban</strong>.
+                      </div>
+                    </div>
+
                     <form onSubmit={handleDepositConfirm} className="flex gap-2">
                       <input
                         type="number" step="0.01" min={selectedMethod?.min || 0}

@@ -23,6 +23,7 @@ const NAV_SECTIONS = [
       { path: '/admin/orders',       icon: ShoppingCart,    label: 'Orders'         },
       { path: '/admin/deposits',     icon: CreditCard,      label: 'Deposits'       },
       { path: '/admin/withdrawals',  icon: DollarSign,      label: 'Withdrawals'    },
+      { path: '/admin/p2p',          icon: ArrowLeftRight,  label: 'P2P Escrow'     },
     ],
   },
   {

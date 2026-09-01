@@ -1133,8 +1133,9 @@ export default function AdminUsers() {
                   if (path.startsWith('/app/invest')) return 'Invest';
                   if (path.startsWith('/app/my-portfolio')) return 'Portfolio';
                   if (path.startsWith('/app/properties')) return 'Properties';
+                  if (path.startsWith('/app/p2p')) return 'P2P Express';
                   if (path.startsWith('/app/referral')) return 'Referrals';
-                  if (path.startsWith('/app/chat')) return 'Support Inbox';
+                  if (path.startsWith('/app/chat')) return 'Inbox';
                   if (path.startsWith('/app/investor-chat')) return 'Investor Chat';
                   if (path.startsWith('/app/settings')) return 'Settings';
                   if (path.startsWith('/app/notifications')) return 'Notification Center';

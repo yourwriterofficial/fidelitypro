@@ -1,0 +1,30 @@
+name: Supabase Keep-Alive Heartbeat
+
+on:
+  schedule:
+    # Runs at 00:00 UTC every 3 days to prevent Supabase inactivity pausing
+    - cron: '0 0 */3 * *'
+  workflow_dispatch:
+
+jobs:
+  ping:
+    name: Ping Supabase REST Endpoint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Perform lightweight ping
+        run: |
+          SUPABASE_URL="${{ secrets.VITE_SUPABASE_URL || 'https://eofbdmhjirbtidtucqkp.supabase.co' }}"
+          SUPABASE_ANON_KEY="${{ secrets.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVvZmJkbWhqaXJidGlkdHVjcWtwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIxNTk0MzAsImV4cCI6MjA5NzczNTQzMH0.sGuRVekxwUGYPDjaY85DceTBYDpsVX-uaf9qkXoXJDY' }}"
+          
+          echo "Sending zero-egress keepalive ping..."
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "apikey: $SUPABASE_ANON_KEY" \
+            -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
+            "$SUPABASE_URL/rest/v1/settings?select=key&limit=1")
+            
+          echo "Keepalive status code: $HTTP_STATUS"
+          if [ "$HTTP_STATUS" -ge 200 ] && [ "$HTTP_STATUS" -lt 400 ]; then
+            echo "Supabase successfully pinged."
+          else
+            echo "Warning: Response code $HTTP_STATUS"
+          fi

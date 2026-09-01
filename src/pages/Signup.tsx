@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Mail, Lock, User, UserPlus } from 'lucide-react';
 import { toast } from 'sonner';
+import { supabase } from '../lib/supabaseClient';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -26,9 +27,17 @@ export default function Signup() {
     e.preventDefault();
     setError('');
 
-    if (!name.trim()) {
+    const cleanName = name.trim();
+    const cleanEmail = email.trim().toLowerCase();
+
+    if (!cleanName) {
       setError('Full name is required');
       toast.error('Full name is required');
+      return;
+    }
+    if (!cleanEmail || !cleanEmail.includes('@')) {
+      setError('Please enter a valid email address');
+      toast.error('Invalid email address');
       return;
     }
     if (password !== confirmPassword) {
@@ -44,46 +53,89 @@ export default function Signup() {
 
     setLoading(true);
     try {
-      const response = await fetch(`${SUPABASE_URL}/functions/v1/signup`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': SUPABASE_ANON_KEY,
-          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-        },
-        body: JSON.stringify({
-          email,
-          password,
-          full_name: name,
-          ref_code: refCode || null,
-        }),
-      });
+      // 1. Attempt signup via server-side Edge Function (handles profile creation & welcome email)
+      let signupSuccess = false;
+      let errorMessage = '';
 
-      // Parse response — handle non-JSON bodies gracefully
-      let result: Record<string, unknown> = {};
       try {
-        result = await response.json();
+        const response = await fetch(`${SUPABASE_URL}/functions/v1/signup`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+          },
+          body: JSON.stringify({
+            email: cleanEmail,
+            password,
+            full_name: cleanName,
+            ref_code: refCode || null,
+          }),
+        });
+
+        let result: any = {};
+        try {
+          result = await response.json();
+        } catch {
+          // non-JSON response
+        }
+
+        if (response.ok) {
+          signupSuccess = true;
+        } else {
+          errorMessage =
+            (typeof result.error === 'string' && result.error) ||
+            (typeof result.message === 'string' && result.message) ||
+            (result.msg) ||
+            `Signup failed (${response.status})`;
+        }
+      } catch (networkErr: any) {
+        console.warn('Signup edge function unreachable, attempting direct fallback:', networkErr);
+      }
+
+      // 2. Direct Supabase Auth fallback if Edge function was unreachable
+      if (!signupSuccess && !errorMessage.toLowerCase().includes('already registered')) {
+        const { data: authData, error: directErr } = await supabase.auth.signUp({
+          email: cleanEmail,
+          password,
+          options: { data: { name: cleanName } },
+        });
+
+        if (directErr) {
+          throw directErr;
+        }
+        if (authData.user) {
+          signupSuccess = true;
+        }
+      } else if (!signupSuccess) {
+        if (errorMessage.toLowerCase().includes('already') || errorMessage.toLowerCase().includes('duplicate')) {
+          throw new Error('An account with this email already exists. Please sign in instead.');
+        }
+        throw new Error(errorMessage || 'Signup failed. Please try again.');
+      }
+
+      toast.success('Account created successfully!');
+
+      // 3. Attempt immediate sign-in for seamless onboarding
+      try {
+        const { error: signInErr } = await supabase.auth.signInWithPassword({
+          email: cleanEmail,
+          password,
+        });
+        if (!signInErr) {
+          navigate('/app');
+          return;
+        }
       } catch {
-        // body wasn't JSON
+        // Fall through to login page if immediate sign-in is delayed
       }
 
-      if (!response.ok) {
-        // FIX: extract error whether it's a string, object, or missing entirely
-        const errMsg =
-          (typeof result.error === 'string' && result.error) ||
-          (typeof result.message === 'string' && result.message) ||
-          (result.error && typeof result.error === 'object'
-            ? JSON.stringify(result.error)
-            : null) ||
-          `Signup failed (${response.status})`;
-        throw new Error(errMsg);
-      }
-
-      toast.success('Account created! Please check your email to confirm.');
       navigate('/login');
     } catch (err: unknown) {
-      const msg =
-        err instanceof Error ? err.message : 'Signup failed. Please try again.';
+      let msg = err instanceof Error ? err.message : 'Signup failed. Please try again.';
+      if (msg.toLowerCase().includes('user already registered') || msg.toLowerCase().includes('already exists')) {
+        msg = 'An account with this email already exists. Please log in.';
+      }
       setError(msg);
       toast.error(msg);
       console.error('Signup error:', err);

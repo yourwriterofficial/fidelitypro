@@ -3,7 +3,7 @@ import { useAuthStore } from '../store/authStore';
 import {
   LogOut, Home, Wallet, Briefcase, Settings, Shield, Lock, Gift,
   Building, LayoutDashboard, Menu, X, MoreHorizontal, ChevronRight, AlertCircle,
-  ChevronsLeft, ChevronsRight, MessageSquare, History, Users, Radio,
+  ChevronsLeft, ChevronsRight, MessageSquare, History, Users, Radio, ArrowRightLeft,
 } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 import NotificationBell from './NotificationBell';
@@ -17,17 +17,24 @@ const navItems = [
   { path: '/app/invest',      icon: Briefcase,     label: 'Invest'    },
   { path: '/app/my-portfolio',icon: Wallet,        label: 'Portfolio' },
   { path: '/app/wallet',      icon: LayoutDashboard, label: 'Wallet'  },
+  { path: '/app/p2p',         icon: ArrowRightLeft, label: 'P2P Express' },
   { path: '/app/staking',     icon: Lock,          label: 'Staking'   },
   { path: '/app/properties',  icon: Building,      label: 'Properties'},
   { path: '/app/referral',    icon: Gift,          label: 'Referral'  },
-  { path: '/app/chat',        icon: MessageSquare, label: 'Support Inbox' },
+  { path: '/app/chat',        icon: MessageSquare, label: 'Inbox' },
   { path: '/app/investor-chat',icon: Users,        label: 'Investor Chat' },
   { path: '/app/live-visitors',icon: Radio,        label: 'Live Visitors', adminOnly: true },
   { path: '/app/history',     icon: History,       label: 'History'   },
   { path: '/app/settings',    icon: Settings,      label: 'Settings'  },
 ];
 
-const bottomNavItems = navItems.slice(0, 5);
+const bottomNavItems = [
+  { path: '/app',             icon: Home,             label: 'Home'       },
+  { path: '/app/invest',      icon: Briefcase,        label: 'Invest'     },
+  { path: '/app/properties',  icon: Building,         label: 'Property'   },
+  { path: '/app/staking',     icon: Lock,             label: 'Staking'    },
+  { path: '/app/wallet',      icon: LayoutDashboard,  label: 'Wallet'     },
+];
 
 export interface OnlineVisitor {
   user_id: string;
@@ -383,7 +390,7 @@ export default function Layout() {
             {!collapsed && (
               <Link to="/app/chat"
                 className="relative p-2 rounded-xl text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition-colors"
-                title="Support Inbox">
+                title="Inbox">
                 <MessageSquare size={19} className={location.pathname === '/app/chat' ? 'text-brand' : 'text-gray-400'} />
                 {unreadChatCount > 0 && (
                   <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[17px] h-[17px] flex items-center justify-center px-0.5 animate-pulse">
@@ -419,7 +426,7 @@ export default function Layout() {
         <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
           {visibleNavItems.map(({ path, icon: Icon, label }) => {
             const active = isActive(path);
-            const hasBadge = label === 'Support Inbox' || label === 'Investor Chat';
+            const hasBadge = label === 'Inbox' || label === 'Investor Chat';
             return (
               <Link key={path} to={path} title={collapsed ? label : undefined}
                 className={`group relative flex items-center gap-3 rounded-xl text-sm font-medium transition-all duration-150 ${collapsed ? 'justify-center py-2.5' : 'px-3.5 py-2.5'} ${
@@ -427,12 +434,12 @@ export default function Layout() {
                 }`}>
                 <Icon size={17} className={active ? 'text-white' : 'text-gray-400 group-hover:text-gray-600'} />
                 {!collapsed && label}
-                {!collapsed && label === 'Support Inbox' && unreadChatCount > 0 && (
+                {!collapsed && label === 'Inbox' && unreadChatCount > 0 && (
                   <span className="ml-auto w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center text-[10px] font-bold shadow-sm animate-pulse">
                     {unreadChatCount}
                   </span>
                 )}
-                {collapsed && label === 'Support Inbox' && unreadChatCount > 0 && (
+                {collapsed && label === 'Inbox' && unreadChatCount > 0 && (
                   <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-red-500 rounded-full border border-white shadow-sm" />
                 )}
                 {!collapsed && label === 'Investor Chat' && (investorChatUnread > 0 || investorChatFollowUnread > 0) && (
@@ -500,7 +507,7 @@ export default function Layout() {
             </Link>
             <Link to="/app/chat"
               className="relative p-2 rounded-xl text-gray-450 hover:bg-gray-100 hover:text-gray-700 transition-colors"
-              title="Support Inbox">
+              title="Inbox">
               <MessageSquare size={19} className={location.pathname === '/app/chat' ? 'text-brand' : 'text-gray-400'} />
               {unreadChatCount > 0 && (
                 <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[17px] h-[17px] flex items-center justify-center px-0.5 animate-pulse">
@@ -537,18 +544,6 @@ export default function Layout() {
               </div>
             </div>
           )}
-          {/* flex-1 wrapper so full-height pages like InvestorChat can fill remaining space.
-              Every page root Outlet renders becomes a flex item of this flex-col container.
-              Many pages use `max-w-* mx-auto` to center their content column on desktop — but
-              an auto margin on a flex item's cross axis (width, here) opts that item OUT of
-              the default stretch-to-fill behavior, so instead of being capped at the
-              container's width it sizes to its content's max-content width (e.g. a table row
-              with a long unbroken string), silently blowing out every ancestor's layout width.
-              overflow-x-hidden/auto deeper in the tree then only clips the result instead of
-              containing it — that's what caused pages to render cut off / shifted on mobile.
-              min-w-0 removes the auto min-content floor; w-full gives the item a definite
-              width so its own mx-auto centers it normally instead of disabling stretch. Both
-              are applied via a child selector so every route's root gets this for free. */}
           <div className="flex-1 min-h-0 min-w-0 flex flex-col [&>*]:min-w-0 [&>*]:w-full">
             <Outlet context={{ onlineUsers: onlineUsersWithLivePage } satisfies LayoutOutletContext} />
           </div>
@@ -622,7 +617,7 @@ export default function Layout() {
                     }`}>
                     <Icon size={16} className={active ? 'text-white' : 'text-gray-400'} />
                     <span>{label}</span>
-                    {label === 'Support Inbox' && unreadChatCount > 0 && (
+                    {label === 'Inbox' && unreadChatCount > 0 && (
                       <span className="ml-auto w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center text-[10px] font-bold shadow-sm animate-pulse">
                         {unreadChatCount}
                       </span>

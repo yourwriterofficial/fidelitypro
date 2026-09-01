@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { sendEmailToUser } from '../../lib/notify';
+import { isDifferentDay, formatChatDateSeparator, formatMessageTime } from '../../lib/chatDate';
 
 interface Profile {
   id: string;
@@ -53,7 +54,7 @@ export default function AdminChat() {
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadingMessages, setLoadingMessages] = useState(false);
-  const [showMobileDetails, setShowMobileDetails] = useState(false);
+  const [showUserDetails, setShowUserDetails] = useState(false);
 
   // New Chat initiation state
   const [showNewChatModal, setShowNewChatModal] = useState(false);
@@ -686,11 +687,16 @@ export default function AdminChat() {
 
                 <button
                   type="button"
-                  onClick={() => setShowMobileDetails(true)}
-                  className="lg:hidden p-2 bg-gray-50 border border-gray-200 rounded-xl hover:bg-gray-100 transition text-gray-600 font-bold shrink-0 flex items-center justify-center"
+                  onClick={() => setShowUserDetails(!showUserDetails)}
+                  className={`px-3 py-1.5 rounded-xl border text-xs font-bold transition flex items-center gap-1.5 shrink-0 shadow-xs ${
+                    showUserDetails 
+                      ? 'bg-brand text-white border-brand shadow-brand/20' 
+                      : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
+                  }`}
                   title="View user details"
                 >
-                  <User size={14} />
+                  <User size={13} />
+                  <span>{showUserDetails ? 'Hide Details' : 'User Details'}</span>
                 </button>
               </div>
             </div>
@@ -711,59 +717,71 @@ export default function AdminChat() {
               ) : (
                 messages.map((msg, index) => {
                   const isMe = msg.sender_id === profile?.id;
+                  const prevMsg = index > 0 ? messages[index - 1] : null;
+                  const showDateDivider = !prevMsg || isDifferentDay(prevMsg.created_at, msg.created_at);
+
                   return (
-                    <div key={msg.id || index} className={`flex ${isMe ? 'justify-end' : 'justify-start'} group relative mb-2`}>
-                      {!isMe && (
-                        <button
-                          onClick={() => handleDeleteMessage(msg.id)}
-                          className="opacity-0 group-hover:opacity-100 p-1.5 text-gray-400 hover:text-red-500 rounded-lg hover:bg-gray-50 transition mr-2 self-center shrink-0"
-                          title="Delete message"
-                        >
-                          <Trash2 size={13} />
-                        </button>
-                      )}
-                      <div className={`max-w-[75%] rounded-2xl px-4 py-3 text-sm shadow-sm relative ${
-                        isMe 
-                          ? 'bg-gradient-to-br from-brand to-indigo-600 text-white rounded-tr-none border border-brand/5 shadow-brand/10' 
-                          : 'bg-white text-slate-800 rounded-tl-none border border-slate-100/85 shadow-slate-105'
-                      }`}>
-                        {isMe && (
-                          <div className="flex items-center gap-1 mb-1">
-                            <span className="text-[10px] font-extrabold text-blue-200">Support</span>
-                            <span className="inline-flex items-center justify-center bg-white text-blue-600 rounded-full p-0.5 w-3 h-3 shadow-xs" title="Verified Support Account">
-                              <svg className="w-2 h-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="5">
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                              </svg>
-                            </span>
-                          </div>
-                        )}
-                        <p className="leading-relaxed break-words font-medium">{msg.body}</p>
-                        
-                        <div className="flex items-center justify-end gap-1.5 mt-1.5">
-                          <span className={`text-[9px] font-medium tabular-nums ${isMe ? 'text-white/60' : 'text-gray-400'}`}>
-                            {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    <div key={msg.id || index} className="space-y-2">
+                      {showDateDivider && (
+                        <div className="flex items-center justify-center my-3 select-none">
+                          <span className="bg-slate-200/70 text-slate-600 text-[11px] font-semibold px-3 py-0.5 rounded-full shadow-xs border border-slate-300/60">
+                            {formatChatDateSeparator(msg.created_at)}
                           </span>
-                          
-                          {isMe && (
-                            <span className="shrink-0" title={msg.read ? "Read by user" : "Sent"}>
-                              {msg.read ? (
-                                <CheckCheck size={13} className="text-emerald-300" />
-                              ) : (
-                                <Check size={13} className="text-white/40" />
-                              )}
-                            </span>
-                          )}
                         </div>
-                      </div>
-                      {isMe && (
-                        <button
-                          onClick={() => handleDeleteMessage(msg.id)}
-                          className="opacity-0 group-hover:opacity-100 p-1.5 text-gray-400 hover:text-red-500 rounded-lg hover:bg-gray-50 transition ml-2 self-center shrink-0"
-                          title="Delete message"
-                        >
-                          <Trash2 size={13} />
-                        </button>
                       )}
+                      <div className={`flex ${isMe ? 'justify-end' : 'justify-start'} group relative mb-2`}>
+                        {!isMe && (
+                          <button
+                            onClick={() => handleDeleteMessage(msg.id)}
+                            className="opacity-0 group-hover:opacity-100 p-1.5 text-gray-400 hover:text-red-500 rounded-lg hover:bg-gray-50 transition mr-2 self-center shrink-0"
+                            title="Delete message"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        )}
+                        <div className={`max-w-[85%] md:max-w-[75%] min-w-[70px] rounded-2xl px-4 py-3 text-sm shadow-sm relative break-words whitespace-pre-wrap ${
+                          isMe 
+                            ? 'bg-gradient-to-br from-brand to-indigo-600 text-white rounded-tr-none border border-brand/5 shadow-brand/10' 
+                            : 'bg-white text-slate-800 rounded-tl-none border border-slate-100/85 shadow-slate-105'
+                        }`}>
+                          {isMe && (
+                            <div className="flex items-center gap-1 mb-1">
+                              <span className="text-[10px] font-extrabold text-blue-200">Support</span>
+                              <span className="inline-flex items-center justify-center bg-white text-blue-600 rounded-full p-0.5 w-3 h-3 shadow-xs" title="Verified Support Account">
+                                <svg className="w-2 h-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="5">
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                </svg>
+                              </span>
+                            </div>
+                          )}
+                          <p className="leading-relaxed break-words font-medium">{msg.body}</p>
+                          
+                          <div className="flex items-center justify-end gap-1.5 mt-1.5">
+                            <span className={`text-[9px] font-medium tabular-nums ${isMe ? 'text-white/60' : 'text-gray-400'}`}>
+                              {formatMessageTime(msg.created_at)}
+                            </span>
+                            
+                            {isMe && (
+                              <span className="shrink-0" title={msg.read ? "Read by user" : "Sent"}>
+                                {msg.read ? (
+                                  <CheckCheck size={13} className="text-emerald-300" />
+                                ) : (
+                                  <Check size={13} className="text-white/40" />
+                                )}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        {isMe && (
+                          <button
+                            onClick={() => handleDeleteMessage(msg.id)}
+                            className="opacity-0 group-hover:opacity-100 p-1.5 text-gray-400 hover:text-red-500 rounded-lg hover:bg-gray-50 transition ml-2 self-center shrink-0"
+                            title="Delete message"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        )}
+                      </div>
                     </div>
                   );
                 })
@@ -800,11 +818,20 @@ export default function AdminChat() {
       </div>
 
       {/* User Context card (Right panel) */}
-      {activeUserId && activeUser && (
-        <div className="hidden lg:flex w-72 border-l border-gray-100 flex-col shrink-0 bg-white">
-          <div className="p-4 border-b border-gray-100 flex items-center gap-2 bg-gray-50/50">
-            <Info size={15} className="text-gray-700" />
-            <h4 className="font-bold text-gray-950 text-xs uppercase tracking-wider">User Details</h4>
+      {activeUserId && activeUser && showUserDetails && (
+        <div className="hidden md:flex w-80 border-l border-gray-100 flex-col shrink-0 bg-white animate-fade-in">
+          <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
+            <div className="flex items-center gap-2">
+              <Info size={15} className="text-gray-700" />
+              <h4 className="font-bold text-gray-950 text-xs uppercase tracking-wider">User Details</h4>
+            </div>
+            <button
+              onClick={() => setShowUserDetails(false)}
+              className="p-1 hover:bg-gray-200/60 rounded-lg text-gray-400 hover:text-gray-700 transition"
+              title="Close details panel"
+            >
+              <X size={16} />
+            </button>
           </div>
 
           <div className="p-5 flex-1 overflow-y-auto overscroll-contain space-y-6">
@@ -986,10 +1013,10 @@ export default function AdminChat() {
       )}
 
       {/* Mobile User Context Details Modal */}
-      {showMobileDetails && activeUser && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 lg:hidden">
-          <div className="absolute inset-0 bg-black/45 backdrop-blur-sm" onClick={() => setShowMobileDetails(false)} />
-          <div className="bg-white rounded-3xl max-w-sm w-full max-h-[85vh] flex flex-col z-10 overflow-hidden border shadow-2xl animate-scale-in">
+      {showUserDetails && activeUser && (
+        <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center p-0 sm:p-4 md:hidden">
+          <div className="absolute inset-0 bg-black/45 backdrop-blur-sm" onClick={() => setShowUserDetails(false)} />
+          <div className="bg-white rounded-t-3xl sm:rounded-3xl max-w-sm w-full max-h-[85vh] flex flex-col z-10 overflow-hidden border shadow-2xl animate-scale-in">
             {/* Header */}
             <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/50 flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -998,7 +1025,7 @@ export default function AdminChat() {
                 </div>
                 <h4 className="font-bold text-gray-900 text-sm">User Context details</h4>
               </div>
-              <button onClick={() => setShowMobileDetails(false)} className="p-1.5 hover:bg-gray-100 rounded-xl transition text-gray-400">
+              <button onClick={() => setShowUserDetails(false)} className="p-1.5 hover:bg-gray-100 rounded-xl transition text-gray-400">
                 <X size={18} />
               </button>
             </div>
@@ -1056,7 +1083,7 @@ export default function AdminChat() {
                 {activeUser.assigned_admin_id === profile?.id ? (
                   <button
                     type="button"
-                    onClick={() => { handleClaimToggle(); setShowMobileDetails(false); }}
+                    onClick={() => { handleClaimToggle(); setShowUserDetails(false); }}
                     className="w-full py-2.5 rounded-xl border transition font-bold text-xs flex items-center justify-center gap-2 bg-blue-50 border-blue-200 text-blue-650 hover:bg-blue-100"
                   >
                     <Check size={13} /> Claimed by Me (Tap to Release)
@@ -1068,7 +1095,7 @@ export default function AdminChat() {
                 ) : (
                   <button
                     type="button"
-                    onClick={() => { handleClaimToggle(); setShowMobileDetails(false); }}
+                    onClick={() => { handleClaimToggle(); setShowUserDetails(false); }}
                     className="w-full py-2.5 rounded-xl border transition font-bold text-xs flex items-center justify-center gap-2 bg-brand border-brand text-white hover:bg-brand-dark shadow-sm"
                   >
                     Claim Conversation
@@ -1090,7 +1117,7 @@ export default function AdminChat() {
                   type="button"
                   onClick={() => {
                     handleFollowToggle(activeUser.name || 'User');
-                    setShowMobileDetails(false);
+                    setShowUserDetails(false);
                   }}
                   className={`w-full py-2.5 rounded-xl border transition font-bold text-xs flex items-center justify-center gap-2 ${
                     followedInvestors.includes((activeUser.name || 'User').toLowerCase())

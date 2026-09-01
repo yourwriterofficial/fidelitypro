@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { notifyUser, sendEmailToUser } from '../lib/notify';
+import { isDifferentDay, formatChatDateSeparator, formatMessageTime } from '../lib/chatDate';
 import { HUMAN_MSGS, HUMAN_TOPIC_TEMPLATES, CURATED_TOPICS, PROCEDURAL_TOPICS } from './investorChatCorpus';
 
 interface InvestorChatMessage {
@@ -1541,7 +1542,9 @@ export default function InvestorChat() {
                 </div>
               )}
 
-              {filteredMessages.map((msg) => {
+              {filteredMessages.map((msg, index) => {
+                const prevMsg = index > 0 ? filteredMessages[index - 1] : null;
+                const showDateDivider = !prevMsg || isDifferentDay(prevMsg.created_at, msg.created_at);
 
                 const flag = COUNTRY_FLAGS[msg.sender_country] || '🌐';
                 const isFollowed = followedUsers.some(f => f.target_name.toLowerCase() === msg.sender_name.toLowerCase());
@@ -1553,16 +1556,25 @@ export default function InvestorChat() {
                 if (isSystemMsg) {
                   const isJoin = msg.body.includes('joined');
                   return (
-                    <div key={msg.id} id={`msg-${msg.id}`} className="flex items-center justify-center gap-2 py-1 my-1">
-                      <span className="h-px flex-1 bg-black/10 dark:bg-white/10" />
-                      <span className={`text-[10px] font-semibold px-3 py-1 rounded-full select-none shadow-sm ${
-                        isJoin
-                          ? 'bg-emerald-500/20 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300'
-                          : 'bg-black/10 dark:bg-white/10 text-gray-600 dark:text-gray-300'
-                      }`}>
-                        {msg.body}
-                      </span>
-                      <span className="h-px flex-1 bg-black/10 dark:bg-white/10" />
+                    <div key={msg.id} className="space-y-1">
+                      {showDateDivider && (
+                        <div className="flex items-center justify-center my-3 select-none">
+                          <span className="bg-black/10 dark:bg-white/10 text-gray-600 dark:text-gray-300 text-[11px] font-semibold px-3 py-0.5 rounded-full shadow-xs border border-black/5 dark:border-white/10">
+                            {formatChatDateSeparator(msg.created_at)}
+                          </span>
+                        </div>
+                      )}
+                      <div id={`msg-${msg.id}`} className="flex items-center justify-center gap-2 py-1 my-1">
+                        <span className="h-px flex-1 bg-black/10 dark:bg-white/10" />
+                        <span className={`text-[10px] font-semibold px-3 py-1 rounded-full select-none shadow-sm ${
+                          isJoin
+                            ? 'bg-emerald-500/20 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300'
+                            : 'bg-black/10 dark:bg-white/10 text-gray-600 dark:text-gray-300'
+                        }`}>
+                          {msg.body}
+                        </span>
+                        <span className="h-px flex-1 bg-black/10 dark:bg-white/10" />
+                      </div>
                     </div>
                   );
                 }
@@ -1570,16 +1582,23 @@ export default function InvestorChat() {
                 const isMine = !!msg.sender_id && msg.sender_id === profile?.id;
 
                 return (
-                  <div
-                    key={msg.id}
-                    id={`msg-${msg.id}`}
-                    data-sender={msg.sender_name}
-                    data-body={msg.body}
-                    className={`flex items-end gap-2 group relative transition-colors duration-500 ${
-                      // Admin always shows on the left regardless of isMine — official channel style
-                      isAdminSender ? 'flex-row' : isMine ? 'flex-row-reverse' : 'flex-row'
-                    } ${isCurrentPinned ? 'bg-blue-500/10 rounded-2xl' : ''}`}
-                  >
+                  <div key={msg.id} className="space-y-2">
+                    {showDateDivider && (
+                      <div className="flex items-center justify-center my-3 select-none">
+                        <span className="bg-black/10 dark:bg-white/10 text-gray-600 dark:text-gray-300 text-[11px] font-semibold px-3 py-0.5 rounded-full shadow-xs border border-black/5 dark:border-white/10">
+                          {formatChatDateSeparator(msg.created_at)}
+                        </span>
+                      </div>
+                    )}
+                    <div
+                      id={`msg-${msg.id}`}
+                      data-sender={msg.sender_name}
+                      data-body={msg.body}
+                      className={`flex items-end gap-2 group relative transition-colors duration-500 ${
+                        // Admin always shows on the left regardless of isMine — official channel style
+                        isAdminSender ? 'flex-row' : isMine ? 'flex-row-reverse' : 'flex-row'
+                      } ${isCurrentPinned ? 'bg-blue-500/10 rounded-2xl' : ''}`}
+                    >
                     {/* Avatar — always for admin, only hidden for regular isMine */}
                     {(!isMine || isAdminSender) && (
                       <div
@@ -1654,7 +1673,7 @@ export default function InvestorChat() {
                         <span className={`text-[10px] tabular-nums leading-none ${
                           isMine && !isAdminSender ? 'text-white/60' : 'text-gray-400 dark:text-gray-500'
                         }`}>
-                          {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          {formatMessageTime(msg.created_at)}
                         </span>
                         {isCurrentPinned && <Pin size={8} className={isMine && !isAdminSender ? 'text-white/60' : 'text-blue-400'} />}
                       </div>
@@ -1746,8 +1765,9 @@ export default function InvestorChat() {
 
                     </div>
                   </div>
-                );
-              })}
+                </div>
+              );
+            })}
             </>
           )}
           <div ref={chatEndRef} />
