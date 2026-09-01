@@ -3,7 +3,7 @@ import { useAuthStore } from '../store/authStore';
 import {
   LogOut, Home, Wallet, Briefcase, Settings, Shield, Lock, Gift,
   Building, LayoutDashboard, Menu, X, MoreHorizontal, ChevronRight, AlertCircle,
-  ChevronsLeft, ChevronsRight, MessageSquare, History, Users, Radio, ArrowRightLeft,
+  ChevronsLeft, ChevronsRight, History, Users, Radio, ArrowRightLeft,
   Headphones,
 } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
@@ -21,7 +21,7 @@ const mainNavItems = [
   { path: '/app/invest',      icon: Briefcase,     label: 'Invest'    },
   { path: '/app/my-portfolio',icon: Wallet,        label: 'Portfolio' },
   { path: '/app/wallet',      icon: LayoutDashboard, label: 'Wallet'  },
-  { path: '/app/chat',        icon: Headphones,    label: 'Support Desk' },
+  { path: '/app/chat',        icon: Headphones,    label: 'Support & Messages' },
   { path: '/app/investor-chat',icon: Users,        label: 'Investor Chat' },
   { path: '/app/live-visitors',icon: Radio,        label: 'Live Visitors', adminOnly: true },
 ];
@@ -78,20 +78,27 @@ export default function Layout() {
     if (!profile?.id) return;
     
     const fetchUnreadCount = async () => {
-      let query = supabase
+      let supportQuery = supabase
         .from('messages')
         .select('*', { count: 'exact', head: true })
         .neq('sender_id', profile.id)
         .eq('read', false);
         
       if (!profile.is_admin) {
-        query = query.eq('user_id', profile.id);
+        supportQuery = supportQuery.eq('user_id', profile.id);
       }
 
-      const { count, error } = await query;
-      if (!error && count !== null) {
-        setUnreadChatCount(count);
-      }
+      const [{ count: supportCount }, { count: directCount }] = await Promise.all([
+        supportQuery,
+        supabase
+          .from('direct_messages')
+          .select('*', { count: 'exact', head: true })
+          .eq('receiver_id', profile.id)
+          .eq('read', false),
+      ]);
+
+      const totalUnread = (supportCount || 0) + (directCount || 0);
+      setUnreadChatCount(totalUnread);
     };
 
     fetchUnreadCount();
@@ -103,9 +110,12 @@ export default function Layout() {
         profile.is_admin
           ? { event: '*', schema: 'public', table: 'messages' }
           : { event: '*', schema: 'public', table: 'messages', filter: `user_id=eq.${profile.id}` },
-        () => {
-          fetchUnreadCount();
-        }
+        () => fetchUnreadCount()
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'direct_messages', filter: `receiver_id=eq.${profile.id}` },
+        () => fetchUnreadCount()
       )
       .subscribe();
 
@@ -394,17 +404,10 @@ export default function Layout() {
           <div className="flex items-center gap-1">
             {!collapsed && <NotificationBell />}
             {!collapsed && (
-              <Link to="/app/chat?tab=support"
-                className="relative p-2 rounded-xl text-gray-400 hover:bg-emerald-50 hover:text-emerald-600 transition-colors"
-                title="24/7 Official Support Desk">
-                <Headphones size={19} className={location.pathname === '/app/chat' && (new URLSearchParams(location.search).get('tab') === 'support' || !new URLSearchParams(location.search).get('user')) ? 'text-emerald-600' : 'text-gray-400'} />
-              </Link>
-            )}
-            {!collapsed && (
               <Link to="/app/chat"
-                className="relative p-2 rounded-xl text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition-colors"
-                title="Inbox">
-                <MessageSquare size={19} className={location.pathname === '/app/chat' ? 'text-brand' : 'text-gray-400'} />
+                className="relative p-2 rounded-xl text-gray-400 hover:bg-emerald-50 hover:text-emerald-600 transition-colors"
+                title="Support & Direct Messages">
+                <Headphones size={19} className={location.pathname === '/app/chat' ? 'text-brand' : 'text-gray-400'} />
                 {unreadChatCount > 0 && (
                   <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[17px] h-[17px] flex items-center justify-center px-0.5 animate-pulse">
                     {unreadChatCount}
@@ -439,7 +442,8 @@ export default function Layout() {
         <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
           {visibleMainNavItems.map(({ path, icon: Icon, label }) => {
             const active = isActive(path);
-            const hasBadge = label === 'Support Desk' || label === 'Inbox' || label === 'Investor Chat';
+            const isChatOrSupport = label === 'Support & Messages' || label === 'Support Desk' || label === 'Inbox';
+            const hasBadge = isChatOrSupport || label === 'Investor Chat';
             return (
               <Link key={path} to={path} title={collapsed ? label : undefined}
                 className={`group relative flex items-center gap-3 rounded-xl text-sm font-medium transition-all duration-150 ${collapsed ? 'justify-center py-2.5' : 'px-3.5 py-2.5'} ${
@@ -447,12 +451,12 @@ export default function Layout() {
                 }`}>
                 <Icon size={17} className={active ? 'text-white' : 'text-gray-400 group-hover:text-gray-600'} />
                 {!collapsed && label}
-                {!collapsed && (label === 'Support Desk' || label === 'Inbox') && unreadChatCount > 0 && (
+                {!collapsed && isChatOrSupport && unreadChatCount > 0 && (
                   <span className="ml-auto w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center text-[10px] font-bold shadow-sm animate-pulse">
                     {unreadChatCount}
                   </span>
                 )}
-                {collapsed && (label === 'Support Desk' || label === 'Inbox') && unreadChatCount > 0 && (
+                {collapsed && isChatOrSupport && unreadChatCount > 0 && (
                   <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-red-500 rounded-full border border-white shadow-sm" />
                 )}
                 {!collapsed && label === 'Investor Chat' && (investorChatUnread > 0 || investorChatFollowUnread > 0) && (
@@ -646,6 +650,7 @@ export default function Layout() {
               {/* Main Nav Items */}
               {visibleMainNavItems.map(({ path, icon: Icon, label }) => {
                 const active = isActive(path);
+                const isChatOrSupport = label === 'Support & Messages' || label === 'Support Desk' || label === 'Inbox';
                 return (
                   <Link key={path} to={path} onClick={() => setMobileMenuOpen(false)}
                     className={`relative flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition ${
@@ -653,7 +658,7 @@ export default function Layout() {
                     }`}>
                     <Icon size={16} className={active ? 'text-white' : 'text-gray-400'} />
                     <span>{label}</span>
-                    {(label === 'Support Desk' || label === 'Inbox') && unreadChatCount > 0 && (
+                    {isChatOrSupport && unreadChatCount > 0 && (
                       <span className="ml-auto w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center text-[10px] font-bold shadow-sm animate-pulse">
                         {unreadChatCount}
                       </span>
