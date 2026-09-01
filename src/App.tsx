@@ -57,7 +57,6 @@ import LiveVisitors from './pages/LiveVisitors';
 import AdminChat from './pages/admin/AdminChat';
 import P2P from './pages/P2P';
 import AdminP2P from './pages/admin/AdminP2P';
-import SupportDeskWidget from './components/SupportDeskWidget';
 import { triggerPassiveHeartbeat } from './lib/heartbeat';
 
 function App() {
@@ -80,7 +79,6 @@ function App() {
         <PushAutoSubscriber />
         <PWAUpdater />
         <InstallPWAPrompt />
-        <SupportDeskWidget />
         <Routes>
           {/* Public Routes */}
           <Route path="/" element={<Landing />} />
