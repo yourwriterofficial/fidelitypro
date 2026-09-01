@@ -21,7 +21,7 @@ const mainNavItems = [
   { path: '/app/invest',      icon: Briefcase,     label: 'Invest'    },
   { path: '/app/my-portfolio',icon: Wallet,        label: 'Portfolio' },
   { path: '/app/wallet',      icon: LayoutDashboard, label: 'Wallet'  },
-  { path: '/app/chat',        icon: MessageSquare, label: 'Inbox' },
+  { path: '/app/chat',        icon: Headphones,    label: 'Support Desk' },
   { path: '/app/investor-chat',icon: Users,        label: 'Investor Chat' },
   { path: '/app/live-visitors',icon: Radio,        label: 'Live Visitors', adminOnly: true },
 ];
@@ -439,7 +439,7 @@ export default function Layout() {
         <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
           {visibleMainNavItems.map(({ path, icon: Icon, label }) => {
             const active = isActive(path);
-            const hasBadge = label === 'Inbox' || label === 'Investor Chat';
+            const hasBadge = label === 'Support Desk' || label === 'Inbox' || label === 'Investor Chat';
             return (
               <Link key={path} to={path} title={collapsed ? label : undefined}
                 className={`group relative flex items-center gap-3 rounded-xl text-sm font-medium transition-all duration-150 ${collapsed ? 'justify-center py-2.5' : 'px-3.5 py-2.5'} ${
@@ -447,12 +447,12 @@ export default function Layout() {
                 }`}>
                 <Icon size={17} className={active ? 'text-white' : 'text-gray-400 group-hover:text-gray-600'} />
                 {!collapsed && label}
-                {!collapsed && label === 'Inbox' && unreadChatCount > 0 && (
+                {!collapsed && (label === 'Support Desk' || label === 'Inbox') && unreadChatCount > 0 && (
                   <span className="ml-auto w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center text-[10px] font-bold shadow-sm animate-pulse">
                     {unreadChatCount}
                   </span>
                 )}
-                {collapsed && label === 'Inbox' && unreadChatCount > 0 && (
+                {collapsed && (label === 'Support Desk' || label === 'Inbox') && unreadChatCount > 0 && (
                   <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-red-500 rounded-full border border-white shadow-sm" />
                 )}
                 {!collapsed && label === 'Investor Chat' && (investorChatUnread > 0 || investorChatFollowUnread > 0) && (
@@ -524,13 +524,21 @@ export default function Layout() {
           </div>
           <div className="flex items-center gap-1">
             <Link to="/app/chat?tab=support"
-              className="relative p-2 rounded-xl text-gray-450 hover:bg-emerald-50 hover:text-emerald-600 transition-colors"
-              title="24/7 Official Support Desk">
-              <Headphones size={19} className={location.pathname === '/app/chat' && (new URLSearchParams(location.search).get('tab') === 'support' || !new URLSearchParams(location.search).get('user')) ? 'text-emerald-600' : 'text-emerald-500'} />
+              className="relative p-2 rounded-xl text-gray-500 hover:bg-emerald-50 hover:text-emerald-700 transition-colors flex items-center gap-1"
+              title="24/7 Support Desk">
+              <div className="relative">
+                <Headphones size={20} className={location.pathname === '/app/chat' ? 'text-brand' : 'text-emerald-600'} />
+                <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-500 border border-white" />
+              </div>
+              {unreadChatCount > 0 && (
+                <span className="bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[17px] h-[17px] flex items-center justify-center px-1 animate-pulse shadow-xs">
+                  {unreadChatCount}
+                </span>
+              )}
             </Link>
             <Link to="/app/investor-chat"
               className="relative p-2 rounded-xl text-gray-450 hover:bg-gray-100 hover:text-gray-700 transition-colors"
-              title="Investor Chat">
+              title="Investor Community Chat">
               <Users size={19} className={location.pathname === '/app/investor-chat' ? 'text-brand' : 'text-gray-400'} />
               {investorChatUnread > 0 && (
                 <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[17px] h-[17px] flex items-center justify-center px-0.5 animate-pulse">
@@ -539,16 +547,6 @@ export default function Layout() {
               )}
               {profile?.is_admin && investorChatFollowUnread > 0 && (
                 <span title="Followed users posted" className="absolute -bottom-0.5 -left-0.5 bg-amber-500 rounded-full w-2.5 h-2.5 border border-white shadow-sm" />
-              )}
-            </Link>
-            <Link to="/app/chat"
-              className="relative p-2 rounded-xl text-gray-450 hover:bg-gray-100 hover:text-gray-700 transition-colors"
-              title="Inbox">
-              <MessageSquare size={19} className={location.pathname === '/app/chat' ? 'text-brand' : 'text-gray-400'} />
-              {unreadChatCount > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[17px] h-[17px] flex items-center justify-center px-0.5 animate-pulse">
-                  {unreadChatCount}
-                </span>
               )}
             </Link>
             <NotificationBell />
@@ -655,7 +653,7 @@ export default function Layout() {
                     }`}>
                     <Icon size={16} className={active ? 'text-white' : 'text-gray-400'} />
                     <span>{label}</span>
-                    {label === 'Inbox' && unreadChatCount > 0 && (
+                    {(label === 'Support Desk' || label === 'Inbox') && unreadChatCount > 0 && (
                       <span className="ml-auto w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center text-[10px] font-bold shadow-sm animate-pulse">
                         {unreadChatCount}
                       </span>

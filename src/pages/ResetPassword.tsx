@@ -19,16 +19,54 @@ export default function ResetPassword() {
   const [verifyingOtp, setVerifyingOtp] = useState(false);
   const [error, setError] = useState('');
 
-  // If the user arrived here by clicking the emailed link, Supabase's
-  // detectSessionInUrl already parsed the recovery token from the URL and
-  // established a session — skip straight to setting a new password
-  // instead of showing the "request a link" form again.
+  // Handle email link click (PKCE ?code=..., hash #access_token=..., or established session)
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session) setStep('set-password');
+    // 1. If user already has an active recovery/auth session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) setStep('set-password');
     });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === 'PASSWORD_RECOVERY') setStep('set-password');
+
+    // 2. Handle PKCE code exchange (?code=...)
+    const urlParams = new URLSearchParams(window.location.search);
+    const code = urlParams.get('code');
+    if (code) {
+      setLoading(true);
+      supabase.auth.exchangeCodeForSession(code).then(({ data, error }) => {
+        setLoading(false);
+        if (!error && data?.session) {
+          setStep('set-password');
+          toast.success('Reset link verified! Please choose your new password.');
+        } else if (error) {
+          console.error('Password reset code exchange error:', error);
+          setError(error.message || 'Reset link is invalid or expired. Please request a new link.');
+        }
+      });
+    }
+
+    // 3. Handle hash fragment (#access_token=...&type=recovery)
+    const hash = window.location.hash;
+    if (hash && hash.includes('access_token')) {
+      const hashParams = new URLSearchParams(hash.substring(1));
+      const accessToken = hashParams.get('access_token');
+      const refreshToken = hashParams.get('refresh_token');
+      if (accessToken) {
+        supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken || '',
+        }).then(({ data, error }) => {
+          if (!error && data?.session) {
+            setStep('set-password');
+            toast.success('Reset link verified! Please choose your new password.');
+          }
+        });
+      }
+    }
+
+    // 4. Listen to auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY' || (session && (event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED'))) {
+        setStep('set-password');
+      }
     });
     return () => subscription.unsubscribe();
   }, []);
@@ -57,20 +95,22 @@ export default function ResetPassword() {
   const handleVerifyOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    if (!otp || otp.trim().length < 6) {
-      setError('Enter the 6-digit code from your email');
+    const cleanOtp = otp.trim();
+    if (!cleanOtp || cleanOtp.length < 4) {
+      setError('Please enter the verification code from your email');
       return;
     }
     setVerifyingOtp(true);
     try {
       const { data, error: verifyErr } = await supabase.auth.verifyOtp({
-        email,
-        token: otp.trim(),
+        email: email.trim().toLowerCase(),
+        token: cleanOtp,
         type: 'recovery',
       });
       if (verifyErr) throw verifyErr;
       if (!data.session) throw new Error('Could not verify code');
       setStep('set-password');
+      toast.success('Code verified! Set your new password.');
     } catch (err: any) {
       const msg = err.message || 'Invalid or expired code';
       setError(msg);
@@ -153,22 +193,22 @@ export default function ResetPassword() {
           <div className="space-y-5">
             <div className="bg-emerald-50 text-emerald-700 p-4 rounded-xl text-center">
               <p className="font-medium">Check your inbox</p>
-              <p className="text-sm mt-1">We've sent a password reset link and a 6-digit code to <strong>{email}</strong></p>
+              <p className="text-sm mt-1">We've sent a password reset link and verification code to <strong>{email}</strong>. Click the link in your email or enter your code below.</p>
             </div>
             <form onSubmit={handleVerifyOtp} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700">6-digit code</label>
+                <label className="block text-sm font-medium text-gray-700">Verification Code / OTP</label>
                 <div className="relative">
                   <KeyRound className="absolute left-3 top-3 text-gray-400" size={18} />
                   <input
                     type="text"
-                    inputMode="numeric"
+                    inputMode="text"
                     autoComplete="one-time-code"
-                    maxLength={6}
+                    maxLength={12}
                     value={otp}
-                    onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
-                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-brand focus:border-transparent tracking-[0.3em] font-mono text-lg"
-                    placeholder="000000"
+                    onChange={(e) => setOtp(e.target.value.replace(/[^a-zA-Z0-9]/g, ''))}
+                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-brand focus:border-transparent tracking-[0.2em] font-mono text-lg"
+                    placeholder="Enter code"
                     required
                   />
                 </div>

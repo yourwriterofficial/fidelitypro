@@ -402,23 +402,40 @@ export default function Chat() {
     try {
       if (activeChat === 'support') {
         // Send to Support Desk
-        const { error } = await supabase.from('messages').insert({
-          user_id: profile.id,
-          sender_id: profile.id,
-          body: cleanText,
-          read: false,
-        });
+        const { data: insertedMsg, error } = await supabase
+          .from('messages')
+          .insert({
+            user_id: profile.id,
+            sender_id: profile.id,
+            body: cleanText,
+            read: false,
+          })
+          .select()
+          .single();
+
         if (error) throw error;
+        if (insertedMsg) {
+          setSupportMessages(prev => prev.some(m => m.id === insertedMsg.id) ? prev : [...prev, insertedMsg]);
+        }
         scrollToBottom();
-      } else if (activeFriend) {
-        // Send Direct Message
-        const { error } = await supabase.from('direct_messages').insert({
-          sender_id: profile.id,
-          receiver_id: activeFriend.id,
-          body: cleanText,
-          read: false,
-        });
+      } else {
+        // Send Direct Message to friend
+        const targetReceiverId = activeFriend ? activeFriend.id : activeChat;
+        const { data: insertedDm, error } = await supabase
+          .from('direct_messages')
+          .insert({
+            sender_id: profile.id,
+            receiver_id: targetReceiverId,
+            body: cleanText,
+            read: false,
+          })
+          .select()
+          .single();
+
         if (error) throw error;
+        if (insertedDm) {
+          setDirectMessages(prev => prev.some(m => m.id === insertedDm.id) ? prev : [...prev, insertedDm]);
+        }
         scrollToBottom();
       }
     } catch (err: any) {

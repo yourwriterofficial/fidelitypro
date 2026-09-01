@@ -99,8 +99,8 @@ export default function Login() {
       setError('Please enter your email address');
       return;
     }
-    if (!cleanOtp || cleanOtp.length < 6) {
-      setError('Enter the 6-digit code from your email');
+    if (!cleanOtp || cleanOtp.length < 4) {
+      setError('Enter the verification code from your email');
       return;
     }
 
@@ -116,7 +116,7 @@ export default function Login() {
       toast.success('Welcome back!');
       navigate('/app');
     } catch (err: any) {
-      const msg = err.message || 'Invalid or expired 6-digit code. Please request a new one.';
+      const msg = err.message || 'Invalid or expired verification code. Please request a new one.';
       setError(msg);
       toast.error(msg);
     } finally {
@@ -208,13 +208,13 @@ export default function Login() {
                 <KeyRound className="absolute left-3 top-3 text-gray-400" size={18} />
                 <input
                   type="text"
-                  inputMode="numeric"
+                  inputMode="text"
                   autoComplete="one-time-code"
-                  maxLength={6}
+                  maxLength={12}
                   value={otp}
-                  onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
-                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-brand focus:border-transparent tracking-[0.3em] font-mono text-lg font-bold text-center"
-                  placeholder="000000"
+                  onChange={(e) => setOtp(e.target.value.replace(/[^a-zA-Z0-9]/g, ''))}
+                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-brand focus:border-transparent tracking-[0.2em] font-mono text-lg font-bold text-center"
+                  placeholder="Enter code"
                   required
                 />
               </div>
