@@ -4,7 +4,7 @@ import {
   LogOut, Home, Wallet, Briefcase, Settings, Shield, Lock, Gift,
   Building, LayoutDashboard, Menu, X, MoreHorizontal, ChevronRight, AlertCircle,
   ChevronsLeft, ChevronsRight, History, Users, Radio, ArrowRightLeft,
-  Headphones,
+  MessageSquare,
 } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 import NotificationBell from './NotificationBell';
@@ -21,7 +21,7 @@ const mainNavItems = [
   { path: '/app/invest',      icon: Briefcase,     label: 'Invest'    },
   { path: '/app/my-portfolio',icon: Wallet,        label: 'Portfolio' },
   { path: '/app/wallet',      icon: LayoutDashboard, label: 'Wallet'  },
-  { path: '/app/chat',        icon: Headphones,    label: 'Support & Messages' },
+  { path: '/app/chat',        icon: MessageSquare, label: 'Messages'  },
   { path: '/app/investor-chat',icon: Users,        label: 'Investor Chat' },
   { path: '/app/live-visitors',icon: Radio,        label: 'Live Visitors', adminOnly: true },
 ];
@@ -405,9 +405,9 @@ export default function Layout() {
             {!collapsed && <NotificationBell />}
             {!collapsed && (
               <Link to="/app/chat"
-                className="relative p-2 rounded-xl text-gray-400 hover:bg-emerald-50 hover:text-emerald-600 transition-colors"
-                title="Support & Direct Messages">
-                <Headphones size={19} className={location.pathname === '/app/chat' ? 'text-brand' : 'text-gray-400'} />
+                className="relative p-2 rounded-xl text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition-colors"
+                title="Messages & Support">
+                <MessageSquare size={19} className={location.pathname === '/app/chat' ? 'text-brand' : 'text-gray-400'} />
                 {unreadChatCount > 0 && (
                   <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[17px] h-[17px] flex items-center justify-center px-0.5 animate-pulse">
                     {unreadChatCount}
@@ -442,7 +442,7 @@ export default function Layout() {
         <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
           {visibleMainNavItems.map(({ path, icon: Icon, label }) => {
             const active = isActive(path);
-            const isChatOrSupport = label === 'Support & Messages' || label === 'Support Desk' || label === 'Inbox';
+            const isChatOrSupport = label === 'Messages' || label === 'Support & Messages' || label === 'Support Desk' || label === 'Inbox';
             const hasBadge = isChatOrSupport || label === 'Investor Chat';
             return (
               <Link key={path} to={path} title={collapsed ? label : undefined}
@@ -490,11 +490,13 @@ export default function Layout() {
                 const active = isActive(path);
                 return (
                   <Link key={path} to={path} title={collapsed ? label : undefined}
-                    className={`flex items-center gap-2.5 rounded-xl text-xs font-semibold transition ${
-                      collapsed ? 'justify-center py-2' : 'px-2.5 py-2'
-                    } ${active ? 'bg-white text-brand shadow-sm border border-gray-100' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100/70'}`}>
-                    <Icon size={15} className={active ? 'text-brand' : 'text-gray-400'} />
-                    {!collapsed && <span>{label}</span>}
+                    className={`flex items-center gap-3 rounded-xl text-sm font-medium transition-all ${
+                      collapsed ? 'justify-center py-2' : 'px-3 py-2'
+                    } ${
+                      active ? 'bg-brand text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                    }`}>
+                    <Icon size={16} className={active ? 'text-white' : 'text-gray-400'} />
+                    {!collapsed && label}
                   </Link>
                 );
               })}
@@ -508,14 +510,20 @@ export default function Layout() {
             </Link>
           )}
 
-          <button onClick={handleSignOut} title={collapsed ? 'Sign Out' : undefined}
-            className={`w-full flex items-center gap-3 rounded-xl text-xs font-bold text-red-600 hover:bg-red-50 transition ${collapsed ? 'justify-center py-2.5' : 'px-3.5 py-2'}`}>
-            <LogOut size={16} /> {!collapsed && 'Sign Out'}
+          <button
+            onClick={handleSignOut}
+            title={collapsed ? 'Sign Out' : undefined}
+            className={`w-full flex items-center gap-3 rounded-xl text-sm font-medium text-red-600 hover:bg-red-50 transition-colors ${
+              collapsed ? 'justify-center py-2' : 'px-3.5 py-2.5'
+            }`}
+          >
+            <LogOut size={16} className="text-red-500" />
+            {!collapsed && 'Sign Out'}
           </button>
         </div>
       </aside>
 
-      {/* ===== MAIN CONTENT ===== */}
+      {/* ===== MAIN CONTENT AREA ===== */}
       <main className={`flex-1 flex flex-col min-h-0 min-w-0 max-w-full md:overflow-hidden transition-[margin] duration-200 ${collapsed ? 'md:ml-20' : 'md:ml-64'}`}>
 
         {/* Mobile Header */}
@@ -527,11 +535,11 @@ export default function Layout() {
             <span className="text-lg font-extrabold text-gray-900">RPM</span>
           </div>
           <div className="flex items-center gap-1">
-            <Link to="/app/chat?tab=support"
-              className="relative p-2 rounded-xl text-gray-500 hover:bg-emerald-50 hover:text-emerald-700 transition-colors flex items-center gap-1"
-              title="24/7 Support Desk">
+            <Link to="/app/chat"
+              className="relative p-2 rounded-xl text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors flex items-center gap-1"
+              title="Messages & Support">
               <div className="relative">
-                <Headphones size={20} className={location.pathname === '/app/chat' ? 'text-brand' : 'text-emerald-600'} />
+                <MessageSquare size={20} className={location.pathname === '/app/chat' ? 'text-brand' : 'text-gray-600'} />
                 <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-500 border border-white" />
               </div>
               {unreadChatCount > 0 && (

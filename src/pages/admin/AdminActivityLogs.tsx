@@ -36,6 +36,10 @@ const TYPE_COLOR: Record<string, string> = {
   order:      'bg-blue-50 text-blue-600 border-blue-100',
   staking:    'bg-indigo-50 text-indigo-600 border-indigo-100',
   property:   'bg-orange-50 text-orange-600 border-orange-100',
+  p2p:        'bg-teal-50 text-teal-700 border-teal-100',
+  kyc:        'bg-yellow-50 text-yellow-800 border-yellow-100',
+  support:    'bg-cyan-50 text-cyan-700 border-cyan-100',
+  social:     'bg-pink-50 text-pink-600 border-pink-100',
   transaction:'bg-purple-50 text-purple-600 border-purple-100',
   email:      'bg-blue-50 text-blue-600 border-blue-100',
 };
@@ -59,6 +63,10 @@ export default function AdminActivityLogs() {
         { data: orders },
         { data: stakingOrders },
         { data: propertyInvestments },
+        { data: p2pOrders },
+        { data: kycRecords },
+        { data: supportMessages },
+        { data: friendReqs },
         { data: transactions },
         { data: emailLogs },
       ] = await Promise.all([
@@ -67,20 +75,24 @@ export default function AdminActivityLogs() {
         supabase.from('orders').select('id,user_id,product_name,amount,status,created_at,profiles(name,email)').order('created_at', { ascending: false }).limit(50),
         supabase.from('staking_orders').select('id,user_id,amount,status,created_at,profiles(name,email)').order('created_at', { ascending: false }).limit(50),
         supabase.from('property_investments').select('id,user_id,amount_paid,status,created_at,profiles(name,email)').order('created_at', { ascending: false }).limit(50),
+        supabase.from('p2p_orders').select('id,user_id,crypto_amount,fiat_amount,type,status,created_at,profiles(name,email)').order('created_at', { ascending: false }).limit(50),
+        supabase.from('kyc_verifications').select('id,user_id,status,id_type,created_at,profiles(name,email)').order('created_at', { ascending: false }).limit(50),
+        supabase.from('messages').select('id,user_id,sender_id,body,read,created_at,profiles:user_id(name,email)').order('created_at', { ascending: false }).limit(50),
+        supabase.from('friend_requests').select('id,sender_id,receiver_id,status,created_at,sender:sender_id(name,email),receiver:receiver_id(name,email)').order('created_at', { ascending: false }).limit(50),
         supabase.from('transactions').select('id,user_id,amount,type,description,status,created_at,profiles(name,email)').order('created_at', { ascending: false }).limit(50),
-        supabase.from('email_logs').select('id,recipient,subject,body,created_at').order('created_at', { ascending: false }).limit(55),
+        supabase.from('email_logs').select('id,recipient,subject,body,created_at').order('created_at', { ascending: false }).limit(50),
       ]);
 
       const toEntry = (item: any, type: string, action: string, details: string, customAmount?: number): LogEntry => ({
         id: `${type}:${item.id}`,
         type,
-        user_id: item.user_id,
-        user_name: item.profiles?.name || item.user_id || 'Unknown',
-        user_email: item.profiles?.email || '',
+        user_id: item.user_id || item.sender_id || 'system',
+        user_name: item.profiles?.name || item.sender?.name || item.user_id || 'Unknown',
+        user_email: item.profiles?.email || item.sender?.email || '',
         action,
         details,
         amount: customAmount !== undefined ? customAmount : item.amount,
-        status: item.status || '',
+        status: item.status || (item.read !== undefined ? (item.read ? 'read' : 'unread') : ''),
         created_at: item.created_at,
         db_id: item.id
       });
@@ -91,6 +103,10 @@ export default function AdminActivityLogs() {
         ...(orders || []).map((o: any) => toEntry(o, 'order', 'Investment Order', `${o.product_name} · $${o.amount}`)),
         ...(stakingOrders || []).map((s: any) => toEntry(s, 'staking', 'Staking Order', `Amount: $${s.amount}`)),
         ...(propertyInvestments || []).map((p: any) => toEntry(p, 'property', 'Property Investment', `Amount: $${p.amount_paid}`, p.amount_paid)),
+        ...(p2pOrders || []).map((p: any) => toEntry(p, 'p2p', `P2P ${p.type.toUpperCase()}`, `${p.crypto_amount} USDT · $${p.fiat_amount}`, p.fiat_amount)),
+        ...(kycRecords || []).map((k: any) => toEntry(k, 'kyc', 'KYC Submission', `Document: ${k.id_type || 'Identity Card'}`)),
+        ...(supportMessages || []).map((m: any) => toEntry(m, 'support', 'Support Message', m.body?.slice(0, 45) + (m.body?.length > 45 ? '...' : ''))),
+        ...(friendReqs || []).map((f: any) => toEntry(f, 'social', 'Investor Connection', `To: ${f.receiver?.name || f.receiver_id}`)),
         ...(transactions || []).map((t: any) => toEntry(t, 'transaction', t.description || 'Transaction', `Type: ${t.type}`)),
         ...(emailLogs || []).map((e: any) => ({
           id: `email:${e.id}`,
@@ -119,23 +135,29 @@ export default function AdminActivityLogs() {
 
   useEffect(() => { fetchLogs(); }, []);
 
-  const filtered = typeFilter === 'all' ? logs : logs.filter(l => l.type === typeFilter);
+  const filtered = logs.filter(l => typeFilter === 'all' || l.type === typeFilter);
   const fmt = (n?: number) => n != null ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n) : '';
 
-  // Single deletion logic
-  const handleDeleteSingle = async (dbId: string, type: string) => {
+  const handleDeleteSingle = async (type: string, dbId: string) => {
     const tableMap: Record<string, string> = {
       withdrawal: 'withdrawals',
       deposit: 'deposits',
       order: 'orders',
       staking: 'staking_orders',
       property: 'property_investments',
+      p2p: 'p2p_orders',
+      kyc: 'kyc_verifications',
+      support: 'messages',
+      social: 'friend_requests',
       transaction: 'transactions',
       email: 'email_logs'
     };
 
     const tableName = tableMap[type];
-    if (!tableName) return;
+    if (!tableName) {
+      toast.error('Unknown log type');
+      return;
+    }
 
     if (!confirm(`Are you sure you want to permanently delete this ${type} record from the database?`)) return;
 
@@ -150,7 +172,6 @@ export default function AdminActivityLogs() {
     }
   };
 
-  // Bulk Selection and Deletion
   const toggleSelect = (id: string) => {
     setSelectedIds(prev => 
       prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
@@ -171,7 +192,6 @@ export default function AdminActivityLogs() {
 
     toast.loading(`Deleting ${selectedIds.length} records...`, { id: 'bulk-delete' });
     try {
-      // Group by table name
       const groupings: Record<string, string[]> = {};
       selectedIds.forEach(id => {
         const [type, dbId] = id.split(':');
@@ -181,6 +201,10 @@ export default function AdminActivityLogs() {
           order: 'orders',
           staking: 'staking_orders',
           property: 'property_investments',
+          p2p: 'p2p_orders',
+          kyc: 'kyc_verifications',
+          support: 'messages',
+          social: 'friend_requests',
           transaction: 'transactions',
           email: 'email_logs'
         };
@@ -191,7 +215,6 @@ export default function AdminActivityLogs() {
         }
       });
 
-      // Run deletions in parallel
       await Promise.all(
         Object.entries(groupings).map(async ([table, ids]) => {
           const { error } = await supabase.from(table).delete().in('id', ids);
@@ -199,10 +222,11 @@ export default function AdminActivityLogs() {
         })
       );
 
-      toast.success('Selected records deleted successfully', { id: 'bulk-delete' });
+      toast.success(`Successfully deleted ${selectedIds.length} records`, { id: 'bulk-delete' });
       setSelectedIds([]);
       fetchLogs();
     } catch (err: any) {
+      console.error(err);
       toast.error(err.message || 'Failed to delete some records', { id: 'bulk-delete' });
     }
   };
@@ -221,10 +245,10 @@ export default function AdminActivityLogs() {
 
       <div className="flex items-center gap-2 flex-wrap">
         <div className="flex items-center gap-1.5 text-sm text-gray-500 mr-1"><Filter size={14} /> Filter:</div>
-        {['all','withdrawal','deposit','order','staking','property','transaction','email'].map(t => (
+        {['all','deposit','withdrawal','order','staking','property','p2p','kyc','support','social','transaction','email'].map(t => (
           <button key={t} onClick={() => { setTypeFilter(t); setSelectedIds([]); }}
             className={`px-3.5 py-1.5 rounded-full text-xs font-medium transition border ${typeFilter === t ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'}`}>
-            {t.charAt(0).toUpperCase() + t.slice(1)}
+            {t === 'p2p' ? 'P2P' : t === 'kyc' ? 'KYC' : t.charAt(0).toUpperCase() + t.slice(1)}
           </button>
         ))}
       </div>

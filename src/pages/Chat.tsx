@@ -6,7 +6,7 @@ import { usePushNotifications } from '../hooks/usePushNotifications';
 import { 
   Send, Check, CheckCheck, HelpCircle, RefreshCw, Bell, BellOff,
   Users, UserPlus, Search, X, ShieldAlert, UserCheck, CheckCircle2,
-  UserX, Headphones, Clock, ArrowLeft
+  UserX, MessageSquare, Clock, ArrowLeft
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { sendEmailAndLog, notifyUser } from '../lib/notify';
@@ -18,8 +18,8 @@ interface SupportMessage {
   user_id: string;
   sender_id: string;
   body: string;
-  read: boolean;
   created_at: string;
+  read: boolean;
 }
 
 interface DirectMessage {
@@ -27,26 +27,32 @@ interface DirectMessage {
   sender_id: string;
   receiver_id: string;
   body: string;
-  read: boolean;
   created_at: string;
+  read: boolean;
+}
+
+interface FriendProfile {
+  id: string;
+  name: string;
+  email: string;
+  avatar_url?: string;
 }
 
 interface FriendRequest {
   id: string;
   sender_id: string;
   receiver_id: string;
-  status: 'pending' | 'accepted' | 'declined' | 'blocked';
+  status: 'pending' | 'accepted' | 'declined';
   created_at: string;
-  sender_profile?: { id: string; name: string; email: string };
-  receiver_profile?: { id: string; name: string; email: string };
+  sender_profile?: FriendProfile;
 }
 
 interface FriendUser {
   id: string;
   name: string;
   email: string;
+  avatar_url?: string;
   lastMessage?: string;
-  lastMessageTime?: string;
   unreadCount?: number;
 }
 
@@ -59,44 +65,39 @@ const SMART_SUGGESTIONS = [
 
 export default function Chat() {
   const { profile } = useAuthStore();
-  const { subscribed, subscribe, unsubscribe } = usePushNotifications(profile?.id);
   const [searchParams, setSearchParams] = useSearchParams();
+  const { subscribed, subscribe, unsubscribe } = usePushNotifications(profile?.id);
 
-  // Active chat state: 'support' or a friend's user_id
-  const [activeChat, setActiveChat] = useState<string>(() => searchParams.get('user') || 'support');
+  // Navigation / active chat state
+  // 'support' = RPM Official Support Desk
+  // <user_id> = Direct chat with friend
+  const [activeChat, setActiveChat] = useState<string>('support');
   const [activeFriend, setActiveFriend] = useState<FriendUser | null>(null);
   const [mobileView, setMobileView] = useState<'list' | 'chat'>('chat');
 
-  // Support messages
+  // Messages state
   const [supportMessages, setSupportMessages] = useState<SupportMessage[]>([]);
-  
-  // Direct messages (for active friend)
   const [directMessages, setDirectMessages] = useState<DirectMessage[]>([]);
-  
-  // Friends & Requests
+  const [text, setText] = useState('');
+  const [sending, setSending] = useState(false);
+
+  // Social / Connections state
   const [friends, setFriends] = useState<FriendUser[]>([]);
   const [incomingRequests, setIncomingRequests] = useState<FriendRequest[]>([]);
-  
-  // Search & Add User Modal
   const [showAddUserModal, setShowAddUserModal] = useState(false);
   const [showRequestsModal, setShowRequestsModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<FriendUser[]>([]);
+  const [searchResults, setSearchResults] = useState<FriendProfile[]>([]);
   const [searching, setSearching] = useState(false);
 
-  // Inputs & Loading
-  const [text, setText] = useState('');
-  const [sending, setSending] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
-  // Auto-scroll
   const scrollToBottom = () => {
     setTimeout(() => {
       chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, 100);
+    }, 50);
   };
 
-  // If Admin, render AdminChat
   if (profile?.is_admin) {
     return <AdminChat />;
   }
@@ -115,6 +116,14 @@ export default function Chat() {
         setSupportMessages(data);
         if (activeChat === 'support') scrollToBottom();
       }
+
+      // Mark unread support replies from staff as read
+      await supabase
+        .from('messages')
+        .update({ read: true })
+        .eq('user_id', profile.id)
+        .neq('sender_id', profile.id)
+        .eq('read', false);
     } catch (err) {
       console.warn('Failed to load support messages:', err);
     }
@@ -197,7 +206,7 @@ export default function Chat() {
         scrollToBottom();
       }
 
-      // Mark read
+      // Mark read in DB
       await supabase
         .from('direct_messages')
         .update({ read: true })
@@ -239,33 +248,52 @@ export default function Chat() {
     }
   }, [activeChat, friends]);
 
-  // Real-time Subscriptions
+  // Real-time Subscriptions with live read receipts
   useEffect(() => {
     if (!profile?.id) return;
 
-    // Support messages channel
+    // Support messages channel (listen for both INSERT and UPDATE)
     const supportSub = supabase
       .channel(`user-support-${profile.id}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `user_id=eq.${profile.id}` }, (payload) => {
-        setSupportMessages(prev => [...prev, payload.new as SupportMessage]);
-        if (activeChat === 'support') scrollToBottom();
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `user_id=eq.${profile.id}` }, (payload) => {
+        if (payload.eventType === 'INSERT') {
+          const newMsg = payload.new as SupportMessage;
+          setSupportMessages(prev => prev.some(m => m.id === newMsg.id) ? prev : [...prev, newMsg]);
+          if (activeChat === 'support') {
+            scrollToBottom();
+            if (newMsg.sender_id !== profile.id) {
+              supabase.from('messages').update({ read: true }).eq('id', newMsg.id).then();
+            }
+          }
+        } else if (payload.eventType === 'UPDATE') {
+          const updated = payload.new as SupportMessage;
+          setSupportMessages(prev => prev.map(m => m.id === updated.id ? updated : m));
+        }
       })
       .subscribe();
 
-    // Direct messages channel
+    // Direct messages channel (listen for both INSERT and UPDATE)
     const directSub = supabase
       .channel(`user-direct-${profile.id}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'direct_messages' }, (payload) => {
-        const newMsg = payload.new as DirectMessage;
-        if (
-          (newMsg.sender_id === profile.id && newMsg.receiver_id === activeChat) ||
-          (newMsg.sender_id === activeChat && newMsg.receiver_id === profile.id)
-        ) {
-          setDirectMessages(prev => [...prev, newMsg]);
-          scrollToBottom();
-        } else {
-          // Update friends list unread
-          fetchFriendsAndRequests();
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'direct_messages' }, (payload) => {
+        if (payload.eventType === 'INSERT') {
+          const newMsg = payload.new as DirectMessage;
+          if (
+            (newMsg.sender_id === profile.id && newMsg.receiver_id === activeChat) ||
+            (newMsg.sender_id === activeChat && newMsg.receiver_id === profile.id)
+          ) {
+            setDirectMessages(prev => prev.some(m => m.id === newMsg.id) ? prev : [...prev, newMsg]);
+            scrollToBottom();
+            if (newMsg.receiver_id === profile.id && activeChat === newMsg.sender_id) {
+              supabase.from('direct_messages').update({ read: true }).eq('id', newMsg.id).then();
+            }
+          } else {
+            // Update friends list unread
+            fetchFriendsAndRequests();
+          }
+        } else if (payload.eventType === 'UPDATE') {
+          const updated = payload.new as DirectMessage;
+          setDirectMessages(prev => prev.map(m => m.id === updated.id ? updated : m));
         }
       })
       .subscribe();
@@ -493,7 +521,7 @@ export default function Chat() {
             }`}
           >
             <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-brand to-indigo-600 text-white flex items-center justify-center font-bold text-sm shadow-md shrink-0 ring-2 ring-emerald-500/20">
-              <Headphones size={18} />
+              <MessageSquare size={18} />
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex justify-between items-center">
@@ -595,7 +623,7 @@ export default function Chat() {
             {activeChat === 'support' ? (
               <div className="flex items-center gap-3 min-w-0">
                 <div className="w-10 h-10 bg-gradient-to-tr from-brand to-indigo-600 rounded-2xl flex items-center justify-center text-white font-bold text-sm shadow-md shrink-0">
-                  <Headphones size={18} />
+                  <MessageSquare size={18} />
                 </div>
                 <div className="min-w-0">
                   <h1 className="font-bold text-sm flex items-center gap-1.5 truncate">

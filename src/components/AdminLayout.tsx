@@ -4,7 +4,7 @@ import {
   LogOut, LayoutDashboard, Package, Users, DollarSign, ShoppingCart,
   Eye, Mail, CreditCard, Settings, Lock, Building, Gift, Bell,
   Menu, X, MoreHorizontal, Activity, Megaphone, ChevronRight, ArrowLeftRight,
-  ChevronsLeft, ChevronsRight, MessageSquare, ShieldCheck, Headphones,
+  ChevronsLeft, ChevronsRight, MessageSquare, ShieldCheck,
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabaseClient';
@@ -152,9 +152,9 @@ export default function AdminLayout() {
           <div className="flex items-center gap-1">
             {!collapsed && (
               <Link to="/admin/chat"
-                className="relative p-2 rounded-xl text-gray-400 hover:bg-emerald-50 hover:text-emerald-600 transition-colors"
+                className="relative p-2 rounded-xl text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition-colors"
                 title="Support Live Chat">
-                <Headphones size={18} className={location.pathname === '/admin/chat' ? 'text-emerald-600' : 'text-gray-400'} />
+                <MessageSquare size={18} className={location.pathname === '/admin/chat' ? 'text-emerald-600' : 'text-gray-400'} />
                 {unreadChatCount > 0 && (
                   <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[17px] h-[17px] flex items-center justify-center px-0.5 animate-pulse">
                     {unreadChatCount}
@@ -243,9 +243,9 @@ export default function AdminLayout() {
           </div>
           <div className="flex items-center gap-1">
             <Link to="/admin/chat"
-              className="relative p-2 rounded-xl text-gray-400 hover:bg-emerald-50 hover:text-emerald-600 transition-colors"
+              className="relative p-2 rounded-xl text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition-colors"
               title="Support Live Chat">
-              <Headphones size={19} className={location.pathname === '/admin/chat' ? 'text-emerald-600' : 'text-gray-500'} />
+              <MessageSquare size={19} className={location.pathname === '/admin/chat' ? 'text-emerald-600' : 'text-gray-500'} />
               {unreadChatCount > 0 && (
                 <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[17px] h-[17px] flex items-center justify-center px-0.5 animate-pulse">
                   {unreadChatCount}

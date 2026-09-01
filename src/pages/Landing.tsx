@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import {
   ArrowRight, TrendingUp, Shield, Mail, Phone, MapPin, RefreshCw,
-  ArrowUp, ArrowDown, Globe, Award, Clock, Lock, Headphones,
+  ArrowUp, ArrowDown, Globe, Award, Clock, Lock, MessageSquare,
   PieChart, Menu, X, ChevronDown, Star, CheckCircle,
   Home, Layers, ArrowLeftRight, Users, BarChart3,
 } from 'lucide-react';
@@ -353,13 +353,13 @@ export default function Landing() {
               <a href="#how-it-works" className="hover:text-brand transition">How It Works</a>
               <a href="#faq"          className="hover:text-brand transition">FAQ</a>
               <Link to="/app/chat?tab=support" className="flex items-center gap-1.5 text-emerald-700 hover:text-emerald-800 font-bold transition bg-emerald-50/90 hover:bg-emerald-100 px-3 py-1 rounded-full border border-emerald-200/80 shadow-xs" title="24/7 Live Support Concierge">
-                <Headphones size={14} className="text-emerald-600" /> Support Desk
+                <MessageSquare size={14} className="text-emerald-600" /> Support Desk
               </Link>
             </div>
 
             <div className="flex items-center gap-3">
               <Link to="/app/chat?tab=support" className="md:hidden p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition" title="24/7 Live Support Desk">
-                <Headphones size={20} />
+                <MessageSquare size={20} />
               </Link>
               <Link to="/login" className="hidden sm:inline-block text-sm font-medium text-gray-700 hover:text-brand transition px-3 py-1.5">
                 Log In
@@ -386,7 +386,7 @@ export default function Landing() {
               <a key={href} href={href} onClick={() => setMobileOpen(false)} className="block py-1 hover:text-brand transition">{label}</a>
             ))}
             <Link to="/app/chat?tab=support" onClick={() => setMobileOpen(false)} className="flex items-center gap-2 py-2 text-emerald-700 font-bold bg-emerald-50 px-3 rounded-xl border border-emerald-200/70">
-              <Headphones size={16} /> 24/7 Live Support Desk
+              <MessageSquare size={16} /> 24/7 Live Support Desk
             </Link>
             <Link to="/login"  onClick={() => setMobileOpen(false)} className="block py-1 hover:text-brand transition">Log In</Link>
             <Link to="/signup" onClick={() => setMobileOpen(false)} className="block mt-2 bg-brand text-white text-center py-2.5 rounded-lg font-semibold">Open Account</Link>
@@ -584,7 +584,7 @@ export default function Landing() {
             {[
               { icon: <Home size={24} />, title: 'Real Estate Access',    desc: 'Fractional property ownership from as little as $500. Earn rental income without the burden of landlord responsibilities.' },
               { icon: <Shield size={24} />,  title: 'Capital Protection',    desc: 'Your principal is secured with audited strategies. Staking guarantees full principal return at maturity.' },
-              { icon: <Headphones size={24} />, title: 'Dedicated Support',     desc: 'Reach our team 24/7 via live chat, email, or phone — real humans who know each product inside out.' },
+              { icon: <MessageSquare size={24} />, title: 'Dedicated Support',     desc: 'Reach our team 24/7 via live chat, email, or phone — real humans who know each product inside out.' },
               { icon: <Layers size={24} />,  title: 'Flexible Lock Savings',  desc: 'Choose your staking term — from 7 days to 12 months — and earn superior APY on idle funds.' },
               { icon: <ArrowLeftRight size={24} />, title: 'Safe P2P Trading',     desc: 'Escrow-protected peer-to-peer USDT marketplace. Trade at your rate with zero counterparty risk.' },
               { icon: <BarChart3 size={24} />, title: 'Real-Time Dashboard',  desc: 'Monitor all four portfolios — properties, staking, P2P, investments — in one unified dashboard.' },
