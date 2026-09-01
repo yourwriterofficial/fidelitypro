@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { supabase } from '../lib/supabaseClient';
 import { usePushNotifications } from '../hooks/usePushNotifications';
@@ -59,10 +60,12 @@ const SMART_SUGGESTIONS = [
 export default function Chat() {
   const { profile } = useAuthStore();
   const { subscribed, subscribe, unsubscribe } = usePushNotifications(profile?.id);
+  const [searchParams, setSearchParams] = useSearchParams();
 
   // Active chat state: 'support' or a friend's user_id
-  const [activeChat, setActiveChat] = useState<string>('support');
+  const [activeChat, setActiveChat] = useState<string>(() => searchParams.get('user') || 'support');
   const [activeFriend, setActiveFriend] = useState<FriendUser | null>(null);
+  const [mobileView, setMobileView] = useState<'list' | 'chat'>('chat');
 
   // Support messages
   const [supportMessages, setSupportMessages] = useState<SupportMessage[]>([]);
@@ -210,6 +213,18 @@ export default function Chat() {
     fetchSupportMessages();
     fetchFriendsAndRequests();
   }, [profile?.id]);
+
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    const userParam = searchParams.get('user');
+    if (tab === 'support') {
+      setActiveChat('support');
+      setMobileView('chat');
+    } else if (userParam) {
+      setActiveChat(userParam);
+      setMobileView('chat');
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     if (activeChat === 'support') {
@@ -418,7 +433,7 @@ export default function Chat() {
       
       {/* ── LEFT COLUMN: THREAD LIST (SUPPORT + DIRECT MESSAGES) ── */}
       <div className={`w-full md:w-80 border-r border-gray-100 flex flex-col shrink-0 bg-slate-50/40 ${
-        activeChat !== 'support' && activeFriend ? 'hidden md:flex' : 'flex'
+        mobileView === 'chat' ? 'hidden md:flex' : 'flex'
       }`}>
         {/* Inbox Header */}
         <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-white">
@@ -449,7 +464,11 @@ export default function Chat() {
         {/* 1. PINNED OFFICIAL SUPPORT DESK (Always at the very top, bypasses friends, cannot be blocked) */}
         <div className="p-3 border-b border-gray-100 bg-emerald-50/20">
           <button
-            onClick={() => setActiveChat('support')}
+            onClick={() => {
+              setActiveChat('support');
+              setMobileView('chat');
+              setSearchParams({ tab: 'support' });
+            }}
             className={`w-full p-3 rounded-2xl transition text-left flex items-start gap-3 border ${
               activeChat === 'support'
                 ? 'bg-slate-900 text-white border-slate-900 shadow-md'
@@ -511,7 +530,11 @@ export default function Chat() {
               return (
                 <button
                   key={f.id}
-                  onClick={() => setActiveChat(f.id)}
+                  onClick={() => {
+                    setActiveChat(f.id);
+                    setMobileView('chat');
+                    setSearchParams({ user: f.id });
+                  }}
                   className={`w-full p-3.5 flex items-center gap-3 transition text-left border-l-4 ${
                     active
                       ? 'bg-brand/5 border-brand'
@@ -538,14 +561,14 @@ export default function Chat() {
 
       {/* ── CENTER / RIGHT: CHAT DISPLAY PANE ── */}
       <div className={`flex-1 flex flex-col min-w-0 bg-white ${
-        activeChat !== 'support' && activeFriend ? 'flex' : 'hidden md:flex'
+        mobileView === 'list' ? 'hidden md:flex' : 'flex'
       }`}>
         
         {/* Chat Pane Header */}
         <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 px-4 sm:px-6 py-4 flex items-center justify-between gap-2 text-white shrink-0 shadow-md">
           <div className="flex items-center gap-3 min-w-0">
             <button
-              onClick={() => setActiveChat('support')}
+              onClick={() => setMobileView('list')}
               className="p-1.5 hover:bg-white/10 rounded-lg text-gray-300 md:hidden shrink-0"
               title="Back to inbox list"
             >

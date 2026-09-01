@@ -352,9 +352,15 @@ export default function Landing() {
               <a href="#plans"        className="hover:text-brand transition">Plans</a>
               <a href="#how-it-works" className="hover:text-brand transition">How It Works</a>
               <a href="#faq"          className="hover:text-brand transition">FAQ</a>
+              <Link to="/app/chat?tab=support" className="flex items-center gap-1.5 text-emerald-700 hover:text-emerald-800 font-bold transition bg-emerald-50/90 hover:bg-emerald-100 px-3 py-1 rounded-full border border-emerald-200/80 shadow-xs" title="24/7 Live Support Concierge">
+                <Headphones size={14} className="text-emerald-600" /> Support Desk
+              </Link>
             </div>
 
             <div className="flex items-center gap-3">
+              <Link to="/app/chat?tab=support" className="md:hidden p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition" title="24/7 Live Support Desk">
+                <Headphones size={20} />
+              </Link>
               <Link to="/login" className="hidden sm:inline-block text-sm font-medium text-gray-700 hover:text-brand transition px-3 py-1.5">
                 Log In
               </Link>
@@ -379,6 +385,9 @@ export default function Landing() {
             {[['#markets','Markets'],['#products','Products'],['#plans','Plans'],['#how-it-works','How It Works'],['#faq','FAQ']].map(([href, label]) => (
               <a key={href} href={href} onClick={() => setMobileOpen(false)} className="block py-1 hover:text-brand transition">{label}</a>
             ))}
+            <Link to="/app/chat?tab=support" onClick={() => setMobileOpen(false)} className="flex items-center gap-2 py-2 text-emerald-700 font-bold bg-emerald-50 px-3 rounded-xl border border-emerald-200/70">
+              <Headphones size={16} /> 24/7 Live Support Desk
+            </Link>
             <Link to="/login"  onClick={() => setMobileOpen(false)} className="block py-1 hover:text-brand transition">Log In</Link>
             <Link to="/signup" onClick={() => setMobileOpen(false)} className="block mt-2 bg-brand text-white text-center py-2.5 rounded-lg font-semibold">Open Account</Link>
           </div>

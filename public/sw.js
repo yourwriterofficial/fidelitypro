@@ -35,7 +35,7 @@ self.addEventListener('push', (event) => {
   const options = {
     body: data.body || 'You have a new notification',
     icon: '/icons/icon-192x192.png',
-    badge: '/icons/icon-192x192.png',
+    badge: '/icons/badge-96x96.png',
     tag: data.tag || 'rpm-notify',
     renotify: true,
     vibrate: [100, 50, 100],

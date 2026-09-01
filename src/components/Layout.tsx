@@ -4,6 +4,7 @@ import {
   LogOut, Home, Wallet, Briefcase, Settings, Shield, Lock, Gift,
   Building, LayoutDashboard, Menu, X, MoreHorizontal, ChevronRight, AlertCircle,
   ChevronsLeft, ChevronsRight, MessageSquare, History, Users, Radio, ArrowRightLeft,
+  Headphones,
 } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 import NotificationBell from './NotificationBell';
@@ -393,6 +394,13 @@ export default function Layout() {
           <div className="flex items-center gap-1">
             {!collapsed && <NotificationBell />}
             {!collapsed && (
+              <Link to="/app/chat?tab=support"
+                className="relative p-2 rounded-xl text-gray-400 hover:bg-emerald-50 hover:text-emerald-600 transition-colors"
+                title="24/7 Official Support Desk">
+                <Headphones size={19} className={location.pathname === '/app/chat' && (new URLSearchParams(location.search).get('tab') === 'support' || !new URLSearchParams(location.search).get('user')) ? 'text-emerald-600' : 'text-gray-400'} />
+              </Link>
+            )}
+            {!collapsed && (
               <Link to="/app/chat"
                 className="relative p-2 rounded-xl text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition-colors"
                 title="Inbox">
@@ -515,6 +523,11 @@ export default function Layout() {
             <span className="text-lg font-extrabold text-gray-900">RPM</span>
           </div>
           <div className="flex items-center gap-1">
+            <Link to="/app/chat?tab=support"
+              className="relative p-2 rounded-xl text-gray-450 hover:bg-emerald-50 hover:text-emerald-600 transition-colors"
+              title="24/7 Official Support Desk">
+              <Headphones size={19} className={location.pathname === '/app/chat' && (new URLSearchParams(location.search).get('tab') === 'support' || !new URLSearchParams(location.search).get('user')) ? 'text-emerald-600' : 'text-emerald-500'} />
+            </Link>
             <Link to="/app/investor-chat"
               className="relative p-2 rounded-xl text-gray-450 hover:bg-gray-100 hover:text-gray-700 transition-colors"
               title="Investor Chat">
