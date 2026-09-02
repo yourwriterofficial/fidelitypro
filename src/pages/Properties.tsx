@@ -9,7 +9,7 @@ import {
   Plus, ShieldCheck, CheckCircle2, Wallet, ArrowRight, Car, Briefcase, TrendingUp
 } from 'lucide-react';
 import { useAccountRestriction } from '../hooks/useAccountRestriction';
-import { notifyAdmins } from '../lib/notify';
+import { notifyAdmins, notifyUser } from '../lib/notify';
 
 interface Property {
   id: string; title: string; description: string; price: number;
@@ -280,11 +280,21 @@ export default function Properties() {
         });
       } catch (_) {}
 
+      const userName = profile?.name || profile?.email || 'Investor';
       notifyAdmins({
-        title: 'New Custom Property Acquisition Request',
-        message: `${profile.name || profile.email} submitted a custom ${customCategory} request ($${price.toLocaleString()} total, $${upfrontDeposit.toLocaleString()} deposit).`,
+        title: `[Property Request] ${userName}`,
+        message: `${userName} submitted a custom ${customCategory} request ($${price.toLocaleString()} total, $${upfrontDeposit.toLocaleString()} deposit).`,
         type: 'alert',
         link: '/admin/properties'
+      });
+
+      // Dispatch user confirmation
+      notifyUser({
+        userId: profile.id,
+        title: 'Custom Property Request Received',
+        message: `Your custom ${customCategory} acquisition request ($${price.toLocaleString()} total, $${upfrontDeposit.toLocaleString()} deposit) was received.`,
+        type: 'info',
+        link: '/app/properties',
       });
 
       toast.success('Custom Acquisition Request Received!', {
@@ -361,11 +371,20 @@ export default function Properties() {
         monthly_payment: monthlyPaymentVal,
       });
       if (error) throw error;
+      const userName = profile?.name || profile?.email || 'Investor';
       notifyAdmins({
-        title: 'New Real Estate Deed Investment',
-        message: `${profile.name || profile.email} invested $${amount.toLocaleString()} in ${selectedProperty.title} (${selectedTerm} Months).`,
-        type: 'success',
+        title: `[Property Deed] ${userName} ($${amount.toLocaleString()})`,
+        message: `${userName} invested $${amount.toLocaleString()} in ${selectedProperty.title} (${selectedTerm} Months).`,
+        type: 'alert',
         link: '/admin/properties'
+      });
+      // Dispatch user confirmation
+      notifyUser({
+        userId: profile.id,
+        title: 'Property Deed Investment Confirmed',
+        message: `You invested $${amount.toLocaleString()} in ${selectedProperty.title} (${selectedTerm} Months). Your fractional deed equity is recorded!`,
+        type: 'success',
+        link: '/app/properties',
       });
       toast.success('Investment recorded!');
       await fetchMyInvestments();

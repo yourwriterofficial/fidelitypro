@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { supabase } from '../lib/supabaseClient';
 import { useAccountRestriction } from '../hooks/useAccountRestriction';
-import { notifyAdmins, notifyAdminsWithEmail } from '../lib/notify';
+import { notifyAdmins, notifyAdminsWithEmail, notifyUser } from '../lib/notify';
 import { toast } from 'sonner';
 import {
   Wallet, ArrowDown, ArrowUp, Copy, Check, Send, RefreshCw,
@@ -200,9 +200,18 @@ export default function WalletPage() {
       const formattedAmount = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
       const userName = profile.name || profile.email || 'A user';
       
+      // Dispatch in-app and web push confirmation to user
+      notifyUser({
+        userId: profile.id,
+        title: 'Deposit Received (Pending)',
+        message: `Your deposit proof of ${formattedAmount} via ${selectedCurrency} has been received and is pending compliance verification.`,
+        type: 'info',
+        link: '/app/wallet',
+      });
+
       // Dispatch in-app and web push notification to admins
       notifyAdmins({
-        title: 'New Deposit Request',
+        title: `[Deposit] ${userName} (${formattedAmount})`,
         message: `${userName} submitted a deposit of ${formattedAmount} via ${selectedCurrency} with payment proof.`,
         type: 'alert',
         link: '/admin/deposits'
@@ -265,9 +274,18 @@ export default function WalletPage() {
       const formattedAmount = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
       const userName = profile.name || profile.email || 'A user';
       
+      // Dispatch in-app and web push confirmation to user
+      notifyUser({
+        userId: profile.id,
+        title: 'Withdrawal Submitted (Pending)',
+        message: `Your withdrawal request of ${formattedAmount} to ${networkLabel} has been placed in the review queue.`,
+        type: 'info',
+        link: '/app/wallet',
+      });
+
       // Dispatch in-app and web push notification to admins
       notifyAdmins({
-        title: 'New Withdrawal Request',
+        title: `[Withdrawal] ${userName} (${formattedAmount})`,
         message: `${userName} requested a withdrawal of ${formattedAmount} to ${networkLabel}.`,
         type: 'alert',
         link: '/admin/withdrawals'

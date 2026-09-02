@@ -9,7 +9,7 @@ import {
   UserX, MessageSquare, Clock, ArrowLeft
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { sendEmailAndLog, notifyUser } from '../lib/notify';
+import { sendEmailAndLog, notifyUser, notifyAdmins } from '../lib/notify';
 import { isDifferentDay, formatChatDateSeparator, formatMessageTime } from '../lib/chatDate';
 import AdminChat from './admin/AdminChat';
 
@@ -444,6 +444,14 @@ export default function Chat() {
         if (error) throw error;
         if (insertedMsg) {
           setSupportMessages(prev => prev.some(m => m.id === insertedMsg.id) ? prev : [...prev, insertedMsg]);
+          // Notify admins of new support message
+          const userName = profile?.name || profile?.email || 'Investor';
+          notifyAdmins({
+            title: `[Support Chat] ${userName}`,
+            message: `${userName}: "${cleanText.slice(0, 75)}${cleanText.length > 75 ? '...' : ''}"`,
+            type: 'alert',
+            link: '/admin/chat',
+          });
         }
         scrollToBottom();
       } else {
@@ -463,6 +471,14 @@ export default function Chat() {
         if (error) throw error;
         if (insertedDm) {
           setDirectMessages(prev => prev.some(m => m.id === insertedDm.id) ? prev : [...prev, insertedDm]);
+          // Notify recipient friend
+          notifyUser({
+            userId: targetReceiverId,
+            title: `New Message from ${profile?.name || 'Contact'}`,
+            message: `${cleanText.slice(0, 75)}${cleanText.length > 75 ? '...' : ''}`,
+            type: 'info',
+            link: '/app/chat',
+          });
         }
         scrollToBottom();
       }

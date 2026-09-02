@@ -333,10 +333,9 @@ export default function Settings() {
       setIsResubmitting(false);
       toast.success('Identity Verification submitted! Compliance will review within 15–30 minutes.');
 
-      // Notify Admins
-      const userName = `${firstName} ${lastName}` || profile.name || profile.email;
+      const userName = `${firstName} ${lastName}`.trim() || profile?.name || profile?.email || 'Investor';
       notifyAdmins({
-        title: 'New KYC Verification Submitted',
+        title: `[KYC Submitted] ${userName}`,
         message: `${userName} submitted Level 1 Identity Verification (${documentType.toUpperCase()}: ${documentNumber}).`,
         type: 'alert',
         link: '/admin/kyc',

@@ -205,43 +205,51 @@ export async function notifyUsers(userIds: string[], params: Omit<NotifyParams, 
 
 /** Sends an in-app and web-push notification to all admin profiles */
 export async function notifyAdmins(params: Omit<NotifyParams, 'userId'>): Promise<void> {
-  const { title, message, type, link } = params;
+  const { title, message, type = 'alert', link = '/admin' } = params;
   try {
-    // 1. Fetch all admins
-    const { data: admins, error: fetchError } = await supabase
-      .from('profiles')
-      .select('id')
-      .eq('is_admin', true);
-      
-    if (fetchError) throw fetchError;
-    if (!admins || admins.length === 0) return;
+    // 1. Fetch admin IDs if queryable from current session
+    let adminIds: string[] = [];
+    try {
+      const { data: admins } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('is_admin', true);
+      if (admins?.length) {
+        adminIds = admins.map(a => a.id);
+      }
+    } catch {
+      // Non-admins may not be able to list other profiles via RLS; send-push edge function will resolve them
+    }
 
-    const adminIds = admins.map(a => a.id);
+    // 2. Try writing in-app notifications directly (will succeed for admin users, or fall back to edge function for non-admins)
+    if (adminIds.length > 0) {
+      try {
+        const inserts = adminIds.map(adminId => ({
+          user_id: adminId,
+          title,
+          message,
+          type: type || 'alert',
+          link: link || '/admin',
+          read: false,
+          created_at: new Date().toISOString(),
+        }));
+        await supabase.from('notifications').insert(inserts);
+      } catch (err) {
+        // Expected if non-admin is calling; send-push edge function uses service role to insert
+        console.warn('[notifyAdmins] Direct notifications insert bypassed by RLS; edge function will handle it:', err);
+      }
+    }
 
-    // 2. Write in-app notifications
-    // Bulk fan-out to admins — not subject to the per-recipient rate limit.
-    const inserts = adminIds.map(adminId => ({
-      user_id: adminId,
-      title,
-      message,
-      type,
-      link: link || null,
-      read: false,
-      created_at: new Date().toISOString(),
-    }));
-    
-    const { error: insertError } = await supabase.from('notifications').insert(inserts);
-    if (insertError) throw insertError;
-
-    // 3. Dispatch web push
+    // 3. Dispatch web push (and server-side in-app fallback via service role)
     await supabase.functions.invoke('send-push', {
       body: {
+        to_admins: true,
         user_ids: adminIds,
         title,
         body: message,
         url: link || '/admin',
-        tag: type,
-        notification_type: type,
+        tag: 'admin-alert',
+        notification_type: 'alert',
       },
     });
   } catch (e) {

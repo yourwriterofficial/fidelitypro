@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { toast } from 'sonner';
 import { CheckCircle, XCircle } from 'lucide-react';
+import { notifyUser } from '../../lib/notify';
 
 interface Order {
   id: string;
@@ -48,7 +49,7 @@ export default function AdminOrders() {
         .update({ status: newStatus })
         .eq('id', orderId);
       if (error) throw error;
-      // Record transaction if activating
+      // Record transaction and notify user if activating
       if (newStatus === 'active') {
         const order = orders.find(o => o.id === orderId);
         if (order) {
@@ -58,6 +59,26 @@ export default function AdminOrders() {
             amount: order.amount,
             description: `Investment in ${order.product_name} activated`,
             status: 'completed',
+          });
+          // Dispatch in-app and web push notification to user
+          await notifyUser({
+            userId: order.user_id,
+            title: 'Investment Plan Activated',
+            message: `Your investment of $${order.amount.toLocaleString()} in ${order.product_name} has been activated and is now active!`,
+            type: 'success',
+            link: '/app/my-portfolio',
+          });
+        }
+      } else if (newStatus === 'cancelled') {
+        const order = orders.find(o => o.id === orderId);
+        if (order) {
+          // Dispatch in-app and web push notification to user
+          await notifyUser({
+            userId: order.user_id,
+            title: 'Investment Order Cancelled',
+            message: `Your pending investment order of $${order.amount.toLocaleString()} in ${order.product_name} was cancelled.`,
+            type: 'alert',
+            link: '/app/invest',
           });
         }
       }

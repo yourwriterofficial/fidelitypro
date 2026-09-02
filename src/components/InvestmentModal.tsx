@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabaseClient';
 import { useAuthStore } from '../store/authStore';
 import { toast } from 'sonner';
 import { X, Copy, Check } from 'lucide-react';
-import { notifyAdmins } from '../lib/notify';
+import { notifyAdmins, notifyUser } from '../lib/notify';
 
 interface Plan {
   id: string;
@@ -97,22 +97,39 @@ export default function InvestmentModal({
         });
       if (error) throw error;
 
+      const userName = profile?.name || profile?.email || 'Investor';
       if (orderStatus === 'active') {
         notifyAdmins({
-          title: 'New Investment Activated',
-          message: `${profile.name || profile.email} activated an investment of $${numAmount.toLocaleString()} in ${plan.name}.`,
-          type: 'success',
+          title: `[Investment] ${userName} ($${numAmount.toLocaleString()})`,
+          message: `${userName} activated an investment of $${numAmount.toLocaleString()} in ${plan.name}.`,
+          type: 'alert',
           link: '/admin/orders'
+        });
+        // Dispatch user confirmation
+        notifyUser({
+          userId: profile.id,
+          title: 'Investment Active',
+          message: `Your investment of $${numAmount.toLocaleString()} in ${plan.name} (${plan.daily_return}% daily return) is active!`,
+          type: 'success',
+          link: '/app/my-portfolio',
         });
         toast.success('Investment active!');
         onSuccess();
         onClose();
       } else {
         notifyAdmins({
-          title: 'New Pending Investment Order',
-          message: `${profile.name || profile.email} created a pending order of $${numAmount.toLocaleString()} in ${plan.name}.`,
-          type: 'info',
+          title: `[Pending Order] ${userName} ($${numAmount.toLocaleString()})`,
+          message: `${userName} created a pending order of $${numAmount.toLocaleString()} in ${plan.name}.`,
+          type: 'alert',
           link: '/admin/orders'
+        });
+        // Dispatch user confirmation
+        notifyUser({
+          userId: profile.id,
+          title: 'Investment Order Created (Pending)',
+          message: `Your order for $${numAmount.toLocaleString()} in ${plan.name} is created. Complete payment to activate.`,
+          type: 'info',
+          link: '/app/wallet',
         });
         setStep('deposit');
         toast.success('Investment order created! Please deposit to activate.');

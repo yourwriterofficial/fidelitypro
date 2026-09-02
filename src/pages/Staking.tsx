@@ -7,7 +7,7 @@ import { useAccountRestriction } from '../hooks/useAccountRestriction';
 import {
   AlertCircle, Calculator, Lock, Clock, X, CheckCircle2, History
 } from 'lucide-react';
-import { notifyAdmins } from '../lib/notify';
+import { notifyAdmins, notifyUser } from '../lib/notify';
 
 interface StakingProduct {
   id: string; name: string; description: string;
@@ -153,11 +153,20 @@ export default function Staking() {
         lock_days: selectedProduct.lock_days, end_date: endDate, status: 'active',
       });
       if (error) throw error;
+      const userName = profile.name || profile.email || 'Investor';
       notifyAdmins({
-        title: 'New Staking Certificate Created',
-        message: `${profile.name || profile.email} locked $${numAmount.toLocaleString()} in ${selectedProduct.name} (${selectedProduct.lock_days} days @ ${selectedProduct.apy}% APY).`,
-        type: 'success',
+        title: `[Staking] ${userName} ($${numAmount.toLocaleString()})`,
+        message: `${userName} locked $${numAmount.toLocaleString()} in ${selectedProduct.name} (${selectedProduct.lock_days} days @ ${selectedProduct.apy}% APY).`,
+        type: 'alert',
         link: '/admin/staking'
+      });
+      // Dispatch user confirmation
+      notifyUser({
+        userId: profile.id,
+        title: 'Staking Certificate Active',
+        message: `You locked $${numAmount.toLocaleString()} in ${selectedProduct.name} (${selectedProduct.lock_days} days @ ${selectedProduct.apy}% APY).`,
+        type: 'success',
+        link: '/app/staking',
       });
       toast.success('Funds committed to lock successfully!');
       await refreshProfile(); fetchOrders(); setModalOpen(false); setAmount('');
@@ -173,6 +182,16 @@ export default function Staking() {
       await supabase.rpc('add_wallet_balance', { user_id: profile?.id, amount: order.maturityAmount });
       await supabase.from('transactions').insert({ user_id: profile?.id, type: 'return', amount: order.maturityAmount, description: `Staking maturity for ${order.product_name}`, status: 'completed' });
       await supabase.from('staking_orders').update({ status: 'completed' }).eq('id', orderId);
+      // Dispatch user confirmation
+      if (profile?.id) {
+        notifyUser({
+          userId: profile.id,
+          title: 'Staking Earnings Claimed',
+          message: `$${order.maturityAmount.toFixed(2)} from your matured ${order.product_name} staking contract has been credited to your wallet balance.`,
+          type: 'success',
+          link: '/app/staking',
+        });
+      }
       toast.success(`$${order.maturityAmount.toFixed(2)} credited to your wallet!`);
       await refreshProfile(); fetchOrders();
     } catch (err: any) { toast.error(err.message); }

@@ -153,12 +153,39 @@ Deno.serve(async (req) => {
   const cors = { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' };
 
   const adminClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
-  const { user_ids, title, body, url = '/app', tag = 'rpm', notification_type } = await req.json();
+  const { user_ids, to_admins, title, body, url = '/app', tag = 'rpm', notification_type } = await req.json();
 
-  if (!user_ids?.length) return new Response(JSON.stringify({ sent: 0 }), { status: 200, headers: cors });
+  let targetIds: string[] = Array.isArray(user_ids) ? [...user_ids] : [];
+
+  // If to_admins is true or targeting an admin route with no user_ids, fetch all admin profiles
+  if (to_admins || (!targetIds.length && url?.startsWith('/admin'))) {
+    const { data: admins } = await adminClient.from('profiles').select('id').eq('is_admin', true);
+    if (admins?.length) {
+      const adminIds = admins.map((a: any) => a.id);
+      targetIds = [...new Set([...targetIds, ...adminIds])];
+
+      // Ensure in-app notification rows are written using the service role client (bypasses RLS)
+      try {
+        const notifInserts = adminIds.map((aId: string) => ({
+          user_id: aId,
+          title,
+          message: body,
+          type: notification_type || 'alert',
+          link: url || '/admin',
+          read: false,
+          created_at: new Date().toISOString(),
+        }));
+        await adminClient.from('notifications').insert(notifInserts);
+      } catch (e) {
+        console.warn('In-app notification insert error in send-push:', e);
+      }
+    }
+  }
+
+  if (!targetIds?.length) return new Response(JSON.stringify({ sent: 0 }), { status: 200, headers: cors });
 
   // Filter users who haven't disabled this notification type (default = enabled), respecting admin locks
-  let filteredIds: string[] = [...new Set(user_ids as string[])];
+  let filteredIds: string[] = [...new Set(targetIds as string[])];
   const prefKey = notification_type ? PREF_KEY[notification_type] : undefined;
   if (prefKey) {
     const [prefsRes, lockRes] = await Promise.all([
@@ -183,9 +210,23 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Query which users in filteredIds are admins
+    const { data: adminProfiles } = await adminClient
+      .from('profiles')
+      .select('id')
+      .in('id', filteredIds)
+      .eq('is_admin', true);
+    const adminSet = new Set((adminProfiles || []).map((a: any) => a.id));
+
     if (!isLocked) {
       const disabled = new Set((prefsRes?.data || []).filter((p: any) => p[prefKey] === false).map((p: any) => p.user_id));
-      filteredIds = filteredIds.filter(id => !disabled.has(id));
+      // Never filter out admins if notification_type === 'alert' or url targets an admin route
+      filteredIds = filteredIds.filter(id => {
+        if (adminSet.has(id) && (notification_type === 'alert' || url.startsWith('/admin'))) {
+          return true;
+        }
+        return !disabled.has(id);
+      });
     }
   }
 

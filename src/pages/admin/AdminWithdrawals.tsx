@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabaseClient';
 import { useAuthStore } from '../../store/authStore';
 import { toast } from 'sonner';
 import { CheckCircle, XCircle } from 'lucide-react';
+import { notifyUser } from '../../lib/notify';
 
 interface Withdrawal {
   id: string;
@@ -89,6 +90,23 @@ export default function AdminWithdrawals() {
           amount: -withdrawal.amount,
           description: 'Withdrawal approved',
           status: 'completed',
+        });
+        // Dispatch in-app and web push alert to user
+        await notifyUser({
+          userId: withdrawal.user_id,
+          title: 'Withdrawal Approved & Sent',
+          message: `Your withdrawal of $${withdrawal.amount.toLocaleString()} has been approved and dispatched to ${withdrawal.address}.`,
+          type: 'success',
+          link: '/app/wallet',
+        });
+      } else if (newStatus === 'rejected' && withdrawal) {
+        // Dispatch in-app and web push alert to user
+        await notifyUser({
+          userId: withdrawal.user_id,
+          title: 'Withdrawal Rejected',
+          message: `Your withdrawal request for $${withdrawal.amount.toLocaleString()} has been rejected. Please contact compliance for details.`,
+          type: 'alert',
+          link: '/app/wallet',
         });
       }
 

@@ -7,7 +7,7 @@ import {
   Wallet, RefreshCw, ShieldAlert, Lock
 } from 'lucide-react';
 import { useAccountRestriction } from '../hooks/useAccountRestriction';
-import { notifyAdmins } from '../lib/notify';
+import { notifyAdmins, notifyUser } from '../lib/notify';
 
 interface P2PMerchant {
   id: string;
@@ -204,11 +204,21 @@ export default function P2P() {
         });
       } catch (_) {}
 
+      const userName = profile?.name || profile?.email || 'Investor';
       notifyAdmins({
-        title: 'New P2P Escrow Order',
-        message: `${profile.name || profile.email} locked $${parsedAmount.toLocaleString()} in P2P Escrow for ${calculatedTargetAmount.toLocaleString()} ${selectedAsset.symbol}.`,
+        title: `[P2P Escrow] ${userName} ($${parsedAmount.toLocaleString()})`,
+        message: `${userName} locked $${parsedAmount.toLocaleString()} in P2P Escrow for ${calculatedTargetAmount.toLocaleString()} ${selectedAsset.symbol}.`,
         type: 'alert',
         link: '/admin/p2p'
+      });
+
+      // Dispatch user confirmation
+      notifyUser({
+        userId: profile.id,
+        title: 'P2P Escrow Order Active',
+        message: `Your $${parsedAmount.toLocaleString()} USD is securely locked in escrow for ${calculatedTargetAmount.toLocaleString()} ${selectedAsset.symbol}. Payout will settle in ~15 minutes.`,
+        type: 'info',
+        link: '/app/p2p',
       });
 
       toast.success('P2P Escrow Order Dispatched!', {

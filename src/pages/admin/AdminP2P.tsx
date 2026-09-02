@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { 
   RefreshCw, Check, X, Search, Plus, Edit2, Lock
 } from 'lucide-react';
+import { notifyUser } from '../../lib/notify';
 
 interface P2POrder {
   id: string;
@@ -109,6 +110,15 @@ export default function AdminP2P() {
         });
       } catch (_) {}
 
+      // Send in-app and push notification to user
+      await notifyUser({
+        userId: order.user_id,
+        title: 'P2P Escrow Settled & Released',
+        message: `Your conversion of $${order.amount_usd.toLocaleString()} to ${order.target_amount.toLocaleString()} ${order.target_currency_symbol} has been completed and released to: ${order.destination_account_or_address}.`,
+        type: 'success',
+        link: '/app/p2p',
+      });
+
       toast.success('P2P Order marked as Completed!');
       fetchOrders();
     } catch (err: any) {
@@ -149,6 +159,15 @@ export default function AdminP2P() {
           read: false,
         });
       } catch (_) {}
+
+      // Send in-app and push notification to user
+      await notifyUser({
+        userId: order.user_id,
+        title: 'P2P Escrow Order Refunded',
+        message: `P2P Order #${order.id.slice(0, 8)} was cancelled and $${order.amount_usd.toLocaleString()} USD has been refunded to your wallet.`,
+        type: 'alert',
+        link: '/app/p2p',
+      });
 
       toast.success('Order cancelled and funds refunded to user wallet!');
       fetchOrders();
