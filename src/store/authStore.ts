@@ -271,9 +271,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           isAdmin: profile?.is_admin || false,
           loading: false,
         });
+      } else {
+        // If session is null and there is no cached user, unblock loading immediately
+        // so public pages (landing, pricing, login) load instantly without a delay or watchdog wait.
+        if (!getCachedUser()) {
+          set({ loading: false });
+        }
       }
-      // If session is null we intentionally do NOT clear state here —
-      // the INITIAL_SESSION handler above is responsible for that.
     } catch (error) {
       console.error('Auth init error:', error);
       // Don't log out the user on an unexpected error — just unblock the UI.

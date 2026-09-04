@@ -16,8 +16,14 @@ export default function PWAUpdater() {
     }
 
     let reloading = false;
-    // When the new worker takes control, seamlessly reload the page into the new deploy
+    let hadController = Boolean(navigator.serviceWorker.controller);
+    // When a new worker takes control during an update, seamlessly reload the page into the new deploy
     const onControllerChange = () => {
+      // If there was no controller when the page first opened, this is the first install, NOT an update.
+      if (!hadController) {
+        hadController = true;
+        return;
+      }
       if (reloading) return;
       reloading = true;
       window.location.reload();
