@@ -127,25 +127,7 @@ export default function Chat() {
   };
 
   const viewParam = searchParams.get('view');
-  if (profile?.is_admin && viewParam !== 'user') {
-    return (
-      <div className="space-y-2">
-        <div className="bg-slate-900 text-white px-4 py-2 flex items-center justify-between text-xs font-semibold rounded-2xl shadow-sm">
-          <span className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-emerald-400" />
-            Viewing as Admin: Support Tickets Desk
-          </span>
-          <button 
-            onClick={() => setSearchParams({ view: 'user' })}
-            className="px-3 py-1 bg-brand hover:bg-brand-dark text-white rounded-xl text-xs font-bold transition shadow-xs"
-          >
-            Preview Member Inbox & Network →
-          </button>
-        </div>
-        <AdminChat />
-      </div>
-    );
-  }
+  const showAdminDesk = Boolean(profile?.is_admin && viewParam !== 'user');
 
   // ── Fetch Support Messages ──────────────────────────────────────────────────
   const fetchSupportMessages = async () => {
@@ -399,19 +381,28 @@ export default function Chat() {
         fetchDirectMessages(friend.id);
       } else {
         // Active chat might be a network contact not yet in friends list
-        supabase.from('profiles').select('id, name, email, avatar_url').eq('id', activeChat).single().then(({ data }) => {
-          if (data) {
-            const tempFriend: FriendUser = {
-              id: data.id,
-              name: data.name || 'Investor Member',
-              email: data.email,
-              avatar_url: data.avatar_url,
-              relationship: profile?.referred_by === data.id ? 'sponsor' : 'friend',
-            };
-            setActiveFriend(tempFriend);
-            fetchDirectMessages(data.id);
-          }
-        });
+        supabase
+          .from('profiles')
+          .select('id, name, email, avatar_url')
+          .eq('id', activeChat)
+          .maybeSingle()
+          .then(({ data, error }) => {
+            if (error) {
+              console.warn('Could not load profile for activeChat:', error);
+              return;
+            }
+            if (data) {
+              const tempFriend: FriendUser = {
+                id: data.id,
+                name: data.name || 'Investor Member',
+                email: data.email,
+                avatar_url: data.avatar_url,
+                relationship: profile?.referred_by === data.id ? 'sponsor' : 'friend',
+              };
+              setActiveFriend(tempFriend);
+              fetchDirectMessages(data.id);
+            }
+          });
       }
     }
   }, [activeChat, friends]);
@@ -735,6 +726,26 @@ export default function Chat() {
 
   const totalNetworkCount = (uplineContact ? 1 : 0) + downlineContacts.length;
   const totalUnreadDirect = friends.reduce((sum, f) => sum + (f.unreadCount || 0), 0);
+
+  if (showAdminDesk) {
+    return (
+      <div className="space-y-2">
+        <div className="bg-slate-900 text-white px-4 py-2 flex items-center justify-between text-xs font-semibold rounded-2xl shadow-sm">
+          <span className="flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-emerald-400" />
+            Viewing as Admin: Support Tickets Desk
+          </span>
+          <button 
+            onClick={() => setSearchParams({ view: 'user' })}
+            className="px-3 py-1 bg-brand hover:bg-brand-dark text-white rounded-xl text-xs font-bold transition shadow-xs"
+          >
+            Preview Member Inbox & Network →
+          </button>
+        </div>
+        <AdminChat />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-[calc(100dvh-160px)] md:h-[calc(100dvh-120px)] mb-16 md:mb-0">
