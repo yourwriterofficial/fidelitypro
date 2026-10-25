@@ -21,6 +21,9 @@ export interface Profile {
   fee_required: number;
   kyc_status?: 'unverified' | 'pending' | 'verified' | 'rejected';
   kyc_level?: number;
+  can_translate?: boolean;
+  browser_language?: string;
+  preferred_translation_lang?: string;
 }
 
 interface AuthState {
@@ -66,10 +69,7 @@ const getCachedProfile = (): Profile | null => {
 const saveCache = (user: User | null, profile: Profile | null) => {
   try {
     if (user) localStorage.setItem(USER_CACHE_KEY, JSON.stringify(user));
-    else localStorage.removeItem(USER_CACHE_KEY);
-
     if (profile) localStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(profile));
-    else localStorage.removeItem(PROFILE_CACHE_KEY);
   } catch {
     // Ignore storage quota errors
   }
@@ -84,7 +84,7 @@ const clearCache = () => {
   }
 };
 
-const fetchProfile = async (userId: string): Promise<Profile | null> => {
+const fetchProfile = async (userId: string, fallbackProfile?: Profile | null): Promise<Profile | null> => {
   try {
     const { data, error } = await supabase
       .from('profiles')
@@ -93,14 +93,14 @@ const fetchProfile = async (userId: string): Promise<Profile | null> => {
       .single();
     if (error) {
       if (error.code !== 'PGRST116') {
-        console.error('Profile fetch error:', error);
+        console.warn('Profile fetch warning (using cache fallback):', error.message || error);
       }
-      return getCachedProfile();
+      return fallbackProfile || getCachedProfile();
     }
-    return data;
+    return data || fallbackProfile || getCachedProfile();
   } catch (err) {
-    console.error('Network profile fetch error:', err);
-    return getCachedProfile();
+    console.warn('Network profile fetch error (using cache fallback):', err);
+    return fallbackProfile || getCachedProfile();
   }
 };
 
@@ -128,7 +128,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       throw error;
     }
     if (data.user) {
-      const profile = await fetchProfile(data.user.id);
+      const profile = await fetchProfile(data.user.id, get().profile);
       saveCache(data.user, profile);
       set({
         user: data.user,
@@ -155,7 +155,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
     const needsEmailConfirm = data.user?.identities?.length === 0 || !data.session;
     if (!needsEmailConfirm && data.user) {
-      const profile = await fetchProfile(data.user.id);
+      const profile = await fetchProfile(data.user.id, get().profile);
       saveCache(data.user, profile);
       set({
         user: data.user,
@@ -185,24 +185,18 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   initAuth: async () => {
     // Prevent double-initialisation (e.g. React StrictMode double-mount).
-    // We use authSubscription as the canonical guard because isInitializing
-    // resets in finally{} while the async work is still in flight.
     if (authSubscription) return;
     if (isInitializing) return;
     isInitializing = true;
 
     try {
-      // ── Step 1: Subscribe to auth state changes FIRST ────────────────────
-      // We wire up the listener before calling getSession() so we never miss
-      // the INITIAL_SESSION event that Supabase fires on PWA cold-start.
-      // INITIAL_SESSION is the authoritative "here is your restored session"
-      // event — on a PWA launch it arrives instead of SIGNED_IN.
+      // ── Step 1: Subscribe to auth state changes ────────────────────────
       const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
         const { isImpersonating } = get();
         if (isImpersonating) return;
 
         if (event === 'SIGNED_OUT') {
-          // Double-check session to prevent transient logout spikes
+          // Double-check session to prevent transient logout spikes during tab wake / reconnection
           const { data: currentCheck } = await supabase.auth.getSession();
           if (!currentCheck?.session) {
             clearCache();
@@ -212,17 +206,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           return;
         }
 
-        // Handle every session-bearing event: initial restore, sign-in, token
-        // refresh, and profile updates.  INITIAL_SESSION is the critical one
-        // that was previously missing — it is what Supabase fires when a PWA
-        // is relaunched from the home screen and the session is restored from
-        // localStorage, so without it the user appeared to be logged out.
+        // Handle every session-bearing event: initial restore, sign-in, token refresh, and profile updates.
         if (
           (event === 'INITIAL_SESSION' || event === 'SIGNED_IN' ||
            event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') &&
           session?.user
         ) {
-          const profile = await fetchProfile(session.user.id);
+          const cachedProfile = get().profile || getCachedProfile();
+          const profile = (await fetchProfile(session.user.id, cachedProfile)) || cachedProfile;
           saveCache(session.user, profile);
           set({
             user: session.user,
@@ -233,37 +224,29 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           return;
         }
 
-        // INITIAL_SESSION with a null session means the user is genuinely
-        // signed out (no stored session exists). Clear state only then.
+        // INITIAL_SESSION with a null session: only clear if neither storage nor cached user exists
         if (event === 'INITIAL_SESSION' && !session) {
-          clearCache();
-          set({ user: null, profile: null, isAdmin: false, loading: false });
+          const storedSession = localStorage.getItem('rpm_auth_session');
+          if (!storedSession && !getCachedUser()) {
+            clearCache();
+            set({ user: null, profile: null, isAdmin: false, loading: false });
+          }
         }
       });
       authSubscription = subscription;
 
-      // ── Step 2: Eagerly resolve from getSession() for fast first paint ───
-      // This runs *after* we've set up the listener, so there is no race.
-      // If it returns a valid session we update state immediately (before the
-      // INITIAL_SESSION event fires) so the UI doesn't flash a loading state.
-      // If it returns null we do NOT clear auth — we wait for the listener's
-      // INITIAL_SESSION event to be authoritative.  This prevents the common
-      // PWA false-logout where getSession() resolves before Supabase has had
-      // a chance to restore the session from localStorage on a cold start.
+      // ── Step 2: Eagerly resolve from getSession() ───────────────────────
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
       if (sessionError) {
-        // A transient network / storage error — don't log the user out.
-        // The auth listener will deliver the correct state when it recovers.
         console.warn('Session retrieval error (non-fatal):', sessionError);
-        // Only mark loading done if we have nothing cached; otherwise keep the
-        // cached state visible until the listener resolves.
         if (!getCachedUser()) set({ loading: false });
         return;
       }
 
       if (session?.user) {
-        const profile = await fetchProfile(session.user.id);
+        const cachedProfile = get().profile || getCachedProfile();
+        const profile = (await fetchProfile(session.user.id, cachedProfile)) || cachedProfile;
         saveCache(session.user, profile);
         set({
           user: session.user,
@@ -272,15 +255,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           loading: false,
         });
       } else {
-        // If session is null and there is no cached user, unblock loading immediately
-        // so public pages (landing, pricing, login) load instantly without a delay or watchdog wait.
+        // If session is null and there is no cached user, unblock loading
         if (!getCachedUser()) {
           set({ loading: false });
         }
       }
     } catch (error) {
       console.error('Auth init error:', error);
-      // Don't log out the user on an unexpected error — just unblock the UI.
       if (!getCachedUser()) set({ loading: false });
     } finally {
       isInitializing = false;
@@ -292,7 +273,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   refreshProfile: async () => {
     const { user } = get();
     if (user) {
-      const profile = await fetchProfile(user.id);
+      const cachedProfile = get().profile || getCachedProfile();
+      const profile = (await fetchProfile(user.id, cachedProfile)) || cachedProfile;
       saveCache(user, profile);
       set({ profile, isAdmin: profile?.is_admin || false });
     }

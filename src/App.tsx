@@ -73,9 +73,10 @@ function App() {
     initAuth();
     triggerPassiveHeartbeat();
     // Watchdog fallback reduced from 5s to 1.2s to prevent lingering spinners
+    // Safety watchdog: only unblock if network is completely unresponsive (8s)
     const timeout = setTimeout(() => {
       setLoading(false);
-    }, 1200);
+    }, 8000);
     return () => clearTimeout(timeout);
   }, [initAuth, setLoading]);
 

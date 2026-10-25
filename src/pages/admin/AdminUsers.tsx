@@ -4,7 +4,7 @@ import { useAuthStore } from '../../store/authStore';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
-  Ban, UserCheck, Eye, Edit, Plus, Minus, Save, X, Mail, Lock, Key, Check, CheckCheck, Trash2, Bell, BellRing, Clock, ChevronDown, ChevronUp
+  Ban, UserCheck, Eye, Languages, Edit, Plus, Minus, Save, X, Mail, Lock, Key, Check, CheckCheck, Trash2, Bell, BellRing, Clock, ChevronDown, ChevronUp
 } from 'lucide-react';
 import { sendEmailAndLog } from '../../lib/notify';
 
@@ -26,6 +26,9 @@ interface User {
   kyc_level?: number;
   created_at: string;
   last_seen?: string;
+  can_translate?: boolean;
+  browser_language?: string;
+  preferred_translation_lang?: string;
 }
 
 interface Investment {
@@ -428,6 +431,25 @@ export default function AdminUsers() {
       setUsers(data || []);
     }
     setLoading(false);
+  };
+
+  const toggleTranslator = async (userId: string, currentStatus: boolean, userName: string) => {
+    try {
+      const nextStatus = !currentStatus;
+      const { error } = await supabase
+        .from('profiles')
+        .update({ can_translate: nextStatus })
+        .eq('id', userId);
+      if (error) throw error;
+      setUsers(prev => prev.map(u => u.id === userId ? { ...u, can_translate: nextStatus } : u));
+      if (selectedUser && selectedUser.id === userId) {
+        setSelectedUser({ ...selectedUser, can_translate: nextStatus });
+        setEditData(prev => ({ ...prev, can_translate: nextStatus }));
+      }
+      toast.success(nextStatus ? `Live translator gifted to ${userName}` : `Live translator revoked for ${userName}`);
+    } catch (err: any) {
+      toast.error(err.message || 'Could not update translator access');
+    }
   };
 
   const openUserModal = async (user: User) => {
@@ -1138,7 +1160,7 @@ export default function AdminUsers() {
                   if (path.startsWith('/app/p2p')) return 'P2P Express';
                   if (path.startsWith('/app/referral')) return 'Referrals';
                   if (path.startsWith('/app/chat')) return 'Inbox';
-                  if (path.startsWith('/app/investor-chat')) return 'Investor Chat';
+                  if (path.startsWith('/app/investor-chat')) return 'Investor Lounge';
                   if (path.startsWith('/app/settings')) return 'Settings';
                   if (path.startsWith('/app/notifications')) return 'Notification Center';
                   if (path.startsWith('/app/history')) return 'History';
@@ -1296,6 +1318,13 @@ export default function AdminUsers() {
                         {u.banned ? <UserCheck size={18} /> : <Ban size={18} />}
                       </button>
                     )}
+                    <button
+                      onClick={() => toggleTranslator(u.id, !!u.can_translate, u.name || u.email)}
+                      className={`transition ${u.can_translate ? 'text-indigo-600 hover:text-indigo-800' : 'text-gray-300 hover:text-indigo-500'}`}
+                      title={u.can_translate ? 'Live Translator active (click to revoke)' : 'Gift Live Translator to user'}
+                    >
+                      <Languages size={18} />
+                    </button>
                     <button onClick={() => impersonateUser(u)} className="text-purple-600 hover:text-purple-800" title="Impersonate user">
                       <Eye size={18} />
                     </button>

@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 import { Mail, Lock, LogIn, Send, KeyRound, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
+import { useAuthStore } from '../store/authStore';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -44,20 +45,10 @@ export default function Login() {
 
     try {
       if (method === 'password') {
-        const { data, error: signInError } = await supabase.auth.signInWithPassword({
-          email: cleanEmail,
-          password,
-        });
-
-        if (signInError) {
-          console.error('Supabase signIn error:', signInError);
-          throw new Error(signInError.message);
-        }
-
-        if (!data.user) throw new Error('No user returned');
-
+        await useAuthStore.getState().signIn(cleanEmail, password);
+        const isAdmin = useAuthStore.getState().isAdmin;
         toast.success('Welcome back!');
-        navigate('/app');
+        navigate(isAdmin ? '/admin' : '/app');
       } else if (method === 'magic') {
         const { error: otpError } = await supabase.auth.signInWithOtp({
           email: cleanEmail,
@@ -113,8 +104,10 @@ export default function Login() {
       });
       if (verifyErr) throw verifyErr;
       if (!data.session) throw new Error('Could not verify code');
+      await useAuthStore.getState().initAuth();
+      const isAdmin = useAuthStore.getState().isAdmin;
       toast.success('Welcome back!');
-      navigate('/app');
+      navigate(isAdmin ? '/admin' : '/app');
     } catch (err: any) {
       const msg = err.message || 'Invalid or expired verification code. Please request a new one.';
       setError(msg);

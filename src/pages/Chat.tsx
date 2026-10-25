@@ -7,12 +7,14 @@ import {
   Send, Check, CheckCheck, HelpCircle, RefreshCw, Bell, BellOff,
   Users, UserPlus, Search, X, ShieldAlert, UserCheck, CheckCircle2,
   UserX, MessageSquare, Clock, ArrowLeft, Share2, Copy, Lock,
-  ShieldCheck, HeartHandshake, ChevronRight, MessageCircle
+  ShieldCheck, ChevronRight, MessageCircle
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { sendEmailAndLog, notifyUser, notifyAdmins } from '../lib/notify';
 import { isDifferentDay, formatChatDateSeparator, formatMessageTime } from '../lib/chatDate';
 import AdminChat from './admin/AdminChat';
+import ChatTranslationBar from '../components/ChatTranslationBar';
+import IncomingTranslation from '../components/IncomingTranslation';
 
 interface SupportMessage {
   id: string;
@@ -37,6 +39,7 @@ interface FriendProfile {
   name: string;
   email: string;
   avatar_url?: string;
+  browser_language?: string;
 }
 
 interface FriendRequest {
@@ -60,6 +63,7 @@ interface FriendUser {
   lastMessageIsMe?: boolean;
   unreadCount?: number;
   relationship?: ContactRelationship;
+  browser_language?: string;
 }
 
 interface NetworkContact {
@@ -81,6 +85,7 @@ const SMART_SUGGESTIONS = [
 
 export default function Chat() {
   const { profile } = useAuthStore();
+  const hasTranslationAccess = Boolean(profile?.is_admin || profile?.can_translate);
   const [searchParams, setSearchParams] = useSearchParams();
   const { subscribed, subscribe, unsubscribe } = usePushNotifications(profile?.id);
 
@@ -165,7 +170,7 @@ export default function Chat() {
       if (profile.referred_by) {
         const { data: upline } = await supabase
           .from('profiles')
-          .select('id, name, email, avatar_url')
+          .select('id, name, email, avatar_url, browser_language')
           .eq('id', profile.referred_by)
           .maybeSingle();
 
@@ -267,7 +272,7 @@ export default function Chat() {
       if (allContactIds.length > 0) {
         const { data: userProfiles } = await supabase
           .from('profiles')
-          .select('id, name, email, avatar_url')
+          .select('id, name, email, avatar_url, browser_language')
           .in('id', allContactIds);
 
         const profileMap = new Map((userProfiles || []).map(p => [p.id, p]));
@@ -383,7 +388,7 @@ export default function Chat() {
         // Active chat might be a network contact not yet in friends list
         supabase
           .from('profiles')
-          .select('id, name, email, avatar_url')
+          .select('id, name, email, avatar_url, browser_language')
           .eq('id', activeChat)
           .maybeSingle()
           .then(({ data, error }) => {
@@ -748,7 +753,7 @@ export default function Chat() {
   }
 
   return (
-    <div className="flex flex-col h-[calc(100dvh-160px)] md:h-[calc(100dvh-120px)] mb-16 md:mb-0">
+    <div className="flex-1 flex flex-col h-[calc(100dvh-150px)] lg:h-[calc(100dvh-120px)] min-h-[580px] mb-16 md:mb-0">
       {profile?.is_admin && (
         <div className="bg-amber-500 text-slate-950 px-4 py-1.5 rounded-2xl mb-2 flex items-center justify-between text-xs font-bold shadow-xs shrink-0">
           <span>Admin Preview: Member Inbox & Network View</span>
@@ -763,8 +768,8 @@ export default function Chat() {
       <div className="flex-1 bg-white border border-gray-200/80 shadow-sm rounded-3xl flex overflow-hidden">
       
       {/* ── LEFT COLUMN: INBOX & DISCOVERY PANEL ───────────────────────────── */}
-      <div className={`w-full md:w-96 border-r border-gray-100 flex flex-col shrink-0 bg-slate-50/40 ${
-        mobileView === 'chat' ? 'hidden md:flex' : 'flex'
+      <div className={`w-full lg:w-80 xl:w-96 border-r border-slate-200/80 flex flex-col shrink-0 bg-slate-50/60 ${
+        mobileView === 'chat' ? 'hidden lg:flex' : 'flex'
       }`}>
 
         {/* 1. Header with Title & Quick Actions */}
@@ -808,19 +813,19 @@ export default function Chat() {
           </div>
 
           {/* 2. Top Segmented Navigation Switcher */}
-          <div className="grid grid-cols-3 gap-1 p-1 bg-slate-100 rounded-2xl text-xs font-bold text-gray-600">
+          <div className="grid grid-cols-3 gap-1 p-1 bg-slate-100/90 rounded-2xl text-[11px] font-bold text-slate-600 select-none">
             <button
               onClick={() => setSidebarTab('chats')}
               className={`py-2 px-1 rounded-xl transition flex items-center justify-center gap-1.5 relative ${
                 sidebarTab === 'chats'
-                  ? 'bg-white text-gray-900 shadow-xs font-extrabold'
-                  : 'hover:text-gray-900'
+                  ? 'bg-white text-slate-900 shadow-xs font-extrabold'
+                  : 'hover:text-slate-900 hover:bg-slate-200/50'
               }`}
             >
-              <MessageCircle size={14} className={sidebarTab === 'chats' ? 'text-brand' : 'text-gray-400'} />
-              <span>Direct</span>
+              <MessageCircle size={13} className={sidebarTab === 'chats' ? 'text-brand' : 'text-slate-400'} />
+              <span className="truncate">Direct</span>
               {totalUnreadDirect > 0 && (
-                <span className="w-4 h-4 rounded-full bg-brand text-white text-[9px] font-extrabold flex items-center justify-center">
+                <span className="w-4 h-4 rounded-full bg-brand text-white text-[9px] font-extrabold flex items-center justify-center shrink-0">
                   {totalUnreadDirect}
                 </span>
               )}
@@ -830,14 +835,14 @@ export default function Chat() {
               onClick={() => setSidebarTab('network')}
               className={`py-2 px-1 rounded-xl transition flex items-center justify-center gap-1.5 relative ${
                 sidebarTab === 'network'
-                  ? 'bg-white text-gray-900 shadow-xs font-extrabold'
-                  : 'hover:text-gray-900'
+                  ? 'bg-white text-slate-900 shadow-xs font-extrabold'
+                  : 'hover:text-slate-900 hover:bg-slate-200/50'
               }`}
             >
-              <Users size={14} className={sidebarTab === 'network' ? 'text-indigo-600' : 'text-gray-400'} />
-              <span>Network</span>
+              <Users size={13} className={sidebarTab === 'network' ? 'text-indigo-600' : 'text-slate-400'} />
+              <span className="truncate">Network</span>
               {totalNetworkCount > 0 && (
-                <span className="px-1.5 py-0.2 rounded-full bg-indigo-100 text-indigo-700 text-[10px] font-bold">
+                <span className="px-1.5 py-0.2 rounded-full bg-indigo-100 text-indigo-700 text-[10px] font-bold shrink-0">
                   {totalNetworkCount}
                 </span>
               )}
@@ -853,12 +858,12 @@ export default function Chat() {
               }}
               className={`py-2 px-1 rounded-xl transition flex items-center justify-center gap-1.5 ${
                 sidebarTab === 'support' || activeChat === 'support'
-                  ? 'bg-white text-gray-900 shadow-xs font-extrabold'
-                  : 'hover:text-gray-900'
+                  ? 'bg-white text-slate-900 shadow-xs font-extrabold'
+                  : 'hover:text-slate-900 hover:bg-slate-200/50'
               }`}
             >
-              <ShieldCheck size={14} className="text-emerald-600" />
-              <span>Support</span>
+              <ShieldCheck size={13} className="text-emerald-600" />
+              <span className="truncate">Support</span>
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping shrink-0" />
             </button>
           </div>
@@ -884,42 +889,77 @@ export default function Chat() {
             )}
 
             {/* Direct Messages List */}
-            <div className="flex-1 overflow-y-auto overscroll-contain divide-y divide-gray-50">
+            <div className="flex-1 overflow-y-auto overscroll-contain divide-y divide-slate-100">
+              
+              {/* Always Pinned Official Support Desk Channel */}
+              <button
+                onClick={() => {
+                  setActiveChat('support');
+                  setActiveFriend(null);
+                  setSidebarTab('support');
+                  setSearchParams({ tab: 'support' });
+                  setMobileView('chat');
+                }}
+                className={`w-full p-3.5 flex items-start gap-3 transition text-left border-l-4 ${
+                  activeChat === 'support'
+                    ? 'bg-emerald-50/80 border-emerald-600 shadow-xs'
+                    : 'border-transparent hover:bg-white'
+                }`}
+              >
+                <div className="relative shrink-0 mt-0.5">
+                  <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-brand to-emerald-600 text-white font-bold flex items-center justify-center text-sm shadow-xs">
+                    <MessageSquare size={17} />
+                  </div>
+                  <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 border-2 border-white rounded-full" />
+                </div>
+
+                <div className="min-w-0 flex-1">
+                  <div className="flex justify-between items-center">
+                    <h4 className="font-bold text-xs text-slate-900 truncate flex items-center gap-1">
+                      <span className="truncate">RPM Support Desk</span>
+                      <CheckCircle2 size={13} className="text-blue-500 shrink-0" />
+                    </h4>
+                    <span className="text-[10px] text-emerald-600 font-bold shrink-0 ml-1">Live</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 mt-0.5 mb-1">
+                    <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200">
+                      24/7 Priority Concierge
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 truncate leading-tight">
+                    {supportMessages.length > 0 
+                      ? supportMessages[supportMessages.length - 1].body 
+                      : 'Ask about deposits, staking yields & deeds...'}
+                  </p>
+                </div>
+              </button>
+
               {friends.length === 0 ? (
-                <div className="p-6 text-center space-y-4 my-auto">
-                  <div className="w-14 h-14 bg-gradient-to-tr from-brand/10 to-indigo-100 text-brand rounded-3xl flex items-center justify-center mx-auto shadow-inner">
-                    <HeartHandshake size={28} className="text-brand" />
+                <div className="p-5 text-center space-y-3.5 my-auto">
+                  <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center mx-auto shadow-inner">
+                    <Users size={22} className="text-indigo-600" />
                   </div>
                   <div>
-                    <h3 className="font-bold text-sm text-gray-900">Chat with People You Know</h3>
-                    <p className="text-xs text-gray-500 mt-1 leading-relaxed max-w-xs mx-auto">
-                      Connect directly with your sponsor, investors you introduced, or search platform members by email.
+                    <h4 className="font-bold text-xs text-slate-900">Direct Peer Conversations</h4>
+                    <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed max-w-xs mx-auto">
+                      Connect 1-on-1 with your sponsor, downlines, or search verified investors by email.
                     </p>
                   </div>
 
-                  <div className="space-y-2 pt-2">
-                    <button
-                      onClick={() => setSidebarTab('network')}
-                      className="w-full py-2.5 px-4 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold rounded-2xl text-xs transition flex items-center justify-center gap-2 border border-indigo-200/60"
-                    >
-                      <Users size={14} />
-                      <span>View People in Your Network ({totalNetworkCount})</span>
-                      <ChevronRight size={14} className="ml-auto" />
-                    </button>
-
+                  <div className="space-y-2 pt-1 max-w-xs mx-auto">
                     <button
                       onClick={() => { setShowAddUserModal(true); setSearchResults([]); setSearchQuery(''); }}
-                      className="w-full py-2.5 px-4 bg-brand hover:bg-brand-dark text-white font-bold rounded-2xl text-xs transition shadow-sm flex items-center justify-center gap-2"
+                      className="w-full py-2 px-3 bg-brand hover:bg-brand-dark text-white font-bold rounded-xl text-xs transition shadow-xs flex items-center justify-center gap-1.5"
                     >
-                      <UserPlus size={14} />
+                      <UserPlus size={13} />
                       <span>Find Member by Name / Email</span>
                     </button>
 
                     <button
                       onClick={copyInviteLink}
-                      className="w-full py-2 px-4 bg-white hover:bg-gray-50 text-gray-600 font-semibold rounded-2xl text-xs transition border border-gray-200 flex items-center justify-center gap-2"
+                      className="w-full py-1.5 px-3 bg-white hover:bg-slate-50 text-slate-700 font-semibold rounded-xl text-xs transition border border-slate-200 flex items-center justify-center gap-1.5"
                     >
-                      <Copy size={13} />
+                      <Copy size={12} />
                       <span>{copiedLink ? 'Link Copied!' : 'Copy Chat Invite Link'}</span>
                     </button>
                   </div>
@@ -1209,58 +1249,91 @@ export default function Chat() {
 
       {/* ── CENTER / RIGHT: CHAT DISPLAY PANE ──────────────────────────────── */}
       <div className={`flex-1 flex flex-col min-w-0 bg-white ${
-        mobileView === 'list' ? 'hidden md:flex' : 'flex'
+        mobileView === 'list' ? 'hidden lg:flex' : 'flex'
       }`}>
         
         {/* If no chat is active, show welcome & discovery screen */}
         {!activeChat ? (
-          <div className="flex-1 flex flex-col items-center justify-center p-6 text-center bg-slate-50/40">
-            <div className="max-w-md w-full p-8 bg-white border border-gray-200/80 rounded-3xl shadow-sm space-y-5">
-              <div className="w-16 h-16 bg-gradient-to-tr from-brand/10 to-indigo-100 text-brand rounded-3xl flex items-center justify-center mx-auto shadow-inner">
-                <MessageCircle size={32} className="text-brand" />
+          <div className="flex-1 flex flex-col items-center justify-center p-6 md:p-10 text-center bg-slate-50/50 overflow-y-auto">
+            <div className="max-w-lg w-full p-6 sm:p-8 bg-white border border-slate-200/80 rounded-3xl shadow-sm space-y-6">
+              
+              <div className="w-16 h-16 bg-gradient-to-tr from-brand/10 via-indigo-50 to-emerald-50 text-brand rounded-3xl flex items-center justify-center mx-auto shadow-inner ring-4 ring-brand/5">
+                <MessageSquare size={30} className="text-brand" />
               </div>
 
-              <div>
-                <h2 className="text-lg font-extrabold text-gray-900">Your Personal Messenger</h2>
-                <p className="text-xs text-gray-500 mt-1.5 leading-relaxed">
-                  Connect and chat with people you know directly on RPM. Share investment ideas, discuss staking earnings, or contact executive support.
+              <div className="space-y-1.5">
+                <h2 className="text-xl font-extrabold text-slate-900 tracking-tight">Executive Messenger & Support</h2>
+                <p className="text-xs text-slate-500 leading-relaxed max-w-sm mx-auto">
+                  Secure peer-to-peer discussions with verified members, direct sponsor communications, and 24/7 priority support concierge.
                 </p>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-2">
-                <button
-                  onClick={() => setSidebarTab('network')}
-                  className="p-3 bg-indigo-50 hover:bg-indigo-100 text-indigo-900 rounded-2xl text-xs font-bold transition text-left border border-indigo-200/60 flex items-center gap-2.5"
-                >
-                  <Users size={18} className="text-indigo-600 shrink-0" />
-                  <div>
-                    <div className="font-extrabold">Network ({totalNetworkCount})</div>
-                    <div className="text-[10px] text-indigo-700 font-normal">Sponsor & referrals</div>
-                  </div>
-                </button>
-
+              <div className="flex flex-col sm:flex-row gap-3 pt-1 text-left">
+                {/* Support Desk Action Card */}
                 <button
                   onClick={() => {
                     setActiveChat('support');
                     setSidebarTab('support');
                     setSearchParams({ tab: 'support' });
+                    setMobileView('chat');
                   }}
-                  className="p-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-950 rounded-2xl text-xs font-bold transition text-left border border-emerald-200/60 flex items-center gap-2.5"
+                  className="flex-1 p-4 bg-gradient-to-br from-emerald-50/80 to-teal-50/40 hover:from-emerald-100/80 hover:to-teal-100/60 border border-emerald-200/70 rounded-2xl transition group shadow-xs"
                 >
-                  <ShieldCheck size={18} className="text-emerald-600 shrink-0" />
-                  <div>
-                    <div className="font-extrabold">Support Desk</div>
-                    <div className="text-[10px] text-emerald-700 font-normal">24/7 Live Desk</div>
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center shadow-xs">
+                      <ShieldCheck size={18} />
+                    </div>
+                    <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-100/80 px-2 py-0.5 rounded-full">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                      Live Concierge
+                    </span>
                   </div>
+                  <h3 className="font-extrabold text-xs text-slate-900 group-hover:text-emerald-700 transition">
+                    RPM Official Support
+                  </h3>
+                  <p className="text-[11px] text-slate-500 mt-0.5 leading-snug">
+                    Direct assistance for deposits, staking yields & deeds.
+                  </p>
+                </button>
+
+                {/* Network Action Card */}
+                <button
+                  onClick={() => {
+                    setSidebarTab('network');
+                    setMobileView('list');
+                  }}
+                  className="flex-1 p-4 bg-gradient-to-br from-indigo-50/80 to-slate-50 hover:from-indigo-100/80 hover:to-slate-100 border border-indigo-200/70 rounded-2xl transition group shadow-xs"
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-xs">
+                      <Users size={18} />
+                    </div>
+                    <span className="text-[10px] font-bold text-indigo-700 bg-indigo-100/80 px-2 py-0.5 rounded-full">
+                      {totalNetworkCount} Active
+                    </span>
+                  </div>
+                  <h3 className="font-extrabold text-xs text-slate-900 group-hover:text-indigo-700 transition">
+                    Investment Network
+                  </h3>
+                  <p className="text-[11px] text-slate-500 mt-0.5 leading-snug">
+                    Message your sponsor or investors you introduced.
+                  </p>
                 </button>
               </div>
 
-              <div className="pt-2 border-t border-gray-100 flex items-center justify-between text-xs text-gray-400">
-                <span>Have friends outside RPM?</span>
-                <button onClick={handleShareInvite} className="font-bold text-brand hover:underline flex items-center gap-1">
-                  <Share2 size={12} /> Invite them
+              <div className="pt-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-400">
+                <span className="flex items-center gap-1.5 text-[11px]">
+                  <Lock size={12} className="text-slate-400 shrink-0" />
+                  <span>End-to-end encrypted direct channels</span>
+                </span>
+                <button 
+                  onClick={handleShareInvite} 
+                  className="font-bold text-brand hover:underline flex items-center gap-1 text-[11px]"
+                >
+                  <Share2 size={12} /> Invite colleague to chat
                 </button>
               </div>
+
             </div>
           </div>
         ) : (
@@ -1270,7 +1343,7 @@ export default function Chat() {
               <div className="flex items-center gap-3 min-w-0">
                 <button
                   onClick={() => setMobileView('list')}
-                  className="p-1.5 hover:bg-white/10 rounded-lg text-gray-300 md:hidden shrink-0"
+                  className="p-1.5 hover:bg-white/10 rounded-lg text-gray-300 lg:hidden shrink-0"
                   title="Back to conversation list"
                 >
                   <ArrowLeft size={17} />
@@ -1410,6 +1483,11 @@ export default function Chat() {
                           </div>
                         )}
                         <p className="leading-relaxed font-medium">{msg.body}</p>
+                        <IncomingTranslation
+                          hasAccess={hasTranslationAccess}
+                          messageText={msg.body}
+                          isMe={isMe}
+                        />
                         
                         <div className="flex items-center justify-end gap-1.5 mt-1.5">
                           <span className={`text-[9px] font-medium tabular-nums ${isMe ? 'text-white/60' : 'text-gray-400'}`}>
@@ -1433,6 +1511,15 @@ export default function Chat() {
               <div ref={chatEndRef} />
             </div>
 
+            <ChatTranslationBar
+              hasAccess={hasTranslationAccess}
+              currentDraft={text}
+              onApplyTranslation={(translated) => setText(translated)}
+              onSendDirectly={(translated) => handleSendMessage(translated)}
+              partnerLanguageHint={activeFriend?.browser_language}
+              currentUserId={profile?.id}
+              className="px-4 pt-3 pb-1 bg-white border-t border-slate-100"
+            />
             {/* Input Form */}
             <form 
               onSubmit={(e) => { e.preventDefault(); handleSendMessage(text); }} 

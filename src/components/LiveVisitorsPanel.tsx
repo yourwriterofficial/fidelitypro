@@ -23,7 +23,7 @@ const getPageLabel = (path: string) => {
   if (path.startsWith('/app/p2p')) return 'P2P Express';
   if (path.startsWith('/app/referral')) return 'Referrals';
   if (path.startsWith('/app/chat')) return 'Inbox';
-  if (path.startsWith('/app/investor-chat')) return 'Investor Chat';
+  if (path.startsWith('/app/investor-chat')) return 'Investor Lounge';
   if (path.startsWith('/app/live-visitors')) return 'Live Visitors';
   if (path.startsWith('/app/settings')) return 'Settings';
   if (path.startsWith('/app/notifications')) return 'Notification Center';

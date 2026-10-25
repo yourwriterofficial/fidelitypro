@@ -5,6 +5,7 @@ import {
   TrendingUp, Lock, Building, ArrowLeftRight, PieChart
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { YieldProjectionCurve } from '../components/portfolio/YieldProjectionCurve';
 
 interface PortfolioItem {
   id: string;
@@ -298,6 +299,14 @@ export default function MyPortfolio() {
           <span className="text-xs text-gray-400 mt-1 block">Daily payouts active</span>
         </div>
       </div>
+
+      {/* Actuarial Compound Growth & Yield Projection Curve */}
+      <YieldProjectionCurve
+        totalEquity={totalInvested}
+        propertyEquity={propertyTotal}
+        stakingEquity={stakingTotal}
+        liquidBalance={profile?.wallet_balance || 0}
+      />
 
       {/* Filter Toolbar */}
       <div className="bg-white rounded-3xl border border-gray-200/80 shadow-sm p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">

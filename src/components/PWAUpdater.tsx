@@ -9,7 +9,8 @@ export default function PWAUpdater() {
     };
     window.addEventListener('vite:preloadError', handlePreloadError);
 
-    if (!('serviceWorker' in navigator)) {
+    // Disable service worker update loop in local dev
+    if (import.meta.env.DEV || !('serviceWorker' in navigator)) {
       return () => {
         window.removeEventListener('vite:preloadError', handlePreloadError);
       };

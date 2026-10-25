@@ -1,3 +1,4 @@
+import SiteTranslator from '../components/SiteTranslator';
 import { Link } from 'react-router-dom';
 import {
   ArrowRight, TrendingUp, Shield, Mail, Phone, MapPin, RefreshCw,
@@ -361,6 +362,7 @@ export default function Landing() {
               <Link to="/app/chat?tab=support" className="md:hidden p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition" title="24/7 Live Support Desk">
                 <MessageSquare size={20} />
               </Link>
+              <SiteTranslator />
               <Link to="/login" className="hidden sm:inline-block text-sm font-medium text-gray-700 hover:text-brand transition px-3 py-1.5">
                 Log In
               </Link>

@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 import NotificationBell from './NotificationBell';
+import SiteTranslator from './SiteTranslator';
 import { useState, useEffect, useRef } from 'react';
 import { useAccountRestriction } from '../hooks/useAccountRestriction';
 import { toast } from 'sonner';
@@ -22,7 +23,7 @@ const mainNavItems = [
   { path: '/app/my-portfolio',icon: Wallet,        label: 'Portfolio' },
   { path: '/app/wallet',      icon: LayoutDashboard, label: 'Wallet'  },
   { path: '/app/chat',        icon: MessageSquare, label: 'Messages'  },
-  { path: '/app/investor-chat',icon: Users,        label: 'Investor Chat' },
+  { path: '/app/investor-chat',icon: Users,        label: 'Investor Lounge' },
   { path: '/app/live-visitors',icon: Radio,        label: 'Live Visitors', adminOnly: true },
 ];
 
@@ -124,7 +125,7 @@ export default function Layout() {
     };
   }, [profile?.id, profile?.is_admin]);
 
-  // Investor Chat unread badge — personal mentions/replies for everyone,
+  // Investor Lounge unread badge — personal mentions/replies for everyone,
   // plus a separate "followed user posted" count for admins only. Both are
   // persisted via notifyUser() with link='/app/investor-chat' and cleared
   // when the user actually opens the page (see InvestorChat.tsx).
@@ -402,7 +403,7 @@ export default function Layout() {
             </div>
           )}
           <div className="flex items-center gap-1">
-            {!collapsed && <NotificationBell />}
+            <NotificationBell />
             {!collapsed && (
               <Link to="/app/chat"
                 className="relative p-2 rounded-xl text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition-colors"
@@ -443,7 +444,8 @@ export default function Layout() {
           {visibleMainNavItems.map(({ path, icon: Icon, label }) => {
             const active = isActive(path);
             const isChatOrSupport = label === 'Messages' || label === 'Support & Messages' || label === 'Support Desk' || label === 'Inbox';
-            const hasBadge = isChatOrSupport || label === 'Investor Chat';
+            const isLounge = path === '/app/investor-chat';
+            const hasBadge = isChatOrSupport || isLounge;
             return (
               <Link key={path} to={path} title={collapsed ? label : undefined}
                 className={`group relative flex items-center gap-3 rounded-xl text-sm font-medium transition-all duration-150 ${collapsed ? 'justify-center py-2.5' : 'px-3.5 py-2.5'} ${
@@ -459,7 +461,7 @@ export default function Layout() {
                 {collapsed && isChatOrSupport && unreadChatCount > 0 && (
                   <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-red-500 rounded-full border border-white shadow-sm" />
                 )}
-                {!collapsed && label === 'Investor Chat' && (investorChatUnread > 0 || investorChatFollowUnread > 0) && (
+                {!collapsed && isLounge && (investorChatUnread > 0 || investorChatFollowUnread > 0) && (
                   <span className="ml-auto flex items-center gap-1">
                     {profile?.is_admin && investorChatFollowUnread > 0 && (
                       <span title="Followed users posted" className="w-5 h-5 bg-amber-500 text-white rounded-full flex items-center justify-center text-[10px] font-bold shadow-sm">
@@ -473,7 +475,7 @@ export default function Layout() {
                     )}
                   </span>
                 )}
-                {collapsed && label === 'Investor Chat' && (investorChatUnread > 0 || investorChatFollowUnread > 0) && (
+                {collapsed && isLounge && (investorChatUnread > 0 || investorChatFollowUnread > 0) && (
                   <span className={`absolute top-2 right-2 w-2.5 h-2.5 rounded-full border border-white shadow-sm ${investorChatUnread > 0 ? 'bg-red-500' : 'bg-amber-500'}`} />
                 )}
                 {!collapsed && active && !hasBadge && <ChevronRight size={13} className="ml-auto opacity-70" />}
@@ -500,6 +502,13 @@ export default function Layout() {
                   </Link>
                 );
               })}
+            </div>
+          )}
+
+          {!collapsed && (
+            <div className="pt-2 border-t border-gray-100 flex items-center justify-between px-1">
+              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Language</span>
+              <SiteTranslator />
             </div>
           )}
 
@@ -671,7 +680,7 @@ export default function Layout() {
                         {unreadChatCount}
                       </span>
                     )}
-                    {label === 'Investor Chat' && (investorChatUnread > 0 || investorChatFollowUnread > 0) && (
+                    {path === '/app/investor-chat' && (investorChatUnread > 0 || investorChatFollowUnread > 0) && (
                       <span className="ml-auto flex items-center gap-1">
                         {profile?.is_admin && investorChatFollowUnread > 0 && (
                           <span title="Followed users posted" className="w-5 h-5 bg-amber-500 text-white rounded-full flex items-center justify-center text-[10px] font-bold shadow-sm">
@@ -709,6 +718,11 @@ export default function Layout() {
                   </div>
                 </div>
               )}
+
+              <div className="pt-2 border-t border-gray-100 flex items-center justify-between px-2 mt-2">
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Language</span>
+                <SiteTranslator />
+              </div>
 
               {profile?.is_admin && (
                 <Link to="/admin" onClick={() => setMobileMenuOpen(false)}

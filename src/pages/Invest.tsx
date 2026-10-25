@@ -310,7 +310,7 @@ export default function Invest() {
                   onClick={() => handleInvest(plan)}
                   className="mt-6 w-full bg-gray-900 group-hover:bg-brand text-white font-bold py-3.5 rounded-2xl text-xs transition shadow-sm flex items-center justify-center gap-2"
                 >
-                  Initiate Plan <ArrowRight size={14} />
+                  Invest in Plan <ArrowRight size={14} />
                 </button>
               </div>
             );

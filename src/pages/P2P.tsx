@@ -4,8 +4,9 @@ import { useAuthStore } from '../store/authStore';
 import { toast } from 'sonner';
 import { 
   ArrowRightLeft, ShieldCheck, CheckCircle2, Clock, 
-  Wallet, RefreshCw, ShieldAlert, Lock
+  Wallet, RefreshCw, ShieldAlert, Lock, ArrowUpRight
 } from 'lucide-react';
+import { P2PEscrowStepperModal, type P2POrderDetails } from '../components/p2p/P2PEscrowStepperModal';
 import { useAccountRestriction } from '../hooks/useAccountRestriction';
 import { notifyAdmins, notifyUser } from '../lib/notify';
 
@@ -79,6 +80,7 @@ export default function P2P() {
   const [selectedMerchant, setSelectedMerchant] = useState<P2PMerchant | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [orderSuccess, setOrderSuccess] = useState<P2POrder | null>(null);
+  const [selectedOrderForStepper, setSelectedOrderForStepper] = useState<P2POrderDetails | null>(null);
 
   const selectedAsset = SUPPORTED_ASSETS.find(a => a.id === targetAssetId) || SUPPORTED_ASSETS[0];
 
@@ -697,7 +699,7 @@ export default function P2P() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-gray-50/80">
-                    {['Order ID / Date', 'Sent (USD)', 'Receiving', 'Destination', 'Merchant Desk', 'Escrow Status'].map(h => (
+                    {['Order ID / Date', 'Sent (USD)', 'Receiving', 'Destination', 'Merchant Desk', 'Escrow Status', 'Action'].map(h => (
                       <th key={h} className="text-left px-6 py-3.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">{h}</th>
                     ))}
                   </tr>
@@ -731,6 +733,15 @@ export default function P2P() {
                           {ord.status.replace('_', ' ')}
                         </span>
                       </td>
+                      <td className="px-6 py-4">
+                        <button
+                          onClick={() => setSelectedOrderForStepper(ord as P2POrderDetails)}
+                          className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-brand text-white font-bold text-[11px] transition shadow-xs flex items-center gap-1"
+                        >
+                          <span>Live Stepper</span>
+                          <ArrowUpRight size={12} />
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -739,6 +750,16 @@ export default function P2P() {
           )}
         </div>
       )}
+
+      {/* Live Escrow Progress Stepper Modal */}
+      <P2PEscrowStepperModal
+        isOpen={Boolean(selectedOrderForStepper || orderSuccess)}
+        order={selectedOrderForStepper || (orderSuccess as P2POrderDetails | null)}
+        onClose={() => {
+          setSelectedOrderForStepper(null);
+          setOrderSuccess(null);
+        }}
+      />
     </div>
   );
 }

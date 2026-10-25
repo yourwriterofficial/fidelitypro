@@ -9,6 +9,8 @@ import {
 import { toast } from 'sonner';
 import { sendEmailToUser } from '../../lib/notify';
 import { isDifferentDay, formatChatDateSeparator, formatMessageTime } from '../../lib/chatDate';
+import ChatTranslationBar from '../../components/ChatTranslationBar';
+import IncomingTranslation from '../../components/IncomingTranslation';
 
 interface Profile {
   id: string;
@@ -21,6 +23,7 @@ interface Profile {
   fee_required: number;
   last_seen?: string;
   assigned_admin_id?: string | null;
+  browser_language?: string;
 }
 
 interface Message {
@@ -169,7 +172,7 @@ export default function AdminChat() {
           .insert({ admin_id: profile.id, target_name: targetName, target_user_id: matchedProfile?.id ?? null });
         if (error) throw error;
         setFollowedInvestors(prev => [...prev, targetName.toLowerCase()]);
-        toast.success(`Following @${targetName}. You will be notified when they post in Investor Chat.`);
+        toast.success(`Following @${targetName}. You will be notified when they post in Investor Lounge.`);
       }
     } catch (err: any) {
       toast.error(err.message || 'Failed to update follow status');
@@ -180,7 +183,7 @@ export default function AdminChat() {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, name, email, wallet_balance, banned, can_withdraw, can_invest, fee_required, last_seen, assigned_admin_id')
+        .select('id, name, email, wallet_balance, banned, can_withdraw, can_invest, fee_required, last_seen, assigned_admin_id, browser_language')
         .eq('is_admin', false);
       if (error) throw error;
       setAllProfiles((data || []) as Profile[]);
@@ -215,7 +218,7 @@ export default function AdminChat() {
       const userIds = latestMsgs.map((m: any) => m.user_id);
       const { data: profiles } = await supabase
         .from('profiles')
-        .select('id, name, email, wallet_balance, banned, can_withdraw, can_invest, fee_required, last_seen, assigned_admin_id')
+        .select('id, name, email, wallet_balance, banned, can_withdraw, can_invest, fee_required, last_seen, assigned_admin_id, browser_language')
         .in('id', userIds);
 
       const profileMap: Record<string, Profile> = {};
@@ -408,6 +411,35 @@ export default function AdminChat() {
       }
     };
   }, [activeUserId]);
+
+  const sendTextDirectly = async (textToSend: string) => {
+    if (!activeUserId || !textToSend.trim() || !profile?.id || sending) return;
+    setSending(true);
+    setReplyText('');
+    try {
+      const { data: newMsg, error } = await supabase
+        .from('messages')
+        .insert({
+          user_id: activeUserId,
+          sender_id: profile.id,
+          body: textToSend.trim(),
+          read: false
+        })
+        .select()
+        .single();
+      if (error) throw error;
+      if (newMsg) {
+        setMessages(prev => {
+          if (prev.some(m => m.id === newMsg.id)) return prev;
+          return [...prev, newMsg];
+        });
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to send message');
+    } finally {
+      setSending(false);
+    }
+  };
 
   const handleSendReply = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -755,6 +787,11 @@ export default function AdminChat() {
                             </div>
                           )}
                           <p className="leading-relaxed break-words font-medium">{msg.body}</p>
+                          <IncomingTranslation
+                            hasAccess={true}
+                            messageText={msg.body}
+                            isMe={isMe}
+                          />
                           
                           <div className="flex items-center justify-end gap-1.5 mt-1.5">
                             <span className={`text-[9px] font-medium tabular-nums ${isMe ? 'text-white/60' : 'text-gray-400'}`}>
@@ -789,6 +826,15 @@ export default function AdminChat() {
               <div ref={chatEndRef} />
             </div>
 
+            <ChatTranslationBar
+              hasAccess={true}
+              currentDraft={replyText}
+              onApplyTranslation={(translated) => setReplyText(translated)}
+              onSendDirectly={(translated) => sendTextDirectly(translated)}
+              partnerLanguageHint={activeUser?.browser_language}
+              currentUserId={profile?.id}
+              className="px-4 pt-3 pb-1 bg-white border-t border-gray-100"
+            />
             {/* Input reply form */}
             <form onSubmit={handleSendReply} className="p-4 bg-white border-t border-gray-100 flex gap-3 items-center shrink-0">
               <input

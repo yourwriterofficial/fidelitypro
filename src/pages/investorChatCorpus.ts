@@ -837,3 +837,152 @@ export function generatePositiveConversationThread(
 
   return thread;
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 6. AUTHENTIC INVESTOR PERSONAS & CONVERSATIONAL Q&A CHAINS
+// ─────────────────────────────────────────────────────────────────────────────
+export interface InvestorPersona {
+  name: string;
+  handle: string;
+  country: string;
+  tier: 'Verified Allocator' | 'Syndicate Member' | 'Founding Member';
+}
+
+export interface ConversationalPair {
+  question: string;
+  reply: string;
+  category: 'real_estate' | 'staking' | 'liquidity' | 'strategy';
+}
+
+export const AUTHENTIC_INVESTORS: InvestorPersona[] = [
+  { name: 'David Miller', handle: 'david_m', country: 'US', tier: 'Verified Allocator' },
+  { name: 'Marcus Vance', handle: 'marcus_v', country: 'US', tier: 'Syndicate Member' },
+  { name: 'James Henderson', handle: 'j_henderson', country: 'GB', tier: 'Founding Member' },
+  { name: 'Elena Rostova', handle: 'elena_r', country: 'CA', tier: 'Verified Allocator' },
+  { name: 'Dr. Aris Thorne', handle: 'aris_thorne', country: 'CH', tier: 'Founding Member' },
+  { name: 'Matteo Rossi', handle: 'm_rossi', country: 'IT', tier: 'Verified Allocator' },
+  { name: 'Stefan Weber', handle: 'stefan_w', country: 'DE', tier: 'Syndicate Member' },
+  { name: 'Kenji Takahashi', handle: 'kenji_t', country: 'JP', tier: 'Verified Allocator' },
+  { name: 'Sophie Laurent', handle: 'sophie_l', country: 'FR', tier: 'Verified Allocator' },
+  { name: 'Omar Al-Sayed', handle: 'omar_sayed', country: 'AE', tier: 'Founding Member' },
+  { name: 'Lucas Miller', handle: 'lucas_m', country: 'AU', tier: 'Syndicate Member' },
+  { name: 'Priya Nair', handle: 'priya_n', country: 'SG', tier: 'Verified Allocator' },
+  { name: 'Carlos Morales', handle: 'carlos_m', country: 'ES', tier: 'Verified Allocator' },
+  { name: 'Henrik Bergman', handle: 'h_bergman', country: 'SE', tier: 'Syndicate Member' },
+  { name: 'Tariq Al-Mansoor', handle: 'tariq_m', country: 'QA', tier: 'Founding Member' },
+  { name: 'Claire van Dijk', handle: 'claire_vd', country: 'NL', tier: 'Verified Allocator' },
+  { name: 'Viktor Novak', handle: 'v_novak', country: 'AT', tier: 'Verified Allocator' },
+  { name: 'Gabriel Costa', handle: 'gabriel_c', country: 'BR', tier: 'Verified Allocator' },
+  { name: 'Nathan Parker', handle: 'n_parker', country: 'NZ', tier: 'Syndicate Member' },
+  { name: 'Arthur De Smet', handle: 'arthur_ds', country: 'BE', tier: 'Verified Allocator' },
+  { name: 'Alexandre Boucher', handle: 'alex_boucher', country: 'CA', tier: 'Founding Member' },
+  { name: 'Lukas Schmidt', handle: 'lukas_s', country: 'DE', tier: 'Verified Allocator' },
+  { name: 'Sarah Jenkins', handle: 'sarah_j', country: 'GB', tier: 'Verified Allocator' },
+  { name: 'Michael Chang', handle: 'm_chang', country: 'US', tier: 'Syndicate Member' },
+  { name: 'Amara Okafor', handle: 'amara_o', country: 'NG', tier: 'Verified Allocator' },
+  { name: 'Charlotte Dubois', handle: 'charlotte_d', country: 'FR', tier: 'Verified Allocator' },
+  { name: 'Liam O\'Connor', handle: 'liam_oc', country: 'IE', tier: 'Verified Allocator' },
+  { name: 'Noah Andersen', handle: 'noah_a', country: 'DK', tier: 'Syndicate Member' },
+  { name: 'Emma Wilson', handle: 'emma_w', country: 'US', tier: 'Verified Allocator' },
+  { name: 'Kavya Sharma', handle: 'kavya_s', country: 'IN', tier: 'Verified Allocator' },
+  { name: 'Felipe Santos', handle: 'felipe_s', country: 'BR', tier: 'Verified Allocator' },
+  { name: 'Chloe Martin', handle: 'chloe_m', country: 'AU', tier: 'Verified Allocator' },
+  { name: 'Dmitri Volkov', handle: 'dmitri_v', country: 'CA', tier: 'Syndicate Member' },
+  { name: 'Yuki Tanaka', handle: 'yuki_t', country: 'JP', tier: 'Founding Member' },
+  { name: 'Isabella Rossi', handle: 'isabella_r', country: 'CH', tier: 'Verified Allocator' },
+  { name: 'Zainab Al-Hassan', handle: 'zainab_h', country: 'AE', tier: 'Verified Allocator' },
+  { name: 'Oliver Scott', handle: 'oliver_s', country: 'GB', tier: 'Syndicate Member' },
+  { name: 'Hannah Fischer', handle: 'hannah_f', country: 'DE', tier: 'Verified Allocator' },
+  { name: 'Adrian Popov', handle: 'adrian_p', country: 'BG', tier: 'Verified Allocator' },
+  { name: 'Mia Lindqvist', handle: 'mia_l', country: 'FI', tier: 'Verified Allocator' },
+  { name: 'Daniel Silva', handle: 'daniel_s', country: 'PT', tier: 'Verified Allocator' },
+  { name: 'Siddharth Rao', handle: 'sid_rao', country: 'SG', tier: 'Founding Member' },
+  { name: 'Rachel Green', handle: 'rachel_g', country: 'US', tier: 'Verified Allocator' },
+  { name: 'Antoine Moreau', handle: 'antoine_m', country: 'FR', tier: 'Syndicate Member' },
+];
+
+export const CONVERSATIONAL_QA_PAIRS: ConversationalPair[] = [
+  {
+    question: "Has anyone received their rental dividend on the Miami luxury deed listing yet?",
+    reply: "Yes, hit available wallet balance around 6am EST. Deposited cleanly in USDT.",
+    category: 'real_estate'
+  },
+  {
+    question: "Looking at the Austin multi-family duplex listing. What's the lock term on fractional equity?",
+    reply: "No lock on the deed shares! Monthly rental dividends distribute on the 1st and you can trade shares anytime.",
+    category: 'real_estate'
+  },
+  {
+    question: "Is the 90-day staking pool daily compound or at maturity?",
+    reply: "Daily compound! Make sure auto-reinvest is toggled on so it snowballs automatically.",
+    category: 'staking'
+  },
+  {
+    question: "What's everyone's split between fixed staking and property deeds?",
+    reply: "I do 60% staking for the daily liquidity and 40% in properties for inflation-hedged monthly cashflow.",
+    category: 'strategy'
+  },
+  {
+    question: "Quick check — how fast are USDT withdrawals clearing to private wallets today?",
+    reply: "Tested $2,400 to TRC20 an hour ago, broadcasted and confirmed on-chain in under 3 minutes.",
+    category: 'liquidity'
+  },
+  {
+    question: "Just deployed $5,000 into the locked savings plan. How long until the first daily distribution?",
+    reply: "First cycle settles at exactly 00:00 UTC, then every 24 hours like clockwork.",
+    category: 'staking'
+  },
+  {
+    question: "Can we reinvest rental dividends directly into the staking compound pool without withdrawing?",
+    reply: "Yes, funds drop right into your liquid wallet balance, so you can stake them with one click.",
+    category: 'real_estate'
+  },
+  {
+    question: "Anyone tried the P2P express trade for local fiat conversion?",
+    reply: "Used it twice this week for EUR and GBP. Escrow releases immediately once payment proof is submitted.",
+    category: 'liquidity'
+  },
+  {
+    question: "Between the Phoenix Solar Villa and the Chicago Plaza, which has higher historic occupancy?",
+    reply: "Phoenix Villa has had 100% occupancy since listing; solar utility leases are multi-year contracts.",
+    category: 'real_estate'
+  },
+  {
+    question: "Does the auto-compound compound the principal only or the daily yield as well?",
+    reply: "Both! It restakes the yield so tomorrow's payout is calculated on the higher balance.",
+    category: 'staking'
+  },
+  {
+    question: "What hardware wallet works best with the withdrawal gateway?",
+    reply: "Ledger and Trezor work seamlessly. You can also cash out directly to Phantom, Trust Wallet, or MetaMask.",
+    category: 'liquidity'
+  },
+  {
+    question: "How are taxes handled on fractional property deeds?",
+    reply: "You get a comprehensive annual report exported right from your History tab with itemized distributions.",
+    category: 'strategy'
+  },
+  {
+    question: "Has anyone upgraded to the VIP Tier yet? What's the main perk?",
+    reply: "Priority escrow settlement and access to the private 180-day 24.5% APY compounding pool. Definitely worth it.",
+    category: 'strategy'
+  },
+  {
+    question: "Can you split an order across multiple payment methods in P2P?",
+    reply: "Each P2P trade is executed per contract, but you can open parallel trades with different verified merchants.",
+    category: 'liquidity'
+  },
+  {
+    question: "What's the minimum allocation for commercial deed fractions?",
+    reply: "Starts at just $500 per deed fraction, making it super accessible compared to traditional syndications.",
+    category: 'real_estate'
+  }
+];
+
+export function simplifyTopicTitle(raw: string): string {
+  if (!raw) return '';
+  return raw
+    .replace(/^(High-Yield Update:\s*|Massive Yields on\s*|Top Performer:\s*|Deep Dive:\s*|Spotlight on\s*|Bullish Outlook:\s*|Strategy Guide:\s*)/i, '')
+    .replace(/(Yield Report|Strategy Breakdown|Dividend Review|Performance Surge|Growth Milestone|Cashflow Analysis|Masterclass|Daily Returns|Compounding Guide|Alpha Update)$/i, '')
+    .trim();
+}

@@ -37,7 +37,7 @@ export default function InactivityBanner() {
           <span className={`font-bold font-mono tracking-tight ${isUrgent ? 'text-red-900' : 'text-amber-900'}`}>
             {formatTime(timeLeft)}
           </span>
-          {' '}or your account will be deactivated. This platform is for active investors only.
+          {' '}or your account will be deactivated. This measure is to counter scammers and protect verified investors. This platform is for active investors only.
         </p>
       </div>
     </div>

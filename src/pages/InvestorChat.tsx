@@ -4,12 +4,23 @@ import { useAuthStore } from '../store/authStore';
 import { supabase } from '../lib/supabaseClient';
 import { 
   Send, Users, Pin, VolumeX, ShieldAlert, ShieldCheck, 
-  Bell, X, Search, ChevronDown, Info
+  Bell, X, Search, ChevronDown, TrendingUp, Building,
+  CheckCircle2, Activity
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { notifyUser, sendEmailToUser } from '../lib/notify';
 import { isDifferentDay, formatChatDateSeparator, formatMessageTime } from '../lib/chatDate';
-import { HUMAN_MSGS, HUMAN_TOPIC_TEMPLATES, CURATED_TOPICS, PROCEDURAL_TOPICS } from './investorChatCorpus';
+import IncomingTranslation from '../components/IncomingTranslation';
+import { MacroMarketBriefingTicker } from '../components/investor/MacroMarketBriefingTicker';
+import { 
+  HUMAN_MSGS, 
+  HUMAN_TOPIC_TEMPLATES, 
+  CURATED_TOPICS, 
+  PROCEDURAL_TOPICS,
+  AUTHENTIC_INVESTORS,
+  CONVERSATIONAL_QA_PAIRS,
+  simplifyTopicTitle
+} from './investorChatCorpus';
 
 interface InvestorChatMessage {
   id: string;
@@ -76,80 +87,50 @@ const COUNTRY_FLAGS = COUNTRIES.reduce((acc, code) => {
   return acc;
 }, {} as Record<string, string>);
 
-// 60,000 unique realistic usernames — 300 first names × 200 last-name-style tags
-// Each name looks like a real handle a person would choose on a chat platform
-const PROCEDURAL_USERNAMES = (() => {
-  const firsts = [
-    "james","john","robert","michael","william","david","richard","joseph","thomas","charles",
-    "christopher","daniel","matthew","anthony","mark","donald","steven","paul","andrew","joshua",
-    "kenneth","kevin","brian","george","timothy","ronald","edward","jason","jeffrey","ryan",
-    "jacob","gary","nicholas","eric","jonathan","stephen","larry","justin","scott","brandon",
-    "benjamin","samuel","raymond","frank","gregory","alexander","patrick","jack","dennis","jerry",
-    "tyler","aaron","henry","jose","adam","douglas","nathan","peter","zachary","kyle",
-    "walter","harold","carl","jeremy","keith","roger","gerald","christian","terry","sean",
-    "austin","arthur","lawrence","noah","jesse","joe","bryan","billy","jordan","albert",
-    "dylan","bruce","willie","alan","elijah","wayne","roy","juan","eugene","randy",
-    "mason","louis","philip","bobby","johnny","bradley","sarah","jessica","emily","ashley",
-    "jennifer","amanda","stephanie","melissa","nicole","elizabeth","helen","dorothy","sandra","donna",
-    "carol","ruth","sharon","michelle","laura","kimberly","deborah","dorothy","lisa","nancy",
-    "karen","betty","helen","anna","margaret","amber","pamela","rachel","samantha","alice",
-    "marie","heather","julia","cynthia","diane","angela","kathryn","julia","joyce","virginia",
-    "mia","charlotte","isabella","sofia","ava","luna","aria","zoey","penelope","layla",
-    "riley","nora","lily","eleanor","hannah","lillian","addison","aubrey","ellie","stella",
-    "natalie","zoe","leah","hazel","violet","aurora","savannah","audrey","brooklyn","bella",
-    "claire","skylar","lucy","paisley","everly","anna","caroline","genesis","aaliyah","kennedy",
-    "ora","nova","maya","willow","kinsley","naomi","alexis","ariana","elena","cathleen",
-    "liam","oliver","ethan","aiden","lucas","caden","grayson","jackson","sebastian","julian",
-    "ezra","mateo","leo","jayden","elias","jaxon","brayden","gabriel","lincoln","owen",
-    "kaito","yuki","takeshi","hiroshi","kenji","akira","riku","haruto","sora","daiki",
-    "wei","lei","fang","ming","chen","hui","jing","xin","yang","tao",
-    "omar","hassan","ali","khalid","ahmed","ibrahim","yusuf","ismail","tariq","sameer",
-    "raj","priya","arjun","kavya","rohit","ananya","vivek","pooja","manish","shreya",
-    "dmitri","ivan","aleksei","nikolai","mikhail","boris","sergei","andrei","vadim","kirill",
-    "sofia","lena","anastasia","katerina","olga","irina","natasha","polina","daria","yulia",
-    "lorenzo","marcello","sandro","giovanni","luigi","paolo","vincenzo","stefano","claudio","fabio",
-    "mathias","ludvig","rasmus","mikkel","magnus","emil","oskar","hugo","lukas_k","lucas_v",
-    "chloe_f","elise_m","clara_g","emma_h","sophie_d","zoey_e","mia_r","ava_s","luna_t","lola_u"
-  ];
-  const tags = [
-    "trades","holds","stacks","invests","wins","hodls","builds","earns","saves","grows",
-    "btc","eth","defi","nft","dao","yield","stake","swap","bull","bear",
-    "real","daily","passive","smart","crypto","alpha","beta","degen","ape","moon",
-    "pro","vip","plus","max","ultra","prime","elite","club","squad","gang",
-    "x","xyz","777","888","999","101","247","365","100","420",
-    "official","real","verified","legit","trusted","safe","solid","base","core","root",
-    "london","dubai","tokyo","nyc","paris","berlin","miami","lagos","sg","hk",
-    "fx","rei","cap","mgmt","fund","hq","labs","works","io","fi",
-    "23","24","25","88","99","00","01","7","77","2025",
-    "one","two","three","go","now","fast","live","up","on","in",
-    "reads","cooks","bakes","hikes","bikes","swims","runs","climbs","games","codes",
-    "paints","writes","travels","explores","dreams","grinds","hustles","thrives","rises","shines",
-    "vibes","chills","jams","rocks","grooves","flows","soars","wanders","roams","ventures",
-    "forever","always","truly","simply","freely","boldly","quietly","loudly","gently","kindly",
-    "junior","senior","original","classic","modern","vintage","retro","fresh","raw","genuine",
-    "north","south","east","west","central","uptown","downtown","midtown","coastal","highland",
-    "papa","mama","auntie","uncle","og","jr","sr","esq","doc","chief",
-    "fit","strong","active","calm","bold","brave","kind","wise","sharp","steady",
-    "star","spark","flame","storm","wave","river","stone","forest","summit","horizon",
-    "52","63","74","85","96","07","13","19","31","42"
-  ];
+// Authentic global investor personas with strictly paired country flags and verified tiers
+const SIMULATED_USERS = AUTHENTIC_INVESTORS.map(u => ({
+  name: u.name,
+  country: u.country,
+  tier: u.tier,
+  handle: u.handle
+}));
 
-  const list: { name: string; country: string }[] = [];
-  let idx = 0;
-  for (const first of firsts) {
-    for (const tag of tags) {
-      const country = COUNTRIES[idx % COUNTRIES.length];
-      // Vary separators and capitalisation so names look genuinely unique
-      const sep = idx % 4 === 0 ? '_' : idx % 4 === 1 ? '.' : idx % 4 === 2 ? '-' : '';
-      const cap = idx % 5 === 0 ? first.charAt(0).toUpperCase() + first.slice(1) : first;
-      list.push({ name: `${cap}${sep}${tag}`, country });
-      idx++;
-    }
+const getInvestorTier = (senderName: string, isAdmin?: boolean): string => {
+  if (isAdmin || senderName.toLowerCase() === 'support' || senderName.toLowerCase() === 'official desk') {
+    return 'Official Desk';
   }
-  return list;
-})();
+  const match = AUTHENTIC_INVESTORS.find(a => a.name.toLowerCase() === senderName.toLowerCase());
+  return match?.tier || 'Verified Allocator';
+};
 
-const SIMULATED_USERS = PROCEDURAL_USERNAMES;
+const renderTierBadge = (tier: string) => {
+  if (tier === 'Official Desk') {
+    return (
+      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20">
+        Official Desk
+      </span>
+    );
+  }
+  if (tier === 'Founding Member') {
+    return (
+      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-purple-500/10 text-purple-700 dark:text-purple-400 border border-purple-500/20">
+        Founding Member
+      </span>
+    );
+  }
+  if (tier === 'Syndicate Member') {
+    return (
+      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-500/20">
+        Syndicate Member
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
+      Verified Allocator
+    </span>
+  );
+};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 50,000-pool human-sounding messages across 10 conversation categories.
@@ -203,33 +184,7 @@ const getActiveTopic = (topicSetting: string, topics: string[]): string | undefi
   return topicSetting;
 };
 
-// Helper to generate consistent avatars
-const AVATAR_GRADIENTS = [
-  'from-blue-500 to-indigo-600',
-  'from-emerald-500 to-teal-600',
-  'from-purple-500 to-pink-500',
-  'from-amber-500 to-orange-600',
-  'from-red-500 to-rose-600',
-  'from-cyan-500 to-blue-600',
-  'from-violet-500 to-purple-600'
-];
 
-// Telegram-style: each sender gets a consistent distinct color for their name
-const NAME_COLORS = [
-  'text-[#E17076]', // red
-  'text-[#7BC862]', // green
-  'text-[#65AADD]', // blue
-  'text-[#FF7F50]', // orange
-  'text-[#A695E7]', // purple
-  'text-[#7EC4CF]', // teal
-  'text-[#E5CA77]', // yellow
-  'text-[#EF7BA3]', // pink
-];
-const getNameColor = (name: string): string => {
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
-  return NAME_COLORS[Math.abs(hash) % NAME_COLORS.length];
-};
 
 export default function InvestorChat() {
   const { profile } = useAuthStore();
@@ -264,16 +219,14 @@ export default function InvestorChat() {
     loadSystemTopics();
   }, []);
   
-  // Real-time dynamic user count — seeded by time of day, 1M-4M range
+  // Real-time dynamic investor count — calibrated to realistic 1,420 - 2,850 active investors
   const [onlineCount, setOnlineCount] = useState(() => {
-    // Base count varies by hour of day (peak midday UTC, trough 3-5am UTC)
     const hour = new Date().getUTCHours();
-    // Sine wave: peak ~3.2M at 14:00 UTC, trough ~1.1M at 04:00 UTC
-    const base = 2_150_000 + Math.sin(((hour - 4) / 24) * 2 * Math.PI) * 1_050_000;
-    // Add ±80k random jitter so each load feels fresh
-    const jitter = Math.floor((Math.random() - 0.5) * 160_000);
+    const base = 1950 + Math.sin(((hour - 4) / 24) * 2 * Math.PI) * 450;
+    const jitter = Math.floor((Math.random() - 0.5) * 80);
     return Math.round(base + jitter);
   });
+
 
   // Telegram-like Pinned Message
   const [pinnedMessage, setPinnedMessage] = useState<InvestorChatMessage | null>(null);
@@ -437,17 +390,30 @@ export default function InvestorChat() {
   const generateRandomMessage = (
     replyToName?: string,
     activeTopic?: string,
-    isLive = false
+    isLive = false,
+    replyToBody?: string
   ): string => {
     let base: string;
-    if (activeTopic && Math.random() < 0.7) {
+    const cleanTopic = activeTopic ? simplifyTopicTitle(activeTopic) : undefined;
+
+    // If the message being replied to was a known question, provide the direct matching answer
+    const matchingPair = replyToBody 
+      ? CONVERSATIONAL_QA_PAIRS.find(p => p.question.toLowerCase() === replyToBody.toLowerCase().trim())
+      : null;
+
+    if (matchingPair) {
+      base = matchingPair.reply;
+    } else if (cleanTopic && Math.random() < 0.20) {
       if (isLive) {
         const template = drawNextTopicTemplate();
-        base = template.replace('{topic}', activeTopic);
+        base = template.replace(/\{topic\}/g, cleanTopic);
       } else {
         const template = TOPIC_TEMPLATES[Math.floor(Math.random() * TOPIC_TEMPLATES.length)];
-        base = template.replace('{topic}', activeTopic);
+        base = template.replace(/\{topic\}/g, cleanTopic);
       }
+    } else if (replyToName && Math.random() < 0.45) {
+      const pair = CONVERSATIONAL_QA_PAIRS[Math.floor(Math.random() * CONVERSATIONAL_QA_PAIRS.length)];
+      base = pair.reply;
     } else {
       if (isLive) {
         base = drawNextBaseMessage();
@@ -456,7 +422,7 @@ export default function InvestorChat() {
       }
     }
 
-    if (replyToName && Math.random() > 0.3) {
+    if (replyToName && Math.random() > 0.3 && !matchingPair) {
       const starterTemplate = REPLY_STARTERS[Math.floor(Math.random() * REPLY_STARTERS.length)];
       const starter = starterTemplate.replace('{name}', replyToName);
       const lowerBase = base.charAt(0).toLowerCase() + base.slice(1);
@@ -532,11 +498,11 @@ export default function InvestorChat() {
         duration: 6000
       });
 
-      // Persist so the Investor Chat nav badge (Layout.tsx) reflects this
+      // Persist so the Investor Lounge nav badge (Layout.tsx) reflects this
       // even when the user isn't currently on the page.
       notifyUser({
         userId: profile.id,
-        title: isTagged ? 'You were mentioned in Investor Chat' : 'New reply in Investor Chat',
+        title: isTagged ? 'You were mentioned in Investor Lounge' : 'New reply in Investor Lounge',
         message: `@${msg.sender_name}: ${msg.body.substring(0, 80)}${msg.body.length > 80 ? '...' : ''}`,
         type: 'info',
         link: '/app/investor-chat'
@@ -549,7 +515,7 @@ export default function InvestorChat() {
   const chatEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
-  // Clear the Investor Chat nav badge (mentions, replies, and — for admins —
+  // Clear the Investor Lounge nav badge (mentions, replies, and — for admins —
   // followed-user alerts) the moment the user actually opens this page.
   useEffect(() => {
     if (!profile?.id) return;
@@ -718,8 +684,8 @@ export default function InvestorChat() {
 
   useEffect(() => {
     const history: InvestorChatMessage[] = [];
-    const baseTime = Date.now() - 24 * 60 * 60 * 1000; // 1 day ago
     const activeTopic = getActiveTopic(simCustomTopic, PROCEDURAL_TOPICS);
+    const cleanTopic = activeTopic ? simplifyTopicTitle(activeTopic) : undefined;
 
     // Walk the pre-shuffled pools sequentially (instead of striding through
     // the original template/name-ordered arrays) and skip anything used in
@@ -727,13 +693,24 @@ export default function InvestorChat() {
     const RECENT_WINDOW = 8;
     const recentNames: string[] = [];
     const recentBodies: string[] = [];
-    const users = shuffledUsersRef.current;
-    const msgs = shuffledMsgsRef.current;
-    if (!users || !msgs) return;
+    const users = shuffledUsersRef.current || SIMULATED_USERS;
+    const msgs = shuffledMsgsRef.current || ALL_MSGS;
+    if (!users || !msgs || users.length === 0) return;
+
+    let rollingTimestamp = Date.now() - (virtualHistoryCount * 3.4 * 60 * 1000);
+    let qaPairCursor = 0;
+    let pendingQaPair: (typeof CONVERSATIONAL_QA_PAIRS)[0] | null = null;
 
     for (let i = 0; i < virtualHistoryCount; i++) {
-      const timeOffset = (virtualHistoryCount - i) * 8 * 60 * 1000; // ~8 mins apart
-      const msgTime = new Date(baseTime + timeOffset).toISOString();
+      const isQuestion = (i % 4 === 1) && !pendingQaPair;
+      const isQaReply = (i % 4 === 2) && !!pendingQaPair;
+
+      // Organic intervals: quick replies take 30-75s; new insights take 1.5-4.5m
+      const deltaMs = isQaReply
+        ? Math.floor(Math.random() * 45000 + 30000)
+        : Math.floor(Math.random() * 180000 + 90000);
+      rollingTimestamp += deltaMs;
+      const msgTime = new Date(Math.min(rollingTimestamp, Date.now() - 20000)).toISOString();
 
       let user = users[i % users.length];
       for (let probe = 1; probe <= 20 && recentNames.includes(user.name); probe++) {
@@ -743,11 +720,22 @@ export default function InvestorChat() {
       if (recentNames.length > RECENT_WINDOW) recentNames.shift();
 
       let body: string;
-      if (activeTopic) {
-        body = generateRandomMessage(undefined, activeTopic);
-        for (let attempt = 0; attempt < 5 && recentBodies.includes(body); attempt++) {
-          body = generateRandomMessage(undefined, activeTopic);
-        }
+      let replyToName: string | undefined;
+      let replyToBody: string | undefined;
+
+      if (isQaReply && history.length > 0 && pendingQaPair) {
+        const prevMsg = history[history.length - 1];
+        replyToName = prevMsg.sender_name;
+        replyToBody = prevMsg.body;
+        body = pendingQaPair.reply;
+        pendingQaPair = null;
+      } else if (isQuestion) {
+        pendingQaPair = CONVERSATIONAL_QA_PAIRS[qaPairCursor % CONVERSATIONAL_QA_PAIRS.length];
+        qaPairCursor++;
+        body = pendingQaPair.question;
+      } else if (cleanTopic && Math.random() < 0.20) {
+        const template = TOPIC_TEMPLATES[Math.floor(Math.random() * TOPIC_TEMPLATES.length)];
+        body = template.replace(/\{topic\}/g, cleanTopic);
       } else {
         body = msgs[i % msgs.length];
         for (let probe = 1; probe <= 20 && recentBodies.includes(body); probe++) {
@@ -764,7 +752,9 @@ export default function InvestorChat() {
         sender_country: user.country,
         body,
         is_pinned: false,
-        reply_to_id: null,
+        reply_to_id: isQaReply && history.length > 0 ? history[history.length - 1].id : null,
+        reply_to_name: replyToName,
+        reply_to_body: replyToBody,
         created_at: msgTime
       });
     }
@@ -918,53 +908,25 @@ export default function InvestorChat() {
 
       recentPosterNamesRef.current = [...recentPosterNamesRef.current, user.name].slice(-6);
 
-      const decider = Math.random();
-      if (decider < 0.08) {
-        // Online-count change — explained by batch joins/leaves, which looks
-        // much more realistic for a room of ~3M users than single joins/leaves.
-        const isJoin = decider < 0.05;
-        const waveRoll = Math.random();
-        
-        let amount = 1;
-        if (waveRoll > 0.02) {
-          amount = waveRoll < 0.70
-            ? Math.floor(Math.random() * 80) + 10       // 10–90 users
-            : waveRoll < 0.95
-            ? Math.floor(Math.random() * 350) + 100     // 100–450 users
-            : Math.floor(Math.random() * 2500) + 500;    // 500–3000 users
-        }
-
-        const flag = COUNTRY_FLAGS[user.country] || '🌐';
-        const label = amount === 1
-          ? `${flag} @${user.name} ${isJoin ? 'joined' : 'left'} the room`
-          : `👥 ${amount.toLocaleString()} users just ${isJoin ? 'joined' : 'left'} the room`;
-
-        const simulatedMsg: InvestorChatMessage = {
-          id: `sim-sys-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-          sender_id: null,
-          sender_name: 'System',
-          sender_country: user.country,
-          body: label,
-          is_pinned: false,
-          reply_to_id: null,
-          created_at: new Date().toISOString()
-        };
-        setMessages(prev => [...prev, simulatedMsg]);
+      // Subtle natural fluctuations in active floor count (1,420 - 2,850)
+      if (Math.random() < 0.15) {
         setOnlineCount(prev => {
-          const next = isJoin ? prev + amount : prev - amount;
-          return Math.max(1_000_000, Math.min(4_000_000, next));
+          const delta = Math.floor(Math.random() * 7) - 3;
+          return Math.max(1420, Math.min(2850, prev + delta));
         });
-        scrollToBottom();
-      } else {
+      }
+
+      {
         // Decider to reply to last msg or post a new topic
         const list = allMessagesListRef.current;
         const lastMsg = list[list.length - 1];
-        const shouldReply = Math.random() > 0.65 && lastMsg && lastMsg.sender_name !== 'System';
+        const shouldReply = Math.random() > 0.45 && lastMsg && lastMsg.sender_name !== 'System';
         
         const activeTopic = getActiveTopic(customTopicVal, PROCEDURAL_TOPICS);
-        const body = generateRandomMessage(shouldReply ? lastMsg.sender_name : undefined, activeTopic, true);
+        const cleanTopic = activeTopic ? simplifyTopicTitle(activeTopic) : undefined;
+        const body = generateRandomMessage(shouldReply ? lastMsg.sender_name : undefined, cleanTopic, true);
 
-        if (activeTopic && body.toLowerCase().includes(activeTopic.toLowerCase())) {
+        if (cleanTopic && body.toLowerCase().includes(cleanTopic.toLowerCase())) {
           topicMessageCountRef.current++;
           if (topicMessageCountRef.current >= topicThresholdRef.current) {
             resetTopicCounter();
@@ -1018,7 +980,7 @@ export default function InvestorChat() {
                 notifyUser({
                   userId: profile.id,
                   title: `Followed user posted`,
-                  message: `${user.name} posted a new update in Investor Chat.`,
+                  message: `${user.name} posted a new update in Investor Lounge.`,
                   type: 'info',
                   link: '/app/investor-chat'
                 });
@@ -1118,19 +1080,19 @@ export default function InvestorChat() {
           // Trigger Alert notification
           await notifyUser({
             userId: matchedUser.id,
-            title: 'Tagged in Investor Chat',
-            message: `${senderName} tagged you in the community chat: "${text.substring(0, 40)}..."`,
+            title: 'Tagged in Investor Lounge',
+            message: `${senderName} tagged you in the community lounge: "${text.substring(0, 40)}..."`,
             type: 'info',
             link: '/app/investor-chat'
           });
 
           // Trigger email notification
-          const emailSubject = `You were tagged in ${import.meta.env.VITE_APP_NAME || 'RPM'} Investor Chat`;
+          const emailSubject = `You were tagged in ${import.meta.env.VITE_APP_NAME || 'RPM'} Investor Lounge`;
           const emailBody = `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #f0f0f0; border-radius: 12px;">
               <h2 style="color: #111;">Hello ${matchedUser.name},</h2>
               <p style="color: #555; font-size: 14px; line-height: 1.5;">
-                <strong>${senderName}</strong> mentioned/tagged you in the global Investor Group Chat.
+                <strong>${senderName}</strong> mentioned/tagged you in the global Investor Lounge.
               </p>
               <div style="background-color: #f9f9f9; padding: 15px; border-left: 4px solid #111; margin: 20px 0; font-style: italic; color: #333;">
                 "${text}"
@@ -1139,7 +1101,7 @@ export default function InvestorChat() {
                 Log into your account to read the full thread and reply to the conversation.
               </p>
               <a href="${window.location.origin}/app/investor-chat" style="display: inline-block; background-color: #111; color: #fff; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; margin-top: 10px;">
-                Open Investor Chat
+                Open Investor Lounge
               </a>
             </div>
           `;
@@ -1312,15 +1274,6 @@ export default function InvestorChat() {
     }
   };
 
-  // Get avatar gradient index based on name hash
-  const getAvatarGradient = (name: string) => {
-    let hash = 0;
-    for (let i = 0; i < name.length; i++) {
-      hash = name.charCodeAt(i) + ((hash << 5) - hash);
-    }
-    const idx = Math.abs(hash) % AVATAR_GRADIENTS.length;
-    return AVATAR_GRADIENTS[idx];
-  };
 
   // Search filtered message list
   const filteredMessages = useMemo(() => {
@@ -1339,46 +1292,64 @@ export default function InvestorChat() {
   return (
     <div className="flex flex-col md:flex-row gap-4 h-full min-h-0">
       
-      {/* Sidebar - Settings & Stats */}
-      <div className="hidden md:flex w-full md:w-64 bg-slate-900 border border-slate-800 text-white rounded-3xl p-5 flex flex-col justify-between shrink-0 h-fit md:h-full shadow-2xl">
-        <div className="space-y-6">
-          <div className="flex items-center gap-2 pb-3 border-b border-slate-800">
-            <Users className="text-brand shrink-0 animate-pulse" size={20} />
+      {/* Sidebar - Floor Intelligence & Overview */}
+      <div className="hidden lg:flex w-full lg:w-72 bg-slate-900 border border-slate-800 text-white rounded-3xl p-5 flex flex-col justify-between shrink-0 h-fit lg:h-full shadow-2xl">
+        <div className="space-y-5">
+          <div className="flex items-center gap-3 pb-3 border-b border-slate-800/80">
+            <div className="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold">
+              <Building size={18} />
+            </div>
             <div>
-              <h2 className="font-bold text-sm">Investor Chat</h2>
-              <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">RPM Global Room</span>
+              <h2 className="font-bold text-sm tracking-tight text-white">Investor Lounge</h2>
+              <span className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider block">Global Syndicate Floor</span>
             </div>
           </div>
 
           {/* Active stats */}
-          <div className="space-y-4">
-            <div className="bg-slate-850/50 border border-slate-850 p-4 rounded-2xl">
-              <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">Live Online</span>
-              <p className="text-xl font-extrabold tabular-nums text-emerald-400 mt-1">
+          <div className="space-y-3">
+            <div className="bg-slate-800/60 border border-slate-700/60 p-4 rounded-2xl relative overflow-hidden">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Active Allocators</span>
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              </div>
+              <p className="text-2xl font-black tabular-nums text-emerald-400 mt-1 tracking-tight">
                 {onlineCount.toLocaleString()}
               </p>
-              <span className="text-[9px] text-slate-400 mt-1 block">Global coverage from 195 countries</span>
+              <span className="text-[10px] text-slate-400 mt-0.5 block">Verified across North America, Europe & Asia</span>
             </div>
             
-            <div className="bg-slate-850/50 border border-slate-850 p-4 rounded-2xl text-xs space-y-1">
+            <div className="bg-slate-800/40 border border-slate-800 p-3.5 rounded-2xl text-xs space-y-2.5">
               <div className="flex justify-between items-center text-slate-400">
-                <span>Room type</span>
-                <span className="font-bold text-white">Public Group</span>
+                <span className="flex items-center gap-1.5"><Activity size={13} className="text-emerald-400" /> Settlement</span>
+                <span className="font-bold text-emerald-300">~2.8m (TRC20/Sol)</span>
               </div>
               <div className="flex justify-between items-center text-slate-400">
-                <span>Members allowed</span>
-                <span className="font-bold text-white">All Investors</span>
+                <span className="flex items-center gap-1.5"><TrendingUp size={13} className="text-blue-400" /> Staking APY</span>
+                <span className="font-bold text-blue-300">Up to 24.5%</span>
+              </div>
+              <div className="flex justify-between items-center text-slate-400">
+                <span className="flex items-center gap-1.5"><Building size={13} className="text-amber-400" /> Fractional Deeds</span>
+                <span className="font-bold text-amber-300">9 Tokenized Listings</span>
               </div>
             </div>
           </div>
 
-          {/* Rules/Info */}
+          {/* Guidelines */}
           <div className="space-y-2 text-xs text-slate-400">
-            <span className="font-bold text-slate-500 text-[10px] uppercase tracking-wider block">Guidelines</span>
-            <ul className="list-disc list-inside space-y-1 text-[11px] leading-relaxed">
-              <li>Use `@name` to tag any active member</li>
-              <li>Tagged members receive emails & push alerts</li>
-              <li>Spamming or flooding will trigger automated ban</li>
+            <span className="font-bold text-slate-400 text-[10px] uppercase tracking-wider block">Floor Code of Conduct</span>
+            <ul className="space-y-1.5 text-[11px] text-slate-400/90 leading-relaxed">
+              <li className="flex items-start gap-1.5">
+                <CheckCircle2 size={13} className="text-emerald-400 shrink-0 mt-0.5" />
+                <span>Tag members with <code className="text-emerald-300 bg-emerald-950/40 px-1 rounded">@name</code> for alerts</span>
+              </li>
+              <li className="flex items-start gap-1.5">
+                <CheckCircle2 size={13} className="text-emerald-400 shrink-0 mt-0.5" />
+                <span>Discussions are recorded to the institutional ledger</span>
+              </li>
+              <li className="flex items-start gap-1.5">
+                <CheckCircle2 size={13} className="text-emerald-400 shrink-0 mt-0.5" />
+                <span>Zero tolerance for spam, solicitations, or scraping</span>
+              </li>
             </ul>
           </div>
         </div>
@@ -1390,40 +1361,45 @@ export default function InvestorChat() {
               onClick={() => setShowAdminPanel(!showAdminPanel)}
               className="w-full py-2.5 bg-brand hover:bg-brand-dark text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 shadow-lg shadow-brand/20"
             >
-              <ShieldCheck size={14} /> {showAdminPanel ? "Hide Admin Tools" : "Show Admin Tools"}
+              <ShieldCheck size={14} /> {showAdminPanel ? "Hide Admin Tools" : "Open Floor Admin Desk"}
             </button>
           </div>
         )}
       </div>
 
-      {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col bg-white rounded-3xl shadow-sm overflow-hidden h-full border border-gray-200">
+      {/* Main Floor Area */}
+      <div className="flex-1 flex flex-col bg-slate-50/50 dark:bg-slate-900 rounded-3xl shadow-sm overflow-hidden h-full border border-slate-200/80 dark:border-slate-800">
         
-        {/* Telegram-style dark header */}
-        <div className="px-4 py-3 bg-[#17212b] flex items-center justify-between gap-3 shrink-0">
+        {/* Executive Header */}
+        <div className="px-5 py-3.5 bg-white dark:bg-slate-850 border-b border-slate-200/80 dark:border-slate-800 flex items-center justify-between gap-3 shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center font-extrabold text-sm shadow">
-              R
+            <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-black text-base shadow-xs">
+              <Building size={20} />
             </div>
             <div>
-              <h3 className="font-bold text-white text-sm leading-tight">RPM Group Room</h3>
-              <p className="text-[11px] text-[#6c8fa8] font-medium flex items-center gap-1.5 mt-0.5">
-                <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse inline-block" />
-                {onlineCount.toLocaleString()} members online
+              <div className="flex items-center gap-2">
+                <h3 className="font-extrabold text-slate-900 dark:text-white text-base leading-tight tracking-tight">Investor Lounge</h3>
+                <span className="hidden sm:inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200/80 dark:border-emerald-800">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  Live Floor
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium flex items-center gap-1 mt-0.5">
+                <span className="font-bold text-slate-700 dark:text-slate-200">{onlineCount.toLocaleString()}</span> active allocators online • Global Desk
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 max-w-[300px] w-full justify-end">
+          <div className="flex items-center gap-2 max-w-[340px] w-full justify-end">
             {/* Search bar */}
-            <div className="relative max-w-[120px] sm:max-w-[180px] w-full">
-              <Search className="absolute left-2.5 top-2 text-[#4a6a80]" size={13} />
+            <div className="relative max-w-[140px] sm:max-w-[200px] w-full">
+              <Search className="absolute left-3 top-2.5 text-slate-400" size={13} />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search..."
-                className="w-full bg-[#0d1117] border border-[#2b3d4f] rounded-xl pl-8 pr-3 py-1.5 text-xs text-white placeholder-[#4a6a80] focus:outline-none focus:ring-1 focus:ring-blue-500"
+                placeholder="Search discussions..."
+                className="w-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl pl-8 pr-3 py-2 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-emerald-500 transition"
               />
             </div>
 
@@ -1434,12 +1410,12 @@ export default function InvestorChat() {
                 onClick={() => setShowFollowedFeed(!showFollowedFeed)}
                 className={`flex items-center justify-center p-2 rounded-xl transition shadow shrink-0 ${
                   showFollowedFeed
-                    ? 'bg-blue-500 text-white hover:bg-blue-600'
-                    : 'bg-[#242f3d] text-[#6c8fa8] hover:text-white border border-[#2b3d4f]'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-slate-100 text-slate-600 hover:text-slate-900 dark:bg-slate-800 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
                 }`}
                 title={showFollowedFeed ? "Hide Followed Feed" : "Show Followed Feed"}
               >
-                <Bell size={13} />
+                <Bell size={14} />
               </button>
             )}
 
@@ -1447,20 +1423,22 @@ export default function InvestorChat() {
             {profile?.is_admin && (
               <button
                 onClick={() => setShowAdminPanel(!showAdminPanel)}
-                className="md:hidden flex items-center justify-center p-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl transition shadow shrink-0"
-                title={showAdminPanel ? "Hide Admin Panel" : "Show Admin Panel"}
+                className="lg:hidden flex items-center justify-center p-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl transition shadow shrink-0"
+                title={showAdminPanel ? "Hide Admin Panel" : "Open Floor Admin Desk"}
               >
-                <ShieldCheck size={16} />
+                <ShieldCheck size={15} />
               </button>
             )}
           </div>
         </div>
 
-        {/* Telegram-style Pinned Message Banner */}
+        {/* Macro Institutional Market Ticker */}
+        <MacroMarketBriefingTicker />
+
+        {/* Pinned Executive Desk Memo */}
         {pinnedMessage && (
-          <div className="relative flex items-center gap-3 px-4 py-2.5 bg-white border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition group"
+          <div className="relative flex items-center gap-3 px-5 py-3 bg-amber-50/80 dark:bg-amber-950/30 border-b border-amber-200/70 dark:border-amber-800/50 cursor-pointer hover:bg-amber-100/50 transition group"
             onClick={() => {
-              // Try id first, then fall back to body+sender match
               let el = document.getElementById(`msg-${pinnedMessage.id}`);
               if (!el) {
                 el = Array.from(document.querySelectorAll('[id^="msg-"]')).find(e => {
@@ -1471,22 +1449,21 @@ export default function InvestorChat() {
               }
               if (el) {
                 el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                el.classList.add('!bg-blue-50');
-                setTimeout(() => el!.classList.remove('!bg-blue-50'), 1500);
+                el.classList.add('!bg-amber-100/80');
+                setTimeout(() => el!.classList.remove('!bg-amber-100/80'), 1500);
               }
             }}
           >
-            {/* Telegram left accent bar */}
-            <div className="w-0.5 h-8 bg-blue-500 rounded-full shrink-0" />
-            <Pin size={12} className="text-blue-500 shrink-0" />
+            <div className="w-1 h-8 bg-amber-500 rounded-full shrink-0" />
+            <Pin size={13} className="text-amber-600 dark:text-amber-400 shrink-0" />
             <div className="min-w-0 flex-1">
-              <span className="text-[10px] font-bold text-blue-600 block">Pinned Message</span>
-              <p className="text-xs text-gray-700 truncate font-medium">@{pinnedMessage.sender_name}: {pinnedMessage.body}</p>
+              <span className="text-[10px] font-bold text-amber-800 dark:text-amber-400 uppercase tracking-wider block">Executive Desk Memo</span>
+              <p className="text-xs text-amber-900 dark:text-amber-200 truncate font-semibold">@{pinnedMessage.sender_name}: {pinnedMessage.body}</p>
             </div>
             {profile?.is_admin && (
               <button
                 onClick={(e) => { e.stopPropagation(); handleUnpinMessage(); }}
-                className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg opacity-0 group-hover:opacity-100 transition shrink-0"
+                className="p-1.5 text-amber-600 hover:text-amber-900 hover:bg-amber-100 rounded-lg opacity-0 group-hover:opacity-100 transition shrink-0"
                 title="Unpin"
               >
                 <X size={13} />
@@ -1495,33 +1472,30 @@ export default function InvestorChat() {
           </div>
         )}
 
-        {/* Resuming Session Notice */}
+        {/* Discreet Live Stream Status */}
         {showOfflineNotice && (
-          <div className="bg-amber-50 dark:bg-[#1a232f] border-b border-amber-200/50 dark:border-[#243547] px-4 py-2.5 flex items-center justify-between gap-3 shrink-0 transition-all select-none">
-            <div className="flex items-start gap-2.5 min-w-0">
-              <Info size={16} className="text-amber-600 dark:text-[#7da4c4] shrink-0 mt-0.5" />
-              <div className="min-w-0">
-                <span className="text-xs font-bold text-amber-800 dark:text-[#8ab4d8] block">Resuming Chat Session</span>
-                <p className="text-[11px] text-amber-700 dark:text-[#8aa5bc] leading-relaxed">
-                  Real-time updates have been resumed. To optimize platform performance and conserve bandwidth, messages dispatched during your absence are not synchronized to your local client history.
-                </p>
-              </div>
+          <div className="bg-emerald-50/80 dark:bg-emerald-950/20 border-b border-emerald-100 dark:border-emerald-900/40 px-5 py-2 flex items-center justify-between gap-3 shrink-0 select-none">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+              <p className="text-xs text-emerald-800 dark:text-emerald-300 font-medium">
+                Live syndicate stream connected. Displaying real-time floor activity.
+              </p>
             </div>
             <button
               onClick={() => setShowOfflineNotice(false)}
-              className="text-amber-500 hover:text-amber-800 dark:text-gray-400 dark:hover:text-white p-1 hover:bg-amber-100 dark:hover:bg-[#2b3d4f] rounded-lg transition shrink-0"
-              title="Dismiss Notice"
+              className="text-emerald-600 hover:text-emerald-900 dark:text-emerald-400 p-1 hover:bg-emerald-100 rounded-lg transition shrink-0"
+              title="Dismiss"
             >
-              <X size={14} />
+              <X size={13} />
             </button>
           </div>
         )}
 
-        {/* Messages feed — Telegram style */}
+        {/* Messages feed */}
         <div 
           ref={chatContainerRef}
           onScroll={handleScroll}
-          className="flex-1 overflow-y-auto overscroll-contain px-3 py-4 md:px-5 space-y-1 bg-[#efeae2] dark:bg-[#0e1621]"
+          className="flex-1 overflow-y-auto overscroll-contain px-3 py-4 md:px-5 space-y-3 bg-slate-50 dark:bg-slate-900/90"
         >
           {loading ? (
             <div className="flex flex-col items-center justify-center h-full gap-2">
@@ -1599,46 +1573,37 @@ export default function InvestorChat() {
                         isAdminSender ? 'flex-row' : isMine ? 'flex-row-reverse' : 'flex-row'
                       } ${isCurrentPinned ? 'bg-blue-500/10 rounded-2xl' : ''}`}
                     >
-                    {/* Avatar — always for admin, only hidden for regular isMine */}
-                    {(!isMine || isAdminSender) && (
-                      <div
-                        className={`w-8 h-8 rounded-full bg-gradient-to-br ${
-                          isAdminSender ? 'from-amber-400 to-yellow-500' : getAvatarGradient(msg.sender_name)
-                        } text-white font-extrabold flex items-center justify-center text-xs shrink-0 shadow-sm self-end mb-0.5`}
-                      >
-                        {msg.sender_name.charAt(0).toUpperCase()}
-                      </div>
-                    )}
-
-                    {/* Bubble — admin premium gold style always; blue only for regular own messages */}
-                    <div className={`relative max-w-[80%] md:max-w-[68%] px-3 pt-2 pb-1.5 shadow-sm ${
+                    {/* Bubble */}
+                    <div className={`relative max-w-[85%] md:max-w-[70%] px-4 py-3 shadow-sm rounded-2xl ${
                       isAdminSender
-                        ? 'bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-700/60 border-l-[3px] border-l-amber-400 dark:border-l-amber-500 rounded-2xl rounded-bl-sm'
+                        ? 'bg-amber-50/90 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-700/60 rounded-bl-sm'
                         : isMine
-                          ? 'bg-[#2b5278] dark:bg-[#2b5278] rounded-2xl rounded-br-sm text-white'
-                          : 'bg-white dark:bg-[#212d3b] border border-gray-100 dark:border-[#2b3d4f] rounded-2xl rounded-bl-sm'
+                          ? 'bg-emerald-600 dark:bg-emerald-700 text-white rounded-br-sm shadow-emerald-600/10'
+                          : 'bg-white dark:bg-[#1a232f] border border-slate-200/80 dark:border-[#2b3d4f] rounded-bl-sm'
                     }`}>
 
                       {/* Sender name — always for others; always for admin even when isMine */}
                       {(!isMine || isAdminSender) && (
-                        <div className="flex items-center gap-1.5 mb-1 flex-wrap">
-                          <span className={`text-[12px] font-black leading-none tracking-tight ${
+                        <div className="flex items-center gap-1.5 mb-1.5 flex-wrap">
+                          <span className={`text-[13px] font-bold tracking-tight leading-none ${
                             isAdminSender
-                              ? 'text-amber-700 dark:text-amber-400'
-                              : getNameColor(msg.sender_name)
+                              ? 'text-amber-800 dark:text-amber-300'
+                              : 'text-slate-900 dark:text-white'
                           }`}>
                             {msg.sender_name}
                           </span>
+                          <span className="text-xs" title={msg.sender_country}>{flag}</span>
+                          {renderTierBadge(getInvestorTier(msg.sender_name, isAdminSender))}
                           {isAdminSender && (
                             <span title="Verified Support Account" className="inline-flex items-center justify-center shrink-0" style={{ width: 14, height: 14 }}>
                               <svg viewBox="0 0 22 22" width="14" height="14" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M20.396 11c-.018-.646-.215-1.275-.57-1.816-.354-.54-.852-.972-1.438-1.246.223-.607.27-1.264.14-1.897-.131-.634-.437-1.218-.882-1.687-.47-.445-1.053-.75-1.687-.882-.633-.13-1.29-.083-1.897.14-.273-.587-.704-1.086-1.245-1.44S11.647 1.62 11 1.604c-.646.017-1.273.213-1.813.568s-.969.854-1.24 1.44c-.608-.223-1.267-.272-1.902-.14-.635.13-1.22.436-1.69.882-.445.47-.749 1.055-.878 1.688-.13.633-.08 1.29.144 1.896-.587.274-1.087.705-1.443 1.245-.356.54-.555 1.17-.574 1.817.02.648.218 1.276.574 1.817.356.54.856.972 1.443 1.245-.224.606-.274 1.263-.144 1.896.13.634.433 1.218.877 1.688.47.443 1.054.747 1.687.878.633.132 1.29.084 1.897-.136.274.586.705 1.084 1.246 1.439.54.354 1.17.551 1.816.569.647-.016 1.276-.213 1.817-.567s.972-.854 1.245-1.44c.604.239 1.266.296 1.903.164.636-.132 1.22-.447 1.68-.907.46-.46.747-1.05.87-1.686.122-.635.068-1.29-.164-1.897.586-.274 1.084-.705 1.439-1.246.354-.54.551-1.17.569-1.816zM9.662 14.85l-3.429-3.428 1.293-1.302 2.072 2.072 4.4-4.794 1.347 1.246z" fill="#1D9BF0"/>
+                                <path d="M20.396 11c-.018-.646-.215-1.275-.57-1.816-.354-.54-.852-.972-1.438-1.246.223-.607.27-1.264.14-1.897-.131-.634-.437-1.218-.882-1.687-.47-.445-1.053-.75-1.687-.882-.633-.13-1.29-.083-1.897.14-.273-.587-.704-1.086-1.245-1.44S11.647 1.62 11 1.604c-.646.017-1.273.213-1.813.568s-.969.854-1.24 1.44c-.608-.223-1.267-.272-1.902-.14-.635.13-1.22.436-1.69.882-.445.47-.749 1.055-.878 1.688-.13.633-.08 1.29.144 1.896-.587.274-1.087.705-1.443 1.245-.356.54-.555 1.17-.574 1.817.02.648.218 1.276.574 1.817.356.54.856.972 1.443 1.245-.224.606-.274 1.263-.144 1.896.13.634.433 1.218.877 1.688.47.443 1.054.747 1.687.878.633.132 1.29.084 1.897-.136.274.586.705 1.084 1.246 1.439.54.354 1.17.551 1.816.569.647-.016 1.276-.213 1.817-.567s.972-.854 1.245-1.44c.604.239 1.266.296 1.903.164.636-.132 1.22-.447 1.68-.907.46-.46.747-1.05.87-1.686.122-.635.068-1.29-.164-1.897.586-.274 1.084-.705 1.439-1.246.354-.54.551-1.17.569-1.816zM9.662 14.85l-3.429-3.428 1.293-1.302 2.072 2.072 4.4-4.794 1.347 1.246z" fill="#10B981"/>
                               </svg>
                             </span>
                           )}
                           {isFollowed && (
-                            <span className="text-[8px] font-bold text-blue-500 flex items-center gap-0.5">
-                              <Bell size={7} /> Following
+                            <span className="text-[9px] font-bold text-blue-500 flex items-center gap-0.5">
+                              <Bell size={8} /> Following
                             </span>
                           )}
                         </div>
@@ -1646,37 +1611,49 @@ export default function InvestorChat() {
 
                       {/* Reply quote strip */}
                       {msg.reply_to_name && (
-                        <div className={`mb-1.5 pl-2.5 border-l-[3px] py-1 pr-2 rounded-r-lg ${
+                        <div className={`mb-2 pl-3 border-l-2 py-1 pr-2 rounded-r-xl ${
                           isMine
                             ? 'border-white/50 bg-white/10'
-                            : 'border-blue-400 bg-blue-50/60 dark:bg-blue-900/30'
+                            : 'border-emerald-500/60 bg-emerald-50/50 dark:bg-emerald-950/20'
                         }`}>
-                          <span className={`text-[10px] font-bold block ${isMine ? 'text-white/80' : 'text-blue-600 dark:text-blue-400'}`}>
-                            @{msg.reply_to_name}
+                          <span className={`text-[10px] font-bold block ${isMine ? 'text-white/90' : 'text-emerald-700 dark:text-emerald-400'}`}>
+                            Replying to @{msg.reply_to_name}
                           </span>
-                          <p className={`text-[10px] truncate leading-tight ${isMine ? 'text-white/60' : 'text-gray-500 dark:text-gray-400'}`}>
+                          <p className={`text-[11px] truncate leading-tight ${isMine ? 'text-white/70' : 'text-slate-600 dark:text-slate-400'}`}>
                             {msg.reply_to_body}
                           </p>
                         </div>
                       )}
 
                       {/* Message text */}
-                      <p className={`text-[13px] leading-snug select-text break-words ${
-                        isMine && !isAdminSender ? 'text-white' : 'text-gray-900 dark:text-gray-100'
+                      <p className={`text-[13.5px] leading-relaxed select-text break-words font-normal ${
+                        isMine && !isAdminSender ? 'text-white' : 'text-slate-800 dark:text-slate-100'
                       }`}>
                         {msg.body}
                       </p>
 
-                      {/* Footer: flag + time */}
-                      <div className={`flex items-center gap-1 mt-1 ${isMine ? 'justify-start' : 'justify-end'}`}>
-                        <span className="text-[9px]" title={msg.sender_country}>{flag}</span>
-                        <span className={`text-[10px] tabular-nums leading-none ${
-                          isMine && !isAdminSender ? 'text-white/60' : 'text-gray-400 dark:text-gray-500'
+                      {/* Footer: time + pin */}
+                      <div className={`flex items-center justify-between gap-1.5 mt-2 pt-1.5 border-t ${
+                        isMine && !isAdminSender ? 'border-white/15' : 'border-slate-100 dark:border-slate-700/60'
+                      }`}>
+                        <span className={`text-[10px] tabular-nums font-medium ${
+                          isMine && !isAdminSender ? 'text-white/70' : 'text-slate-400'
                         }`}>
                           {formatMessageTime(msg.created_at)}
                         </span>
-                        {isCurrentPinned && <Pin size={8} className={isMine && !isAdminSender ? 'text-white/60' : 'text-blue-400'} />}
+                        {isCurrentPinned && (
+                          <span className={`flex items-center gap-1 text-[10px] font-semibold ${isMine && !isAdminSender ? 'text-white/80' : 'text-amber-500'}`}>
+                            <Pin size={10} /> Pinned
+                          </span>
+                        )}
                       </div>
+
+                      {/* Incoming translation pill */}
+                      <IncomingTranslation 
+                        hasAccess={Boolean(profile?.is_admin || (profile as any)?.has_translator || (profile as any)?.translator_access)}
+                        messageText={msg.body}
+                        isMe={isMine}
+                      />
 
                       {/* Admin mention quick-reply buttons */}
                       {profile?.is_admin && (() => {
@@ -1791,52 +1768,70 @@ export default function InvestorChat() {
 
         {/* Reply Target strip */}
         {replyTarget && (
-          <div className="bg-[#17212b] border-t border-[#2b3d4f] px-4 py-2 flex justify-between items-center gap-3 shrink-0">
+          <div className="bg-slate-100 dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700 px-5 py-2.5 flex justify-between items-center gap-3 shrink-0">
             <div className="flex items-center gap-2 min-w-0">
-              <div className="w-0.5 h-8 bg-blue-400 rounded-full shrink-0" />
+              <div className="w-1 h-8 bg-emerald-500 rounded-full shrink-0" />
               <div className="min-w-0">
-                <span className="text-[10px] font-bold text-blue-400 block">Reply to @{replyTarget.sender_name}</span>
-                <p className="text-[11px] text-gray-300 truncate">{replyTarget.body}</p>
+                <span className="text-[11px] font-bold text-emerald-700 dark:text-emerald-400 block">Replying to @{replyTarget.sender_name}</span>
+                <p className="text-[11px] text-slate-600 dark:text-slate-300 truncate">{replyTarget.body}</p>
               </div>
             </div>
-            <button onClick={() => setReplyTarget(null)} className="text-gray-500 hover:text-gray-300 p-1 shrink-0">
+            <button onClick={() => setReplyTarget(null)} className="text-slate-400 hover:text-slate-700 dark:hover:text-white p-1 shrink-0">
               <X size={14} />
             </button>
           </div>
         )}
 
-        {/* Telegram-style input bar */}
-        <div className="px-3 py-2.5 bg-[#17212b] border-t border-[#2b3d4f] shrink-0">
+        {/* Executive Input Bar */}
+        <div className="p-3.5 bg-white dark:bg-slate-850 border-t border-slate-200/80 dark:border-slate-800 shrink-0">
           {isCurrentBanned ? (
-            <div className="bg-red-900/30 text-red-300 border border-red-800/50 rounded-2xl p-3 flex items-center justify-center gap-3 text-xs font-semibold select-none">
-              <ShieldAlert size={18} className="shrink-0" />
-              <span>You have been banned from posting in this chat.</span>
+            <div className="bg-red-50 text-red-700 border border-red-200 rounded-2xl p-3 flex items-center justify-center gap-3 text-xs font-semibold select-none">
+              <ShieldAlert size={18} className="shrink-0 text-red-600" />
+              <span>You have been restricted from posting in the Investor Lounge.</span>
             </div>
           ) : (
-            <form onSubmit={handleSubmit} className="flex gap-2 items-center">
-              <input
-                id="chat-input-field"
-                type="text"
-                value={text}
-                onChange={e => setText(e.target.value)}
-                placeholder={
-                  impersonatedUser
-                    ? `Type as @${impersonatedUser.name}...`
-                    : replyTarget
-                      ? `Reply to @${replyTarget.sender_name}...`
-                      : 'Message RPM Group Room...'
-                }
-                className="flex-1 bg-[#242f3d] border border-[#2b3d4f] rounded-2xl px-4 py-2.5 text-sm text-white placeholder-[#4a6a80] focus:outline-none focus:ring-1 focus:ring-blue-500 min-w-0"
-                disabled={sending}
-              />
-              <button
-                type="submit"
-                disabled={!text.trim() || sending}
-                className="bg-[#2b5278] hover:bg-[#3a6d9e] disabled:bg-[#1c2d3f] text-white rounded-full w-10 h-10 flex items-center justify-center shrink-0 transition shadow disabled:opacity-40"
-              >
-                <Send size={16} />
-              </button>
-            </form>
+            <div className="space-y-2">
+              {/* Quick financial topic shortcuts */}
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-[11px]">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider shrink-0 mr-1">Quick Tags:</span>
+                {['$STAKING', '$DEED', '$USDT', '$APY', '$RENTAL'].map(tag => (
+                  <button
+                    key={tag}
+                    type="button"
+                    onClick={() => setText(prev => (prev ? `${prev} ${tag}` : tag))}
+                    className="px-2.5 py-0.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-200 dark:border-slate-700 font-bold text-[10px] transition shrink-0"
+                  >
+                    {tag}
+                  </button>
+                ))}
+              </div>
+
+              <form onSubmit={handleSubmit} className="flex gap-2 items-center">
+                <input
+                  id="chat-input-field"
+                  type="text"
+                  value={text}
+                  onChange={e => setText(e.target.value)}
+                  placeholder={
+                    impersonatedUser
+                      ? `Post as @${impersonatedUser.name}...`
+                      : replyTarget
+                        ? `Reply to @${replyTarget.sender_name}...`
+                        : 'Share portfolio milestone, discuss yields, or tag @member...'
+                  }
+                  className="flex-1 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl px-4 py-2.5 text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition min-w-0"
+                  disabled={sending}
+                />
+                <button
+                  type="submit"
+                  disabled={!text.trim() || sending}
+                  className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-200 dark:disabled:bg-slate-800 text-white rounded-2xl px-5 h-11 flex items-center justify-center gap-1.5 font-bold text-xs shrink-0 transition shadow-sm disabled:opacity-40"
+                >
+                  <span>Send</span>
+                  <Send size={14} />
+                </button>
+              </form>
+            </div>
           )}
         </div>
       </div>
