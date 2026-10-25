@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { useAuthStore } from '../store/authStore';
 import { toast } from 'sonner';
-import { BellOff, Check, CheckCheck, X, Calendar, ArrowRight, ShieldAlert, ShieldCheck, Info } from 'lucide-react';
+import { Bell, Check, CheckCheck, X, Calendar, ArrowRight, ShieldAlert, ShieldCheck, Info } from 'lucide-react';
 
 interface Notification {
   id: string;
@@ -156,7 +156,7 @@ export default function NotificationsPage() {
           <div className="text-center py-12 text-gray-400">Loading notifications...</div>
         ) : notifications.length === 0 ? (
           <div className="bg-white rounded-2xl border border-gray-100 p-12 text-center shadow-sm">
-            <BellOff size={32} className="text-gray-300 mx-auto mb-3" />
+            <Bell size={32} className="text-gray-300 mx-auto mb-3" />
             <h3 className="font-bold text-gray-800">Clear Skies!</h3>
             <p className="text-sm text-gray-450 mt-1">No notifications matching the filter were found.</p>
           </div>

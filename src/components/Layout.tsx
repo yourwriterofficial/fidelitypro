@@ -4,7 +4,7 @@ import {
   LogOut, Home, Wallet, Briefcase, Settings, Shield, Lock, Gift,
   Building, LayoutDashboard, Menu, X, MoreHorizontal, ChevronRight, AlertCircle,
   ChevronsLeft, ChevronsRight, History, Users, Radio, ArrowRightLeft,
-  MessageSquare,
+  MessageSquare, Bell,
 } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 import NotificationBell from './NotificationBell';
@@ -28,6 +28,7 @@ const mainNavItems = [
 ];
 
 const secondaryNavItems = [
+  { path: '/app/notifications', icon: Bell,       label: 'Notifications' },
   { path: '/app/referral',    icon: Gift,          label: 'Referral'  },
   { path: '/app/history',     icon: History,       label: 'History'   },
   { path: '/app/settings',    icon: Settings,      label: 'Settings'  },
@@ -64,6 +65,7 @@ export default function Layout() {
   );
   const { restricted, withdrawRestricted, investRestricted, stakeRestricted, propertyRestricted } = useAccountRestriction();
   const [unreadChatCount, setUnreadChatCount] = useState(0);
+  const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
   const [investorChatUnread, setInvestorChatUnread] = useState(0);
   const [investorChatFollowUnread, setInvestorChatFollowUnread] = useState(0);
   const lastLoggedPathRef = useRef<string | null>(null);
@@ -161,6 +163,32 @@ export default function Layout() {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${profile.id}` },
         () => fetchInvestorChatUnread()
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [profile?.id]);
+
+  useEffect(() => {
+    if (!profile?.id) return;
+    const fetchUnreadNotifs = async () => {
+      const { count } = await supabase
+        .from('notifications')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', profile.id)
+        .eq('read', false);
+      setUnreadNotificationsCount(count || 0);
+    };
+    fetchUnreadNotifs();
+
+    const channel = supabase
+      .channel(`layout_notifs_${Math.random().toString(36).slice(2)}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${profile.id}` },
+        () => fetchUnreadNotifs()
       )
       .subscribe();
 
@@ -490,15 +518,24 @@ export default function Layout() {
             <div className={`rounded-2xl bg-gray-50/90 border border-gray-100 p-1 space-y-0.5 ${collapsed ? 'py-1' : 'p-1'}`}>
               {visibleSecondaryNavItems.map(({ path, icon: Icon, label }) => {
                 const active = isActive(path);
+                const isNotifications = path === '/app/notifications';
                 return (
                   <Link key={path} to={path} title={collapsed ? label : undefined}
-                    className={`flex items-center gap-3 rounded-xl text-sm font-medium transition-all ${
+                    className={`relative flex items-center gap-3 rounded-xl text-sm font-medium transition-all ${
                       collapsed ? 'justify-center py-2' : 'px-3 py-2'
                     } ${
                       active ? 'bg-brand text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
                     }`}>
                     <Icon size={16} className={active ? 'text-white' : 'text-gray-400'} />
                     {!collapsed && label}
+                    {!collapsed && isNotifications && unreadNotificationsCount > 0 && (
+                      <span className="ml-auto w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center text-[10px] font-bold shadow-sm animate-pulse">
+                        {unreadNotificationsCount > 9 ? '9+' : unreadNotificationsCount}
+                      </span>
+                    )}
+                    {collapsed && isNotifications && unreadNotificationsCount > 0 && (
+                      <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border border-white shadow-sm" />
+                    )}
                   </Link>
                 );
               })}
@@ -536,7 +573,7 @@ export default function Layout() {
       <main className={`flex-1 flex flex-col min-h-0 min-w-0 max-w-full md:overflow-hidden transition-[margin] duration-200 ${collapsed ? 'md:ml-20' : 'md:ml-64'}`}>
 
         {/* Mobile Header */}
-        <header className="md:hidden bg-white border-b border-gray-100 px-4 py-3 flex items-center justify-between sticky top-0 z-20 shadow-sm">
+        <header className="md:hidden bg-white border-b border-gray-100 px-4 py-3 flex items-center justify-between fixed top-0 left-0 right-0 z-30 shadow-sm h-14">
           <div className="flex items-center gap-2">
             <div className="w-7 h-7 bg-brand rounded-lg flex items-center justify-center">
               <span className="text-white font-extrabold text-xs">R</span>
@@ -580,7 +617,7 @@ export default function Layout() {
 
         {/* Page content */}
         <div 
-          className="flex-1 flex flex-col min-h-0 md:overflow-y-auto overflow-x-hidden p-4 md:p-6 w-full min-w-0"
+          className="flex-1 flex flex-col min-h-0 md:overflow-y-auto overflow-x-hidden p-4 md:p-6 w-full min-w-0 pt-[68px] md:pt-6"
           style={{ paddingBottom: 'var(--page-pb)' }}
         >
           {(restricted || withdrawRestricted || investRestricted || stakeRestricted || propertyRestricted) && (
@@ -619,7 +656,7 @@ export default function Layout() {
                 <div className={`p-1 rounded-lg ${active ? 'bg-brand/10' : ''}`}>
                   <Icon size={18} />
                 </div>
-                <span className="text-[9.5px] font-medium truncate max-w-[44px]">{label}</span>
+                <span className="text-[9.5px] font-medium truncate max-w-[58px] text-center">{label}</span>
               </Link>
             );
           })}
@@ -705,6 +742,7 @@ export default function Layout() {
                   <div className="bg-gray-50/80 rounded-2xl border border-gray-100 p-1.5 space-y-0.5">
                     {visibleSecondaryNavItems.map(({ path, icon: Icon, label }) => {
                       const active = isActive(path);
+                      const isNotifications = path === '/app/notifications';
                       return (
                         <Link key={path} to={path} onClick={() => setMobileMenuOpen(false)}
                           className={`flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold transition ${
@@ -712,6 +750,11 @@ export default function Layout() {
                           }`}>
                           <Icon size={15} className={active ? 'text-brand' : 'text-gray-400'} />
                           <span>{label}</span>
+                          {isNotifications && unreadNotificationsCount > 0 && (
+                            <span className="ml-auto px-1.5 py-0.5 bg-red-500 text-white rounded-full text-[10px] font-bold shadow-xs">
+                              {unreadNotificationsCount > 9 ? '9+' : unreadNotificationsCount}
+                            </span>
+                          )}
                         </Link>
                       );
                     })}

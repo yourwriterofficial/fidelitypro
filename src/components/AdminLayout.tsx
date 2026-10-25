@@ -150,6 +150,11 @@ export default function AdminLayout() {
             </div>
           )}
           <div className="flex items-center gap-1">
+            <Link to="/admin/notifications"
+              className="relative p-2 rounded-xl text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition-colors"
+              title="Admin Notifications">
+              <Bell size={18} className={location.pathname === '/admin/notifications' ? 'text-gray-900' : 'text-gray-400'} />
+            </Link>
             {!collapsed && (
               <Link to="/admin/chat"
                 className="relative p-2 rounded-xl text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition-colors"
@@ -231,7 +236,7 @@ export default function AdminLayout() {
       <main className={`flex-1 min-h-screen flex flex-col min-w-0 max-w-full md:overflow-hidden transition-[margin] duration-200 ${collapsed ? 'md:ml-20' : 'md:ml-64'}`}>
 
         {/* Mobile Header */}
-        <header className="md:hidden bg-white border-b border-gray-100 px-4 py-3 flex items-center justify-between sticky top-0 z-20 shadow-sm">
+        <header className="md:hidden bg-white border-b border-gray-100 px-4 py-3 flex items-center justify-between fixed top-0 left-0 right-0 z-30 shadow-sm h-14">
           <div className="flex items-center gap-2">
             <div className="w-7 h-7 bg-gray-900 rounded-lg flex items-center justify-center">
               <span className="text-white font-extrabold text-xs">R</span>
@@ -242,6 +247,11 @@ export default function AdminLayout() {
             </div>
           </div>
           <div className="flex items-center gap-1">
+            <Link to="/admin/notifications"
+              className="relative p-2 rounded-xl text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition-colors"
+              title="Admin Notifications">
+              <Bell size={19} className={location.pathname === '/admin/notifications' ? 'text-gray-900' : 'text-gray-500'} />
+            </Link>
             <Link to="/admin/chat"
               className="relative p-2 rounded-xl text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition-colors"
               title="Support Live Chat">
@@ -260,7 +270,7 @@ export default function AdminLayout() {
         </header>
 
         {/* Page content */}
-        <div className="flex-1 p-4 md:p-6 pb-24 md:pb-6 overflow-x-hidden w-full min-w-0">
+        <div className="flex-1 p-4 md:p-6 pb-24 md:pb-6 overflow-x-hidden w-full min-w-0 pt-[68px] md:pt-6">
           <Outlet />
         </div>
 

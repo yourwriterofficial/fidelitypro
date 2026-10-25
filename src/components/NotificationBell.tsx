@@ -2,7 +2,7 @@ import { useEffect, useState, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 import { useAuthStore } from '../store/authStore';
-import { Bell, BellOff, Check, CheckCheck, X } from 'lucide-react';
+import { Bell, Check, CheckCheck, X } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface Notification {
@@ -35,7 +35,6 @@ export default function NotificationBell() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [open, setOpen] = useState(false);
-  const [loading, setLoading] = useState(true);
   const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
   const intervalRef = useRef<number | null>(null);
   const prevUnreadCount = useRef(0);
@@ -44,36 +43,53 @@ export default function NotificationBell() {
 
   const fetchNotifications = async () => {
     if (!user) return;
-    const { data, error } = await supabase.from('notifications').select('*')
-      .eq('user_id', user.id).order('created_at', { ascending: false }).limit(20);
-    if (error) { console.error(error); return; }
-    const newUnread = data?.filter(n => !n.read).length || 0;
-    if (newUnread > prevUnreadCount.current) {
-      const newNotifs = data?.filter(n => !n.read && n.created_at > new Date(Date.now() - 30000).toISOString());
-      if (newNotifs?.length) toast.info(`${newNotifs.length} new notification${newNotifs.length > 1 ? 's' : ''}`);
+    try {
+      const { data, error } = await supabase.from('notifications').select('*')
+        .eq('user_id', user.id).order('created_at', { ascending: false }).limit(20);
+      if (error) { console.error(error); return; }
+      const newUnread = data?.filter(n => !n.read).length || 0;
+      if (newUnread > prevUnreadCount.current) {
+        const newNotifs = data?.filter(n => !n.read && n.created_at > new Date(Date.now() - 30000).toISOString());
+        if (newNotifs?.length) toast.info(`${newNotifs.length} new notification${newNotifs.length > 1 ? 's' : ''}`);
+      }
+      prevUnreadCount.current = newUnread;
+      setNotifications(data || []);
+      setUnreadCount(newUnread);
+    } catch (e) {
+      console.error(e);
     }
-    prevUnreadCount.current = newUnread;
-    setNotifications(data || []);
-    setUnreadCount(newUnread);
-    setLoading(false);
   };
 
   useEffect(() => {
-    if (!user) return;
+    if (!user?.id) return;
     fetchNotifications();
     intervalRef.current = setInterval(fetchNotifications, 15000);
-    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
-  }, [user]);
+
+    const channel = supabase
+      .channel(`notif_bell_${Math.random().toString(36).slice(2)}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` },
+        () => fetchNotifications()
+      )
+      .subscribe();
+
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id]);
 
   // Calculate dropdown position so it never goes off-screen
   const calcPos = useCallback(() => {
     if (!buttonRef.current) return;
     const rect = buttonRef.current.getBoundingClientRect();
-    const dropW = 320; // w-80
+    const isMobile = typeof window !== 'undefined' && window.innerWidth < 640;
+    const dropW = isMobile ? Math.min(340, window.innerWidth - 24) : 320;
     const gap = 8;
     const top = rect.bottom + gap;
     // Align right edge with button right, but clamp to viewport
-    const left = Math.max(8, Math.min(rect.right - dropW, window.innerWidth - dropW - 8));
+    const left = Math.max(12, Math.min(rect.right - dropW, window.innerWidth - dropW - 12));
     setDropdownPos({ top, left });
   }, []);
 
@@ -116,13 +132,11 @@ export default function NotificationBell() {
     }
   };
 
-  if (loading) return <div className="w-8 h-8 animate-pulse bg-gray-100 rounded-xl" />;
-
   return (
     <div className="relative">
       {/* Bell button */}
       <button ref={buttonRef} onClick={handleToggle} aria-label="Notifications"
-        className={`relative p-2 rounded-xl transition-colors ${open ? 'bg-gray-100' : 'hover:bg-gray-100'}`}>
+        className={`relative p-2 rounded-xl transition-colors ${open ? 'bg-gray-100 text-brand' : 'hover:bg-gray-100 text-gray-500 hover:text-gray-800'}`}>
         {unreadCount > 0 ? (
           <>
             <Bell size={19} className="text-brand" />
@@ -131,14 +145,20 @@ export default function NotificationBell() {
             </span>
           </>
         ) : (
-          <BellOff size={19} className="text-gray-400" />
+          <Bell size={19} className="text-gray-500 hover:text-gray-800" />
         )}
       </button>
 
       {/* Dropdown — fixed so it's never clipped by sidebar or off-screen */}
       {open && (
         <div ref={dropdownRef}
-          style={{ position: 'fixed', top: dropdownPos.top, left: dropdownPos.left, width: 320 }}
+          style={{
+            position: 'fixed',
+            top: dropdownPos.top,
+            left: dropdownPos.left,
+            width: typeof window !== 'undefined' && window.innerWidth < 640 ? 'calc(100vw - 24px)' : 320,
+            maxWidth: 360
+          }}
           className="bg-white rounded-2xl shadow-2xl border border-gray-100 z-[9999] overflow-hidden">
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 bg-gray-50/60 sticky top-0">
@@ -165,7 +185,7 @@ export default function NotificationBell() {
           <div className="max-h-[360px] overflow-y-auto divide-y divide-gray-50">
             {notifications.length === 0 ? (
               <div className="py-10 text-center">
-                <BellOff size={24} className="text-gray-200 mx-auto mb-2" />
+                <Bell size={24} className="text-gray-300 mx-auto mb-2" />
                 <p className="text-sm text-gray-400">No notifications yet</p>
               </div>
             ) : (
