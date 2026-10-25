@@ -1,8 +1,10 @@
 {
+  "id": "/",
   "name": "RPM (Rema Profit Machine)",
   "short_name": "RPM",
   "description": "Investment, staking, and property portfolio platform.",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#00674F",
   "theme_color": "#00674F",

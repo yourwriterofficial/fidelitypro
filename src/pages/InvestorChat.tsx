@@ -5,7 +5,7 @@ import { supabase } from '../lib/supabaseClient';
 import { 
   Send, Users, Pin, VolumeX, ShieldAlert, ShieldCheck, 
   Bell, X, Search, ChevronDown, TrendingUp, Building,
-  CheckCircle2, Activity
+  Activity
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { notifyUser, sendEmailToUser } from '../lib/notify';
@@ -1292,76 +1292,56 @@ export default function InvestorChat() {
   return (
     <div className="flex flex-col md:flex-row gap-4 h-full min-h-0">
       
-      {/* Sidebar - Floor Intelligence & Overview */}
-      <div className="hidden lg:flex w-full lg:w-72 bg-slate-900 border border-slate-800 text-white rounded-3xl p-5 flex flex-col justify-between shrink-0 h-fit lg:h-full shadow-2xl">
-        <div className="space-y-5">
-          <div className="flex items-center gap-3 pb-3 border-b border-slate-800/80">
-            <div className="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold">
-              <Building size={18} />
+      {/* Sidebar - Floor Intelligence & Overview (Compressed & Compact) */}
+      <div className="hidden lg:flex w-full lg:w-60 bg-slate-900 border border-slate-800 text-white rounded-2xl p-3.5 flex flex-col justify-between shrink-0 h-fit lg:h-full shadow-xl">
+        <div className="space-y-3">
+          <div className="flex items-center gap-2.5 pb-2.5 border-b border-slate-800">
+            <div className="w-7 h-7 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold">
+              <Building size={14} />
             </div>
             <div>
-              <h2 className="font-bold text-sm tracking-tight text-white">Investor Lounge</h2>
-              <span className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider block">Global Syndicate Floor</span>
+              <h2 className="font-bold text-xs tracking-tight text-white leading-tight">Investor Lounge</h2>
+              <span className="text-[9px] text-emerald-400 font-bold uppercase tracking-wider block">Global Floor</span>
             </div>
           </div>
 
           {/* Active stats */}
-          <div className="space-y-3">
-            <div className="bg-slate-800/60 border border-slate-700/60 p-4 rounded-2xl relative overflow-hidden">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Active Allocators</span>
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+          <div className="space-y-2">
+            <div className="bg-slate-800/60 border border-slate-700/60 p-2.5 rounded-xl flex items-center justify-between">
+              <div>
+                <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider block">Active Allocators</span>
+                <p className="text-lg font-black tabular-nums text-emerald-400 tracking-tight leading-tight mt-0.5">
+                  {onlineCount.toLocaleString()}
+                </p>
               </div>
-              <p className="text-2xl font-black tabular-nums text-emerald-400 mt-1 tracking-tight">
-                {onlineCount.toLocaleString()}
-              </p>
-              <span className="text-[10px] text-slate-400 mt-0.5 block">Verified across North America, Europe & Asia</span>
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
             </div>
             
-            <div className="bg-slate-800/40 border border-slate-800 p-3.5 rounded-2xl text-xs space-y-2.5">
+            <div className="bg-slate-800/40 border border-slate-800 p-2.5 rounded-xl text-[11px] space-y-2">
               <div className="flex justify-between items-center text-slate-400">
-                <span className="flex items-center gap-1.5"><Activity size={13} className="text-emerald-400" /> Settlement</span>
+                <span className="flex items-center gap-1.5"><Activity size={12} className="text-emerald-400" /> Settlement</span>
                 <span className="font-bold text-emerald-300">~2.8m (TRC20/Sol)</span>
               </div>
               <div className="flex justify-between items-center text-slate-400">
-                <span className="flex items-center gap-1.5"><TrendingUp size={13} className="text-blue-400" /> Staking APY</span>
+                <span className="flex items-center gap-1.5"><TrendingUp size={12} className="text-blue-400" /> Staking APY</span>
                 <span className="font-bold text-blue-300">Up to 24.5%</span>
               </div>
               <div className="flex justify-between items-center text-slate-400">
-                <span className="flex items-center gap-1.5"><Building size={13} className="text-amber-400" /> Fractional Deeds</span>
-                <span className="font-bold text-amber-300">9 Tokenized Listings</span>
+                <span className="flex items-center gap-1.5"><Building size={12} className="text-amber-400" /> Fractional</span>
+                <span className="font-bold text-amber-300">9 Listings</span>
               </div>
             </div>
-          </div>
-
-          {/* Guidelines */}
-          <div className="space-y-2 text-xs text-slate-400">
-            <span className="font-bold text-slate-400 text-[10px] uppercase tracking-wider block">Floor Code of Conduct</span>
-            <ul className="space-y-1.5 text-[11px] text-slate-400/90 leading-relaxed">
-              <li className="flex items-start gap-1.5">
-                <CheckCircle2 size={13} className="text-emerald-400 shrink-0 mt-0.5" />
-                <span>Tag members with <code className="text-emerald-300 bg-emerald-950/40 px-1 rounded">@name</code> for alerts</span>
-              </li>
-              <li className="flex items-start gap-1.5">
-                <CheckCircle2 size={13} className="text-emerald-400 shrink-0 mt-0.5" />
-                <span>Discussions are recorded to the institutional ledger</span>
-              </li>
-              <li className="flex items-start gap-1.5">
-                <CheckCircle2 size={13} className="text-emerald-400 shrink-0 mt-0.5" />
-                <span>Zero tolerance for spam, solicitations, or scraping</span>
-              </li>
-            </ul>
           </div>
         </div>
 
         {/* Admin Dashboard Controls inside sidebar */}
         {profile?.is_admin && (
-          <div className="pt-4 border-t border-slate-800 space-y-2 mt-4">
+          <div className="pt-2 border-t border-slate-800 mt-2">
             <button
               onClick={() => setShowAdminPanel(!showAdminPanel)}
-              className="w-full py-2.5 bg-brand hover:bg-brand-dark text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 shadow-lg shadow-brand/20"
+              className="w-full py-2 bg-brand hover:bg-brand-dark text-white rounded-lg text-[11px] font-bold transition flex items-center justify-center gap-1.5 shadow-sm"
             >
-              <ShieldCheck size={14} /> {showAdminPanel ? "Hide Admin Tools" : "Open Floor Admin Desk"}
+              <ShieldCheck size={13} /> {showAdminPanel ? "Hide Admin" : "Floor Admin"}
             </button>
           </div>
         )}

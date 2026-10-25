@@ -508,7 +508,7 @@ export default function Layout() {
           {!collapsed && (
             <div className="pt-2 border-t border-gray-100 flex items-center justify-between px-1">
               <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Language</span>
-              <SiteTranslator />
+              <SiteTranslator dropup />
             </div>
           )}
 
@@ -721,7 +721,7 @@ export default function Layout() {
 
               <div className="pt-2 border-t border-gray-100 flex items-center justify-between px-2 mt-2">
                 <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Language</span>
-                <SiteTranslator />
+                <SiteTranslator dropup />
               </div>
 
               {profile?.is_admin && (

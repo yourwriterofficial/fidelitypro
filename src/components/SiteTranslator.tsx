@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { ChevronDown, Globe } from 'lucide-react';
 import { SUPPORTED_LANGUAGES, detectBrowserLanguage, syncBrowserLanguage } from '../lib/translator';
 import { useAuthStore } from '../store/authStore';
@@ -10,10 +10,31 @@ declare global {
   }
 }
 
-export default function SiteTranslator() {
+interface SiteTranslatorProps {
+  dropup?: boolean;
+}
+
+export default function SiteTranslator({ dropup }: SiteTranslatorProps = {}) {
   const { profile } = useAuthStore();
   const [currentLang, setCurrentLang] = useState<string>('en');
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [openUpward, setOpenUpward] = useState(dropup ?? false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const toggleDropdown = () => {
+    if (!dropdownOpen && containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - rect.bottom;
+      if (dropup !== undefined) {
+        setOpenUpward(dropup);
+      } else if (spaceBelow < 300 && rect.top > spaceBelow) {
+        setOpenUpward(true);
+      } else {
+        setOpenUpward(false);
+      }
+    }
+    setDropdownOpen(!dropdownOpen);
+  };
 
   useEffect(() => {
     // 1. Silently record the browser language to profile if user is authenticated
@@ -101,10 +122,10 @@ export default function SiteTranslator() {
       `}</style>
 
       {/* Floating or embedded discreet language toggle */}
-      <div className="relative inline-block text-left notranslate" translate="no">
+      <div ref={containerRef} className="relative inline-block text-left notranslate" translate="no">
         <button
           type="button"
-          onClick={() => setDropdownOpen(!dropdownOpen)}
+          onClick={toggleDropdown}
           className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-white/80 hover:bg-white text-slate-700 hover:text-slate-900 border border-slate-200/80 shadow-xs transition text-xs font-semibold notranslate"
           title="Change language / Cambiar idioma"
           translate="no"
@@ -120,7 +141,7 @@ export default function SiteTranslator() {
         {dropdownOpen && (
           <>
             <div className="fixed inset-0 z-40" onClick={() => setDropdownOpen(false)} />
-            <div className="absolute right-0 mt-2 z-50 w-52 max-h-72 overflow-y-auto bg-white rounded-2xl shadow-xl border border-gray-100 p-1 divide-y divide-gray-50 notranslate" translate="no">
+            <div className={`absolute right-0 ${openUpward ? 'bottom-full mb-2' : 'top-full mt-2'} z-50 w-52 max-h-64 overflow-y-auto bg-white rounded-2xl shadow-xl border border-gray-100 p-1 divide-y divide-gray-50 notranslate`} translate="no">
               <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-gray-400 notranslate">
                 Site Language / Idioma
               </div>

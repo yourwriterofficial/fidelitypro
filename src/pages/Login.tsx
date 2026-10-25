@@ -3,11 +3,12 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 import { Mail, Lock, LogIn, Send, KeyRound, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
-import { useAuthStore } from '../store/authStore';
+import { useAuthStore, fetchProfileWithTimeout, saveCache } from '../store/authStore';
 
 export default function Login() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { user, isAdmin, loading: authLoading } = useAuthStore();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -15,6 +16,13 @@ export default function Login() {
   const [method, setMethod] = useState<'password' | 'magic' | 'otp'>('password');
   const [otp, setOtp] = useState('');
   const [verifyingOtp, setVerifyingOtp] = useState(false);
+
+  // Auto-redirect if user is already authenticated or newly signed in
+  useEffect(() => {
+    if (!authLoading && user) {
+      navigate(isAdmin ? '/admin' : '/app', { replace: true });
+    }
+  }, [user, isAdmin, authLoading, navigate]);
 
   useEffect(() => {
     const urlEmail = searchParams.get('email');
@@ -46,9 +54,9 @@ export default function Login() {
     try {
       if (method === 'password') {
         await useAuthStore.getState().signIn(cleanEmail, password);
-        const isAdmin = useAuthStore.getState().isAdmin;
+        const isAdminUser = useAuthStore.getState().isAdmin;
         toast.success('Welcome back!');
-        navigate(isAdmin ? '/admin' : '/app');
+        navigate(isAdminUser ? '/admin' : '/app', { replace: true });
       } else if (method === 'magic') {
         const { error: otpError } = await supabase.auth.signInWithOtp({
           email: cleanEmail,
@@ -103,11 +111,21 @@ export default function Login() {
         type: 'email',
       });
       if (verifyErr) throw verifyErr;
-      if (!data.session) throw new Error('Could not verify code');
-      await useAuthStore.getState().initAuth();
-      const isAdmin = useAuthStore.getState().isAdmin;
+      if (!data.session || !data.user) throw new Error('Could not verify code');
+
+      const cached = useAuthStore.getState().profile;
+      const profile = await fetchProfileWithTimeout(data.user.id, cached, 2000);
+      saveCache(data.user, profile);
+      useAuthStore.setState({
+        user: data.user,
+        profile,
+        isAdmin: profile?.is_admin || false,
+        loading: false,
+      });
+
+      const isAdminUser = profile?.is_admin || false;
       toast.success('Welcome back!');
-      navigate(isAdmin ? '/admin' : '/app');
+      navigate(isAdminUser ? '/admin' : '/app', { replace: true });
     } catch (err: any) {
       const msg = err.message || 'Invalid or expired verification code. Please request a new one.';
       setError(msg);

@@ -45,10 +45,10 @@ interface AuthState {
   clearImpersonation: () => void;
 }
 
-const PROFILE_CACHE_KEY = 'rpm_cached_profile';
-const USER_CACHE_KEY = 'rpm_cached_user';
+export const PROFILE_CACHE_KEY = 'rpm_cached_profile';
+export const USER_CACHE_KEY = 'rpm_cached_user';
 
-const getCachedUser = (): User | null => {
+export const getCachedUser = (): User | null => {
   try {
     const raw = localStorage.getItem(USER_CACHE_KEY);
     return raw ? JSON.parse(raw) : null;
@@ -57,7 +57,7 @@ const getCachedUser = (): User | null => {
   }
 };
 
-const getCachedProfile = (): Profile | null => {
+export const getCachedProfile = (): Profile | null => {
   try {
     const raw = localStorage.getItem(PROFILE_CACHE_KEY);
     return raw ? JSON.parse(raw) : null;
@@ -66,7 +66,7 @@ const getCachedProfile = (): Profile | null => {
   }
 };
 
-const saveCache = (user: User | null, profile: Profile | null) => {
+export const saveCache = (user: User | null, profile: Profile | null) => {
   try {
     if (user) localStorage.setItem(USER_CACHE_KEY, JSON.stringify(user));
     if (profile) localStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(profile));
@@ -75,7 +75,7 @@ const saveCache = (user: User | null, profile: Profile | null) => {
   }
 };
 
-const clearCache = () => {
+export const clearCache = () => {
   try {
     localStorage.removeItem(USER_CACHE_KEY);
     localStorage.removeItem(PROFILE_CACHE_KEY);
@@ -84,25 +84,39 @@ const clearCache = () => {
   }
 };
 
-const fetchProfile = async (userId: string, fallbackProfile?: Profile | null): Promise<Profile | null> => {
+export const fetchProfileWithTimeout = async (
+  userId: string,
+  fallbackProfile?: Profile | null,
+  timeoutMs: number = 2500
+): Promise<Profile | null> => {
   try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+
     const { data, error } = await supabase
       .from('profiles')
       .select('*')
       .eq('id', userId)
+      .abortSignal(controller.signal)
       .single();
+
+    clearTimeout(timer);
+
     if (error) {
       if (error.code !== 'PGRST116') {
-        console.warn('Profile fetch warning (using cache fallback):', error.message || error);
+        console.warn('Profile fetch warning (using fallback):', error.message || error);
       }
       return fallbackProfile || getCachedProfile();
     }
     return data || fallbackProfile || getCachedProfile();
   } catch (err) {
-    console.warn('Network profile fetch error (using cache fallback):', err);
+    console.warn('Network profile fetch error (using fallback):', err);
     return fallbackProfile || getCachedProfile();
   }
 };
+
+export const fetchProfile = (userId: string, fallbackProfile?: Profile | null) =>
+  fetchProfileWithTimeout(userId, fallbackProfile, 2500);
 
 let authSubscription: { unsubscribe: () => void } | null = null;
 let isInitializing = false;
@@ -128,7 +142,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       throw error;
     }
     if (data.user) {
-      const profile = await fetchProfile(data.user.id, get().profile);
+      const cached = get().profile || getCachedProfile();
+      saveCache(data.user, cached);
+      const profile = await fetchProfileWithTimeout(data.user.id, cached, 2000);
       saveCache(data.user, profile);
       set({
         user: data.user,
@@ -155,7 +171,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
     const needsEmailConfirm = data.user?.identities?.length === 0 || !data.session;
     if (!needsEmailConfirm && data.user) {
-      const profile = await fetchProfile(data.user.id, get().profile);
+      const cached = get().profile || getCachedProfile();
+      saveCache(data.user, cached);
+      const profile = await fetchProfileWithTimeout(data.user.id, cached, 2000);
       saveCache(data.user, profile);
       set({
         user: data.user,
@@ -191,46 +209,61 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
     try {
       // ── Step 1: Subscribe to auth state changes ────────────────────────
-      const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
         const { isImpersonating } = get();
         if (isImpersonating) return;
 
         if (event === 'SIGNED_OUT') {
-          // Double-check session to prevent transient logout spikes during tab wake / reconnection
-          const { data: currentCheck } = await supabase.auth.getSession();
-          if (!currentCheck?.session) {
-            clearCache();
-            set({ user: null, profile: null, isAdmin: false, loading: false,
-                  isImpersonating: false, originalUser: null, originalProfile: null });
-          }
+          clearCache();
+          set({
+            user: null,
+            profile: null,
+            isAdmin: false,
+            loading: false,
+            isImpersonating: false,
+            originalUser: null,
+            originalProfile: null,
+          });
           return;
         }
 
-        // Handle every session-bearing event: initial restore, sign-in, token refresh, and profile updates.
+        // Handle every session-bearing event synchronously to prevent Web Lock deadlocks
         if (
           (event === 'INITIAL_SESSION' || event === 'SIGNED_IN' ||
            event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') &&
           session?.user
         ) {
           const cachedProfile = get().profile || getCachedProfile();
-          const profile = (await fetchProfile(session.user.id, cachedProfile)) || cachedProfile;
-          saveCache(session.user, profile);
+          saveCache(session.user, cachedProfile);
           set({
             user: session.user,
-            profile,
-            isAdmin: profile?.is_admin || false,
+            profile: cachedProfile,
+            isAdmin: cachedProfile?.is_admin || false,
             loading: false,
           });
+
+          // Defer subsequent database query via setTimeout(0) to release Navigator Lock first!
+          setTimeout(async () => {
+            try {
+              const freshProfile = await fetchProfileWithTimeout(session.user.id, cachedProfile, 2500);
+              if (freshProfile) {
+                saveCache(session.user, freshProfile);
+                set({
+                  profile: freshProfile,
+                  isAdmin: freshProfile.is_admin || false,
+                });
+              }
+            } catch (err) {
+              console.warn('Background profile sync warning:', err);
+            }
+          }, 0);
           return;
         }
 
-        // INITIAL_SESSION with a null session: only clear if neither storage nor cached user exists
+        // INITIAL_SESSION with a null session: unblock immediately
         if (event === 'INITIAL_SESSION' && !session) {
-          const storedSession = localStorage.getItem('rpm_auth_session');
-          if (!storedSession && !getCachedUser()) {
-            clearCache();
-            set({ user: null, profile: null, isAdmin: false, loading: false });
-          }
+          clearCache();
+          set({ user: null, profile: null, isAdmin: false, loading: false });
         }
       });
       authSubscription = subscription;
@@ -240,29 +273,37 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       if (sessionError) {
         console.warn('Session retrieval error (non-fatal):', sessionError);
-        if (!getCachedUser()) set({ loading: false });
+        set({ loading: false });
         return;
       }
 
       if (session?.user) {
         const cachedProfile = get().profile || getCachedProfile();
-        const profile = (await fetchProfile(session.user.id, cachedProfile)) || cachedProfile;
-        saveCache(session.user, profile);
+        saveCache(session.user, cachedProfile);
         set({
           user: session.user,
-          profile,
-          isAdmin: profile?.is_admin || false,
+          profile: cachedProfile,
+          isAdmin: cachedProfile?.is_admin || false,
           loading: false,
         });
+
+        // Background update without blocking initial render
+        fetchProfileWithTimeout(session.user.id, cachedProfile, 2500).then((freshProfile) => {
+          if (freshProfile) {
+            saveCache(session.user, freshProfile);
+            set({
+              profile: freshProfile,
+              isAdmin: freshProfile.is_admin || false,
+            });
+          }
+        }).catch(() => {});
       } else {
-        // If session is null and there is no cached user, unblock loading
-        if (!getCachedUser()) {
-          set({ loading: false });
-        }
+        clearCache();
+        set({ user: null, profile: null, isAdmin: false, loading: false });
       }
     } catch (error) {
       console.error('Auth init error:', error);
-      if (!getCachedUser()) set({ loading: false });
+      set({ loading: false });
     } finally {
       isInitializing = false;
     }
@@ -274,9 +315,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     const { user } = get();
     if (user) {
       const cachedProfile = get().profile || getCachedProfile();
-      const profile = (await fetchProfile(user.id, cachedProfile)) || cachedProfile;
-      saveCache(user, profile);
-      set({ profile, isAdmin: profile?.is_admin || false });
+      const profile = await fetchProfileWithTimeout(user.id, cachedProfile, 2500);
+      if (profile) {
+        saveCache(user, profile);
+        set({ profile, isAdmin: profile.is_admin || false });
+      }
     }
   },
 

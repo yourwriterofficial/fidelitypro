@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Languages, Send, Check, X, RefreshCw, ChevronDown } from 'lucide-react';
 import { 
   SUPPORTED_LANGUAGES, 
@@ -28,22 +28,12 @@ export default function ChatTranslationBar({
   className = '',
 }: ChatTranslationBarProps) {
   const [targetLang, setTargetLang] = useState<string>(() => {
-    if (partnerLanguageHint && partnerLanguageHint !== 'en' && SUPPORTED_LANGUAGES.some(l => l.code === partnerLanguageHint)) {
-      return partnerLanguageHint;
-    }
-    return getSavedTargetLanguage(currentUserId);
+    return getSavedTargetLanguage(currentUserId) || 'en';
   });
 
   const [isTranslating, setIsTranslating] = useState(false);
   const [preview, setPreview] = useState<{ original: string; translated: string; targetName: string } | null>(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
-
-  // Sync if partner hint arrives or changes
-  useEffect(() => {
-    if (partnerLanguageHint && partnerLanguageHint !== 'en' && SUPPORTED_LANGUAGES.some(l => l.code === partnerLanguageHint)) {
-      setTargetLang(partnerLanguageHint);
-    }
-  }, [partnerLanguageHint]);
 
   // 100% Stealth: If user is not entitled, render absolutely nothing
   if (!hasAccess) return null;
@@ -187,7 +177,7 @@ export default function ChatTranslationBar({
                     Select Target Language
                   </div>
                   <div className="py-1">
-                    {SUPPORTED_LANGUAGES.filter(l => l.code !== 'en').map((lang) => (
+                    {SUPPORTED_LANGUAGES.map((lang) => (
                       <button
                         key={lang.code}
                         type="button"
@@ -212,7 +202,7 @@ export default function ChatTranslationBar({
           </div>
 
           {/* Hint if partner's browser language is detected */}
-          {partnerLangObj && partnerLangObj.code !== 'en' && targetLang !== partnerLangObj.code && (
+          {partnerLangObj && targetLang !== partnerLangObj.code && (
             <button
               type="button"
               onClick={() => handleSelectLanguage(partnerLangObj.code)}

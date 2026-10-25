@@ -121,13 +121,9 @@ export function usePushNotifications(userId: string | undefined) {
           return;
         }
 
-        // If permission is 'default', request it
-        let perm = Notification.permission;
-        if (perm === 'default') {
-          perm = await Notification.requestPermission();
-          setPermission(perm);
-        }
-        if (perm !== 'granted') return;
+        // Auto-subscribe requires permission to be already granted;
+        // requesting permission without a user gesture is blocked in modern browsers.
+        if (Notification.permission !== 'granted') return;
 
         const vapidKey = await resolveVapidPublicKey();
         const sub = await reg.pushManager.subscribe({

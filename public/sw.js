@@ -1,8 +1,14 @@
-// RPM Service Worker — handles Web Push notifications and notification clicks.
+// RPM Service Worker — handles Web Push notifications, notification clicks, and PWA installability.
 const APP_ORIGIN = self.location.origin;
+const CACHE_NAME = 'rpm-shell-v1';
 
-// Auto skip waiting immediately upon install so new deployments activate automatically
-self.addEventListener('install', () => {
+// Cache minimal core shell on install and skip waiting so new worker activates
+self.addEventListener('install', (event) => {
+  event.waitUntil(
+    caches.open(CACHE_NAME).then((cache) => {
+      return cache.addAll(['/index.html', '/favicon.svg', '/manifest.json']).catch(() => {});
+    })
+  );
   self.skipWaiting();
 });
 
@@ -10,12 +16,40 @@ self.addEventListener('message', (event) => {
   if (event.data?.type === 'SKIP_WAITING') self.skipWaiting();
 });
 
-// Activate immediately and claim all client tabs without disruption
-self.addEventListener('activate', (e) => {
-  e.waitUntil(
+// Clean up old caches on activate and claim clients
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
     caches.keys()
-      .then((keys) => Promise.all(keys.map((key) => caches.delete(key))))
+      .then((keys) => Promise.all(
+        keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))
+      ))
       .then(() => self.clients.claim())
+  );
+});
+
+// ── Fetch: live network first with offline shell fallback ────────────────────
+// Required by Chromium for full PWA installability & beforeinstallprompt event.
+self.addEventListener('fetch', (event) => {
+  if (event.request.method !== 'GET') return;
+
+  // For navigation requests (page loads)
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request).catch(async () => {
+        const cache = await caches.open(CACHE_NAME);
+        const cached = await cache.match('/index.html');
+        return cached || Response.error();
+      })
+    );
+    return;
+  }
+
+  // Live network first for all other requests; fallback to cache if offline
+  event.respondWith(
+    fetch(event.request).catch(async () => {
+      const cached = await caches.match(event.request);
+      return cached || Response.error();
+    })
   );
 });
 

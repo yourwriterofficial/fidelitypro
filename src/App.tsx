@@ -72,11 +72,10 @@ function App() {
   useEffect(() => {
     initAuth();
     triggerPassiveHeartbeat();
-    // Watchdog fallback reduced from 5s to 1.2s to prevent lingering spinners
-    // Safety watchdog: only unblock if network is completely unresponsive (8s)
+    // Safety watchdog: ensure UI unblocks even under extreme network latency
     const timeout = setTimeout(() => {
       setLoading(false);
-    }, 8000);
+    }, 3000);
     return () => clearTimeout(timeout);
   }, [initAuth, setLoading]);
 

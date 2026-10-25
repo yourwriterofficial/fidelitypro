@@ -1,26 +1,15 @@
-import { useEffect, useState, useRef } from 'react';
-import { supabase } from '../lib/supabaseClient';
+import { useAuthStore } from '../store/authStore';
 import { usePushNotifications } from '../hooks/usePushNotifications';
 
 /**
- * Invisible component that auto-subscribes the logged-in user to push
- * notifications. Drop it into the root layout so every authenticated
- * session gets push enabled by default.
+ * Component that auto-subscribes the logged-in user to push
+ * notifications once authenticated.
  */
 export default function PushAutoSubscriber() {
-  const [userId, setUserId] = useState<string | undefined>(undefined);
-  const resolved = useRef(false);
+  const { user } = useAuthStore();
 
-  useEffect(() => {
-    if (resolved.current) return;
-    resolved.current = true;
-    supabase.auth.getUser().then(({ data }) => {
-      if (data?.user?.id) setUserId(data.user.id);
-    });
-  }, []);
-
-  // The hook itself handles auto-subscribe via its internal useEffect
-  usePushNotifications(userId);
+  // The hook itself handles auto-subscribe via its internal useEffect when user is present
+  usePushNotifications(user?.id);
 
   return null; // Renders nothing
 }

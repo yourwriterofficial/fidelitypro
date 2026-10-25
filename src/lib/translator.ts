@@ -8,6 +8,7 @@ export interface LanguageOption {
 }
 
 export const SUPPORTED_LANGUAGES: LanguageOption[] = [
+  { code: 'en', name: 'English', nativeName: 'English', flag: '🇬🇧' },
   { code: 'es', name: 'Spanish', nativeName: 'Español', flag: '🇪🇸' },
   { code: 'fr', name: 'French', nativeName: 'Français', flag: '🇫🇷' },
   { code: 'de', name: 'German', nativeName: 'Deutsch', flag: '🇩🇪' },
@@ -26,7 +27,6 @@ export const SUPPORTED_LANGUAGES: LanguageOption[] = [
   { code: 'id', name: 'Indonesian', nativeName: 'Bahasa Indonesia', flag: '🇮🇩' },
   { code: 'uk', name: 'Ukrainian', nativeName: 'Українська', flag: '🇺🇦' },
   { code: 'tl', name: 'Filipino', nativeName: 'Filipino', flag: '🇵🇭' },
-  { code: 'en', name: 'English', nativeName: 'English', flag: '🇬🇧' },
 ];
 
 // In-memory translation cache to eliminate duplicate network calls
@@ -73,15 +73,17 @@ export async function syncBrowserLanguage(userId?: string): Promise<string> {
 
 /**
  * Get the saved language preference for a user (persisted across sessions)
+ * Defaults to 'en' (English).
  */
 export function getSavedTargetLanguage(userId?: string): string {
-  if (typeof window === 'undefined') return 'es';
+  if (typeof window === 'undefined') return 'en';
+  const isExplicit = localStorage.getItem('rpm_trans_target_explicit') === 'true';
   const key = userId ? `rpm_trans_target_${userId}` : 'rpm_trans_target';
   const saved = localStorage.getItem(key);
-  if (saved && SUPPORTED_LANGUAGES.some(l => l.code === saved)) {
+  if (isExplicit && saved && SUPPORTED_LANGUAGES.some(l => l.code === saved)) {
     return saved;
   }
-  return 'es';
+  return 'en';
 }
 
 /**
@@ -92,6 +94,7 @@ export async function saveTargetLanguage(lang: string, userId?: string): Promise
   const key = userId ? `rpm_trans_target_${userId}` : 'rpm_trans_target';
   localStorage.setItem(key, lang);
   localStorage.setItem('rpm_trans_target', lang);
+  localStorage.setItem('rpm_trans_target_explicit', 'true');
 
   if (userId) {
     try {

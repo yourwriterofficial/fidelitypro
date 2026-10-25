@@ -18,11 +18,18 @@ export default function PWAUpdater() {
 
     let reloading = false;
     let hadController = Boolean(navigator.serviceWorker.controller);
-    // When a new worker takes control during an update, seamlessly reload the page into the new deploy
+    // When a new worker takes control during an update, reload into the new deploy unless user is interacting
     const onControllerChange = () => {
       // If there was no controller when the page first opened, this is the first install, NOT an update.
       if (!hadController) {
         hadController = true;
+        return;
+      }
+      // If the user is actively typing in an input or on an auth route, avoid abrupt reload
+      const isInteracting = document.activeElement &&
+        ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName);
+      const isAuthPage = window.location.pathname === '/login' || window.location.pathname === '/signup';
+      if (isInteracting || isAuthPage) {
         return;
       }
       if (reloading) return;
