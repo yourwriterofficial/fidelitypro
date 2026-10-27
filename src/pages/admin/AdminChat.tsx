@@ -7,7 +7,7 @@ import {
   Wallet, ShieldAlert, ShieldCheck, Mail, User, Info, ArrowLeft, Plus, X, Trash2, Bell
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { sendEmailToUser } from '../../lib/notify';
+import { queueMessageEmailToUser } from '../../lib/notify';
 import { isDifferentDay, formatChatDateSeparator, formatMessageTime } from '../../lib/chatDate';
 import ChatTranslationBar from '../../components/ChatTranslationBar';
 import IncomingTranslation from '../../components/IncomingTranslation';
@@ -282,11 +282,16 @@ export default function AdminChat() {
     if (messageId === 'temp') return;
     if (!confirm('Are you sure you want to permanently delete this message?')) return;
     try {
-      const { error } = await supabase
+      // .select() returns the deleted rows so an RLS-blocked delete (0 rows)
+      // is reported instead of silently "succeeding". The DB trigger also
+      // removes the linked user notification and cancels any queued email.
+      const { data: deleted, error } = await supabase
         .from('messages')
         .delete()
-        .eq('id', messageId);
+        .eq('id', messageId)
+        .select('id');
       if (error) throw error;
+      if (!deleted || deleted.length === 0) throw new Error('Message could not be deleted (permission denied).');
       toast.success('Message deleted');
       setMessages(prev => prev.filter(m => m.id !== messageId));
     } catch (err: any) {
@@ -496,16 +501,22 @@ export default function AdminChat() {
             message: `Support: "${textToSend.substring(0, 40)}${textToSend.length > 40 ? '...' : ''}"`,
             type: 'info',
             link: '/app/chat',
-            read: false
+            read: false,
+            source_message_id: newMsg.id
           });
         } catch (notifErr) {
           console.warn('Failed to insert user notification:', notifErr);
         }
 
-        // Send email alert to user (respecting preference locks)
+        // Queue email alert to user (respecting preference locks). The server
+        // holds it for 5 minutes and cancels it if this message is deleted.
         try {
-          await sendEmailToUser(
+          const safeText = textToSend
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/\n/g, '<br />');
+          await queueMessageEmailToUser(
             activeUserId,
+            newMsg.id,
             'info',
             'New message from RPM Support',
             `
@@ -513,7 +524,7 @@ export default function AdminChat() {
                 <h2 style="color: #0f172a;">New Message from RPM Support</h2>
                 <p>Our support team has sent you a new reply:</p>
                 <blockquote style="background: #f8fafc; border-left: 4px solid #0f172a; padding: 12px; margin: 16px 0; font-style: italic;">
-                  "${textToSend}"
+                  "${safeText}"
                 </blockquote>
                 <p style="margin-top: 24px;">
                   <a href="${window.location.origin}/app/chat" 
@@ -836,17 +847,24 @@ export default function AdminChat() {
               className="px-4 pt-3 pb-1 bg-white border-t border-gray-100"
             />
             {/* Input reply form */}
-            <form onSubmit={handleSendReply} className="p-4 bg-white border-t border-gray-100 flex gap-3 items-center shrink-0">
-              <input
-                type="text"
+            {/* Textarea: Enter inserts a line break; only the Send button submits. */}
+            <form onSubmit={e => { e.preventDefault(); }} className="p-4 bg-white border-t border-gray-100 flex gap-3 items-end shrink-0">
+              <textarea
+                rows={1}
                 value={replyText}
                 onChange={e => setReplyText(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') {
+                    e.stopPropagation();
+                  }
+                }}
                 placeholder="Type your reply..."
-                className="flex-1 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-gray-900 focus:border-transparent outline-none"
+                className="flex-1 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-gray-900 focus:border-transparent outline-none resize-none max-h-40 overflow-y-auto [field-sizing:content]"
                 disabled={sending}
               />
               <button
-                type="submit"
+                type="button"
+                onClick={handleSendReply}
                 disabled={!replyText.trim() || sending}
                 className="bg-gray-900 hover:bg-gray-800 disabled:bg-gray-200 text-white rounded-xl p-3 transition shadow-sm hover:shadow-md shrink-0 flex items-center justify-center disabled:text-gray-400"
               >

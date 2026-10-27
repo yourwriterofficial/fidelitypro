@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import { 
   Building2, Plus, ShieldCheck, ArrowRight, AlertCircle, ChevronLeft, ChevronRight 
 } from 'lucide-react';
@@ -50,6 +50,19 @@ export default function Properties() {
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
   const [investModalOpen, setInvestModalOpen] = useState(false);
   const [customModalOpen, setCustomModalOpen] = useState(false);
+  const location = useLocation();
+
+  const scrollToDeeds = () => {
+    // Defer until the deeds section has rendered with the latest data.
+    setTimeout(() => {
+      document.getElementById('my-deeds')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 150);
+  };
+
+  // Deep link from the purchase notification: /app/properties#my-deeds
+  useEffect(() => {
+    if (!loading && location.hash === '#my-deeds') scrollToDeeds();
+  }, [loading, location.hash]);
 
   // Restriction Guard
   if (profile && (!profile.can_property || propertyRestricted)) {
@@ -121,6 +134,20 @@ export default function Properties() {
           <Plus size={16} />
           <span>Request Assisted Escrow</span>
         </button>
+      </div>
+
+      {/* ── MY FRACTIONAL DEEDS & ASSISTED ORDERS ──────────────────────────
+          Shown above the catalog so purchased assets and title deeds are
+          immediately visible instead of buried below pagination. */}
+      <div id="my-deeds" className="scroll-mt-24">
+        <MyPropertiesSection
+          investments={myInvestments}
+          customRequests={myCustomRequests}
+          onRequestCustom={() => {
+            setCustomSuccess(false);
+            setCustomModalOpen(true);
+          }}
+        />
       </div>
 
       {/* ── ASSISTED ACQUISITION CONCIERGE BANNER ────────────────────────── */}
@@ -257,16 +284,6 @@ export default function Properties() {
         </div>
       )}
 
-      {/* ── MY FRACTIONAL DEEDS & ASSISTED ORDERS ────────────────────────── */}
-      <MyPropertiesSection
-        investments={myInvestments}
-        customRequests={myCustomRequests}
-        onRequestCustom={() => {
-          setCustomSuccess(false);
-          setCustomModalOpen(true);
-        }}
-      />
-
       {/* ── MODALS ──────────────────────────────────────────────────────── */}
       {selectedProperty && (
         <PropertyInvestModal
@@ -284,6 +301,7 @@ export default function Properties() {
           onSubmitInvest={async (amount, termMonths) => {
             await handleInvestSubmit(selectedProperty, amount, termMonths);
             setInvestModalOpen(false);
+            scrollToDeeds();
           }}
           submitting={submittingInvest}
         />

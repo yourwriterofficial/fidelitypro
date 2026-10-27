@@ -434,6 +434,12 @@ export default function Chat() {
           setSupportMessages(prev => prev.map(m => m.id === updated.id ? updated : m));
         }
       })
+      // Realtime DELETE events cannot be filtered by column, so listen unfiltered
+      // and drop the message locally by id (payload.old only carries the PK).
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'messages' }, (payload) => {
+        const oldId = (payload.old as { id?: string })?.id;
+        if (oldId) setSupportMessages(prev => prev.filter(m => m.id !== oldId));
+      })
       .subscribe();
 
     // Direct messages channel
@@ -457,6 +463,10 @@ export default function Chat() {
         } else if (payload.eventType === 'UPDATE') {
           const updated = payload.new as DirectMessage;
           setDirectMessages(prev => prev.map(m => m.id === updated.id ? updated : m));
+        } else if (payload.eventType === 'DELETE') {
+          const oldId = (payload.old as { id?: string })?.id;
+          if (oldId) setDirectMessages(prev => prev.filter(m => m.id !== oldId));
+          fetchFriendsAndRequests();
         }
       })
       .subscribe();
@@ -1444,7 +1454,8 @@ export default function Chat() {
                     {SMART_SUGGESTIONS.map(s => (
                       <button
                         key={s}
-                        onClick={() => handleSendMessage(s)}
+                        type="button"
+                        onClick={() => setText(s)}
                         className="px-3 py-1.5 bg-slate-100 hover:bg-brand hover:text-white rounded-xl text-xs font-semibold text-gray-700 transition"
                       >
                         {s}
@@ -1520,21 +1531,29 @@ export default function Chat() {
               currentUserId={profile?.id}
               className="px-4 pt-3 pb-1 bg-white border-t border-slate-100"
             />
-            {/* Input Form */}
+            {/* Input Form — a textarea is used so Enter solely inserts a line break;
+                messages ONLY send when the Send button is explicitly clicked. */}
             <form 
-              onSubmit={(e) => { e.preventDefault(); handleSendMessage(text); }} 
-              className="p-4 bg-white border-t border-slate-100 flex gap-3 items-center shrink-0"
+              onSubmit={(e) => { e.preventDefault(); }} 
+              className="p-4 bg-white border-t border-slate-100 flex gap-3 items-end shrink-0"
             >
-              <input
-                type="text"
+              <textarea
+                rows={1}
                 value={text}
                 onChange={(e) => setText(e.target.value)}
+                onKeyDown={(e) => {
+                  // Enter inserts a normal line break and will never trigger a send.
+                  if (e.key === 'Enter') {
+                    e.stopPropagation();
+                  }
+                }}
                 placeholder={activeChat === 'support' ? "Type message to support desk..." : `Message ${activeFriend?.name || 'contact'}...`}
-                className="flex-1 border border-slate-200 rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-brand focus:border-transparent outline-none bg-slate-50/50"
+                className="flex-1 border border-slate-200 rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-brand focus:border-transparent outline-none bg-slate-50/50 resize-none max-h-40 overflow-y-auto [field-sizing:content]"
                 disabled={sending}
               />
               <button
-                type="submit"
+                type="button"
+                onClick={() => handleSendMessage(text)}
                 disabled={!text.trim() || sending}
                 className="bg-brand hover:bg-brand-dark disabled:bg-gray-200 disabled:text-gray-400 text-white rounded-2xl p-3.5 transition shadow-md shadow-brand/10 shrink-0 flex items-center justify-center"
               >

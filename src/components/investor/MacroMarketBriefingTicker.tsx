@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { TrendingUp, Building2, ShieldCheck, ChevronDown, ChevronUp, Globe2, Activity } from 'lucide-react';
 
 export const MacroMarketBriefingTicker: React.FC = () => {
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(true);
 
   const metrics = [
     { label: 'Real Estate Cap Rate', val: '7.85% Net Dividend', change: '+0.3%', icon: <Building2 size={12} className="text-emerald-500" /> },
@@ -49,14 +49,14 @@ export const MacroMarketBriefingTicker: React.FC = () => {
 
       {/* Expanded Macro Summary Card */}
       {!collapsed && (
-        <div className="px-5 py-2.5 bg-slate-950 border-t border-slate-800/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-[11px] text-slate-400">
-          <div className="flex items-center gap-2">
-            <Globe2 size={13} className="text-indigo-400 shrink-0" />
-            <span>
+        <div className="px-5 py-2.5 bg-slate-950 border-t border-slate-800/80 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 text-[11px] text-slate-400">
+          <div className="flex items-start gap-2 min-w-0 flex-1">
+            <Globe2 size={13} className="text-indigo-400 shrink-0 mt-0.5" />
+            <span className="leading-relaxed">
               <strong className="text-slate-200">Executive Syndicate Briefing:</strong> Institutional real estate capital inflows remain buoyant. Rental yields across tokenized US residential holdings are averaging 9.2%–14.5% annual return with daily dividend settlement.
             </span>
           </div>
-          <span className="text-[10px] text-slate-500 font-mono shrink-0">
+          <span className="text-[10px] text-slate-500 font-mono shrink-0 whitespace-nowrap">
             Refreshed Hourly • RPM Global Analytics
           </span>
         </div>

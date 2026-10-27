@@ -113,7 +113,7 @@ export default function Dashboard() {
       try {
         const { count } = await supabase
           .from('p2p_orders').select('*', { count: 'exact', head: true })
-          .or(`buyer_id.eq.${profile.id},seller_id.eq.${profile.id}`);
+          .eq('user_id', profile.id);
         setP2pCount(count || 0);
       } catch {
         setP2pCount(0);

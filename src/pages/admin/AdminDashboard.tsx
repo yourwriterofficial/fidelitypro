@@ -86,7 +86,7 @@ export default function AdminDashboard() {
         supabase.from('orders').select('id, user_id, product_name, amount, status, created_at, profiles(name, email)').order('created_at', { ascending: false }).limit(6),
         supabase.from('staking_orders').select('id, user_id, amount, status, created_at, profiles(name, email)').order('created_at', { ascending: false }).limit(6),
         supabase.from('property_investments').select('id, user_id, amount_paid, status, created_at, profiles(name, email)').order('created_at', { ascending: false }).limit(6),
-        supabase.from('p2p_orders').select('id, user_id, crypto_amount, fiat_amount, type, status, created_at, profiles(name, email)').order('created_at', { ascending: false }).limit(6),
+        supabase.from('p2p_orders').select('id, user_id, user_name, user_email, order_type, amount_usd, target_amount, status, created_at').order('created_at', { ascending: false }).limit(6),
         supabase.from('kyc_verifications').select('id, user_id, status, id_type, created_at, profiles(name, email)').order('created_at', { ascending: false }).limit(6),
         supabase.from('messages').select('id, user_id, sender_id, body, read, created_at, profiles:user_id(name, email)').order('created_at', { ascending: false }).limit(6),
       ]);
@@ -97,7 +97,7 @@ export default function AdminDashboard() {
         ...(orders || []).map(o => ({ ...o, actType: 'order', actionTitle: `Plan: ${o.product_name}`, displayAmount: o.amount })),
         ...(stakingOrders || []).map(s => ({ ...s, actType: 'staking', actionTitle: 'Locked Savings (Staking)', displayAmount: s.amount })),
         ...(propertyInvestments || []).map(p => ({ ...p, actType: 'property', actionTitle: 'Real Estate Purchase', displayAmount: p.amount_paid })),
-        ...(p2pOrders || []).map(p => ({ ...p, actType: 'p2p', actionTitle: `P2P ${p.type.toUpperCase()}`, displayAmount: p.fiat_amount })),
+        ...(p2pOrders || []).map((p: any) => ({ ...p, actType: 'p2p', actionTitle: `P2P ${(p.order_type || 'trade').toUpperCase()}`, displayAmount: p.amount_usd || p.target_amount || 0, profiles: { name: p.user_name || 'Trader', email: p.user_email || '' } })),
         ...(kycRecords || []).map(k => ({ ...k, actType: 'kyc', actionTitle: `KYC: ${k.id_type || 'Identity Card'}` })),
         ...(supportMessages || []).map(m => ({ ...m, actType: 'support', actionTitle: `Support: ${m.body?.slice(0, 35)}...`, status: m.read ? 'read' : 'unread' })),
       ];

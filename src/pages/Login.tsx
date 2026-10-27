@@ -3,12 +3,12 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 import { Mail, Lock, LogIn, Send, KeyRound, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
-import { useAuthStore, fetchProfileWithTimeout, saveCache } from '../store/authStore';
+import { useAuthStore, fetchProfileWithTimeout, saveCache, getCachedProfile } from '../store/authStore';
 
 export default function Login() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { user, isAdmin, loading: authLoading } = useAuthStore();
+  const { user, profile, isAdmin, loading: authLoading } = useAuthStore();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -17,12 +17,13 @@ export default function Login() {
   const [otp, setOtp] = useState('');
   const [verifyingOtp, setVerifyingOtp] = useState(false);
 
-  // Auto-redirect if user is already authenticated or newly signed in
+  // Auto-redirect if user is already authenticated on initial visit
+  // Guard against interfering when the user is actively submitting a login form
   useEffect(() => {
-    if (!authLoading && user) {
+    if (!authLoading && user && profile && !loading && !verifyingOtp) {
       navigate(isAdmin ? '/admin' : '/app', { replace: true });
     }
-  }, [user, isAdmin, authLoading, navigate]);
+  }, [user, profile, isAdmin, authLoading, loading, verifyingOtp, navigate]);
 
   useEffect(() => {
     const urlEmail = searchParams.get('email');
@@ -54,14 +55,14 @@ export default function Login() {
     try {
       if (method === 'password') {
         await useAuthStore.getState().signIn(cleanEmail, password);
-        const isAdminUser = useAuthStore.getState().isAdmin;
+        const { isAdmin: isAdminUser } = useAuthStore.getState();
         toast.success('Welcome back!');
         navigate(isAdminUser ? '/admin' : '/app', { replace: true });
       } else if (method === 'magic') {
         const { error: otpError } = await supabase.auth.signInWithOtp({
           email: cleanEmail,
           options: {
-            emailRedirectTo: `${window.location.origin}/app`,
+            emailRedirectTo: `${window.location.origin}/login`,
           },
         });
 
@@ -113,8 +114,8 @@ export default function Login() {
       if (verifyErr) throw verifyErr;
       if (!data.session || !data.user) throw new Error('Could not verify code');
 
-      const cached = useAuthStore.getState().profile;
-      const profile = await fetchProfileWithTimeout(data.user.id, cached, 2000);
+      const cached = useAuthStore.getState().profile || getCachedProfile();
+      const profile = await fetchProfileWithTimeout(data.user.id, cached, 2500);
       saveCache(data.user, profile);
       useAuthStore.setState({
         user: data.user,

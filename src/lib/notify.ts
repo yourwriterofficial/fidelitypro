@@ -198,6 +198,44 @@ export async function sendEmailToUser(
   }
 }
 
+/**
+ * Queues a "new message" email for a user. The server holds it for 5 minutes
+ * (enforced by a DB trigger) and cancels it if the source message is deleted
+ * in the meantime. Respects the user's notification preferences & admin locks.
+ */
+export async function queueMessageEmailToUser(
+  userId: string,
+  sourceMessageId: string,
+  type: 'info' | 'warning' | 'success' | 'alert',
+  subject: string,
+  htmlContent: string
+): Promise<boolean> {
+  try {
+    const { data: profile, error: profErr } = await supabase
+      .from('profiles')
+      .select('email')
+      .eq('id', userId)
+      .single();
+    if (profErr || !profile?.email) return false;
+
+    const emailEnabled = await isNotificationEnabled(userId, `email_${type}` as const);
+    if (!emailEnabled) return false;
+
+    const { error } = await supabase.from('message_email_queue').insert({
+      user_id: userId,
+      source_message_id: sourceMessageId,
+      recipient: profile.email,
+      subject,
+      html: htmlContent,
+    });
+    if (error) throw error;
+    return true;
+  } catch (err) {
+    console.error('[notify] queueMessageEmailToUser failed:', err);
+    return false;
+  }
+}
+
 /** Sends a notification to multiple users (bulk broadcast — not subject to the per-recipient rate limit) */
 export async function notifyUsers(userIds: string[], params: Omit<NotifyParams, 'userId'>): Promise<void> {
   await Promise.all(userIds.map(userId => dispatchNotification({ ...params, userId })));

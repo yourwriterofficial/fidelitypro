@@ -102,9 +102,19 @@ export default function WalletPage() {
         }
       });
       deposits?.forEach(d => {
-        if (d.status !== 'confirmed') {
-          all.push({ id: d.id, type: 'deposit', amount: d.amount,
-            description: 'Pending deposit', status: d.status, created_at: d.created_at, is_admin_action: false });
+        // Ensure all deposits are visible: pending, failed, or confirmed deposits
+        // that were not mirrored as a separate transaction row.
+        const alreadyInTxs = txs?.some(t => t.type === 'deposit' && (t.id === d.id || Math.abs(t.amount - d.amount) < 0.001));
+        if (!alreadyInTxs) {
+          all.push({
+            id: d.id,
+            type: 'deposit',
+            amount: d.amount,
+            description: d.status === 'confirmed' ? 'Deposit (Confirmed)' : 'Deposit (Pending)',
+            status: d.status,
+            created_at: d.created_at,
+            is_admin_action: false
+          });
         }
       });
       all.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
@@ -118,6 +128,18 @@ export default function WalletPage() {
   useEffect(() => {
     fetchSettings();
     fetchTransactionHistory();
+  }, [profile?.id]);
+
+  // Live refresh: admin top-ups, deposit confirmations and purchases made in
+  // another tab/device appear without a manual page reload.
+  useEffect(() => {
+    if (!profile?.id) return;
+    const channel = supabase
+      .channel(`wallet-history-${profile.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions', filter: `user_id=eq.${profile.id}` }, () => fetchTransactionHistory())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'deposits', filter: `user_id=eq.${profile.id}` }, () => fetchTransactionHistory())
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
   }, [profile?.id]);
 
   const handleProofUpload = async (file: File) => {

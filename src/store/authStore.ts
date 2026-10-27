@@ -127,7 +127,7 @@ const initialCachedProfile = getCachedProfile();
 export const useAuthStore = create<AuthState>((set, get) => ({
   user: initialCachedUser,
   profile: initialCachedProfile,
-  loading: !initialCachedUser,
+  loading: !(initialCachedUser && initialCachedProfile),
   isAdmin: initialCachedProfile?.is_admin || false,
   isImpersonating: false,
   originalUser: null,
@@ -144,7 +144,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     if (data.user) {
       const cached = get().profile || getCachedProfile();
       saveCache(data.user, cached);
-      const profile = await fetchProfileWithTimeout(data.user.id, cached, 2000);
+      const profile = await fetchProfileWithTimeout(data.user.id, cached, 2500);
       saveCache(data.user, profile);
       set({
         user: data.user,
@@ -239,7 +239,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             user: session.user,
             profile: cachedProfile,
             isAdmin: cachedProfile?.is_admin || false,
-            loading: false,
+            loading: !cachedProfile,
           });
 
           // Defer subsequent database query via setTimeout(0) to release Navigator Lock first!
@@ -251,10 +251,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
                 set({
                   profile: freshProfile,
                   isAdmin: freshProfile.is_admin || false,
+                  loading: false,
                 });
+              } else {
+                set({ loading: false });
               }
             } catch (err) {
               console.warn('Background profile sync warning:', err);
+              set({ loading: false });
             }
           }, 0);
           return;
@@ -284,7 +288,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           user: session.user,
           profile: cachedProfile,
           isAdmin: cachedProfile?.is_admin || false,
-          loading: false,
+          loading: !cachedProfile,
         });
 
         // Background update without blocking initial render
@@ -294,9 +298,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             set({
               profile: freshProfile,
               isAdmin: freshProfile.is_admin || false,
+              loading: false,
             });
+          } else {
+            set({ loading: false });
           }
-        }).catch(() => {});
+        }).catch(() => {
+          set({ loading: false });
+        });
       } else {
         clearCache();
         set({ user: null, profile: null, isAdmin: false, loading: false });

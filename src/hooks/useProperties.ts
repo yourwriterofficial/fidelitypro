@@ -22,7 +22,7 @@ const initialFilters: PropertyFilterState = {
 };
 
 export function useProperties() {
-  const { profile } = useAuthStore();
+  const { profile, refreshProfile } = useAuthStore();
   const [properties, setProperties] = useState<Property[]>([]);
   const [loading, setLoading] = useState(true);
   const [scrollSpeed, setScrollSpeed] = useState(3);
@@ -212,15 +212,17 @@ export function useProperties() {
 
     setSubmittingInvest(true);
     try {
-      await supabase.rpc('deduct_wallet_balance', { user_id: profile.id, amount });
+      const { error: deductErr } = await supabase.rpc('deduct_wallet_balance', { user_id: profile.id, amount });
+      if (deductErr) throw deductErr;
 
-      await supabase.from('transactions').insert({
+      const { error: txErr } = await supabase.from('transactions').insert({
         user_id: profile.id,
         type: 'investment',
         amount: -amount,
         description: `Property Investment: ${property.title}`,
         status: 'completed',
       });
+      if (txErr) console.error('[properties] Failed to log investment transaction:', txErr);
 
       const downPaymentRequired = property.price * (property.down_payment_percent / 100);
       const remaining = Math.max(0, property.price - amount);
@@ -252,14 +254,14 @@ export function useProperties() {
         title: 'Property Deed Investment Confirmed',
         message: `You invested $${amount.toLocaleString()} in ${property.title} (${termMonths} Months). Your fractional deed equity is recorded!`,
         type: 'success',
-        link: '/app/properties',
+        link: '/app/properties#my-deeds',
       });
 
       toast.success('Investment Recorded Successfully!', {
-        description: `Fractional deed equity allocated for ${property.title}.`,
+        description: `Fractional deed equity allocated for ${property.title}. Your title deed is under "My Active Deeds".`,
       });
 
-      await fetchMyInvestments();
+      await Promise.all([fetchMyInvestments(), refreshProfile()]);
     } catch (err: any) {
       toast.error(err.message || 'Failed to complete investment');
       throw err;

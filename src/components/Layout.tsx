@@ -636,7 +636,7 @@ export default function Layout() {
               </div>
             </div>
           )}
-          <div className="flex-1 min-h-0 min-w-0 flex flex-col [&>*]:min-w-0 [&>*]:w-full">
+          <div className="flex-1 min-h-0 min-w-0 flex flex-col h-full [&>*]:min-w-0 [&>*]:w-full">
             <Outlet context={{ onlineUsers: onlineUsersWithLivePage } satisfies LayoutOutletContext} />
           </div>
         </div>

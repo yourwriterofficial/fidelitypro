@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import {
   Ban, UserCheck, Eye, Languages, Edit, Plus, Minus, Save, X, Mail, Lock, Key, Check, CheckCheck, Trash2, Bell, BellRing, Clock, ChevronDown, ChevronUp
 } from 'lucide-react';
-import { sendEmailAndLog } from '../../lib/notify';
+import { sendEmailAndLog, queueMessageEmailToUser } from '../../lib/notify';
 
 interface User {
   id: string;
@@ -534,11 +534,15 @@ export default function AdminUsers() {
   const handleDeleteMessage = async (messageId: string) => {
     if (!confirm('Are you sure you want to permanently delete this message?')) return;
     try {
-      const { error } = await supabase
+      // .select() returns deleted rows so an RLS-blocked delete is reported.
+      // The DB trigger also removes the linked notification and queued email.
+      const { data: deleted, error } = await supabase
         .from('messages')
         .delete()
-        .eq('id', messageId);
+        .eq('id', messageId)
+        .select('id');
       if (error) throw error;
+      if (!deleted || deleted.length === 0) throw new Error('Message could not be deleted (permission denied).');
       toast.success('Message deleted');
       setChatMessages(prev => prev.filter(m => m.id !== messageId));
     } catch (err: any) {
@@ -595,25 +599,31 @@ export default function AdminUsers() {
           message: `Support: "${textToSend.substring(0, 40)}${textToSend.length > 40 ? '...' : ''}"`,
           type: 'info',
           link: '/app/chat',
-          read: false
+          read: false,
+          source_message_id: newMsg.id
         });
       } catch (notifErr) {
         console.warn('Failed to insert user notification:', notifErr);
       }
 
-      // Send email alert to user
+      // Queue email alert to user: held 5 minutes server-side and cancelled
+      // if this message is deleted before then.
       if (selectedUser.email) {
         try {
-          await supabase.functions.invoke('send-email', {
-            body: {
-              to: selectedUser.email,
-              subject: 'New message from RPM Support',
-              html: `
+          const safeText = textToSend
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/\n/g, '<br />');
+          await queueMessageEmailToUser(
+            selectedUser.id,
+            newMsg.id,
+            'info',
+            'New message from RPM Support',
+            `
                 <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #f0f0f0; border-radius: 8px;">
                   <h2 style="color: #0f172a;">New Message from RPM Support</h2>
                   <p>Our support team has sent you a new reply:</p>
                   <blockquote style="background: #f8fafc; border-left: 4px solid #0f172a; padding: 12px; margin: 16px 0; font-style: italic;">
-                    "${textToSend}"
+                    "${safeText}"
                   </blockquote>
                   <p style="margin-top: 24px;">
                     <a href="${window.location.origin}/app/chat" 
@@ -623,8 +633,7 @@ export default function AdminUsers() {
                   </p>
                 </div>
               `
-            }
-          });
+          );
         } catch (emailErr) {
           console.warn('Email notify to user failed:', emailErr);
         }
@@ -727,14 +736,16 @@ export default function AdminUsers() {
       return;
     }
     try {
-      await supabase.rpc('add_wallet_balance', { user_id: selectedUser.id, amount });
-      await supabase.from('transactions').insert({
+      const { error: balErr } = await supabase.rpc('add_wallet_balance', { user_id: selectedUser.id, amount });
+      if (balErr) throw balErr;
+      const { error: txErr } = await supabase.from('transactions').insert({
         user_id: selectedUser.id,
         type: 'admin',
         amount,
         description: 'Admin wallet top-up',
         status: 'completed',
       });
+      if (txErr) throw new Error(`Balance credited but history entry failed: ${txErr.message}`);
       toast.success(`Added $${amount} to wallet`);
       setTopupAmount('');
 
@@ -773,14 +784,16 @@ export default function AdminUsers() {
       return;
     }
     try {
-      await supabase.rpc('deduct_wallet_balance', { user_id: selectedUser.id, amount });
-      await supabase.from('transactions').insert({
+      const { error: balErr } = await supabase.rpc('deduct_wallet_balance', { user_id: selectedUser.id, amount });
+      if (balErr) throw balErr;
+      const { error: txErr } = await supabase.from('transactions').insert({
         user_id: selectedUser.id,
         type: 'admin',
         amount: -amount,
         description: 'Admin wallet deduction',
         status: 'completed',
       });
+      if (txErr) throw new Error(`Balance deducted but history entry failed: ${txErr.message}`);
       toast.success(`Deducted $${amount} from wallet`);
       setDeductAmount('');
       await fetchUsers();

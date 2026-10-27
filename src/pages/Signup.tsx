@@ -4,6 +4,7 @@ import { Mail, Lock, User, UserPlus } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '../lib/supabaseClient';
 import { notifyAdminsWithEmail } from '../lib/notify';
+import { useAuthStore } from '../store/authStore';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -140,14 +141,9 @@ export default function Signup() {
 
       // 3. Attempt immediate sign-in for seamless onboarding
       try {
-        const { error: signInErr } = await supabase.auth.signInWithPassword({
-          email: cleanEmail,
-          password,
-        });
-        if (!signInErr) {
-          navigate('/app');
-          return;
-        }
+        await useAuthStore.getState().signIn(cleanEmail, password);
+        navigate('/app');
+        return;
       } catch {
         // Fall through to login page if immediate sign-in is delayed
       }

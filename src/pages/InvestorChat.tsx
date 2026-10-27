@@ -240,7 +240,7 @@ export default function InvestorChat() {
   // Followed users state (Admin only, synced with DB)
   const [followedUsers, setFollowedUsers] = useState<FollowedUser[]>([]);
   const [showAdminPanel, setShowAdminPanel] = useState(false);
-  const [showFollowedFeed, setShowFollowedFeed] = useState(true);
+  const [showFollowedFeed, setShowFollowedFeed] = useState(false);
   const [searchParams] = useSearchParams();
   const msgIdParam = searchParams.get('msgId');
   const [simSpeedMs, setSimSpeedMs] = useState<number>(() => Number(localStorage.getItem('rpm_chat_sim_speed') || '5000'));
@@ -1290,10 +1290,10 @@ export default function InvestorChat() {
   }, [allMessagesList, searchQuery]);
 
   return (
-    <div className="flex flex-col md:flex-row gap-4 h-full min-h-0">
+    <div className="flex-1 flex flex-col md:flex-row gap-4 h-[calc(100dvh-150px)] lg:h-[calc(100dvh-120px)] min-h-[580px] max-h-full mb-16 md:mb-0 min-w-0">
       
       {/* Sidebar - Floor Intelligence & Overview (Compressed & Compact) */}
-      <div className="hidden lg:flex w-full lg:w-60 bg-slate-900 border border-slate-800 text-white rounded-2xl p-3.5 flex flex-col justify-between shrink-0 h-fit lg:h-full shadow-xl">
+      <div className="hidden lg:flex w-full lg:w-60 bg-slate-900 border border-slate-800 text-white rounded-2xl p-3.5 flex flex-col justify-between shrink-0 h-full overflow-y-auto shadow-xl">
         <div className="space-y-3">
           <div className="flex items-center gap-2.5 pb-2.5 border-b border-slate-800">
             <div className="w-7 h-7 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold">
@@ -1348,7 +1348,7 @@ export default function InvestorChat() {
       </div>
 
       {/* Main Floor Area */}
-      <div className="flex-1 flex flex-col bg-slate-50/50 dark:bg-slate-900 rounded-3xl shadow-sm overflow-hidden h-full border border-slate-200/80 dark:border-slate-800">
+      <div className="flex-1 min-h-0 min-w-0 flex flex-col bg-slate-50/50 dark:bg-slate-900 rounded-3xl shadow-sm overflow-hidden h-full border border-slate-200/80 dark:border-slate-800">
         
         {/* Executive Header */}
         <div className="px-5 py-3.5 bg-white dark:bg-slate-850 border-b border-slate-200/80 dark:border-slate-800 flex items-center justify-between gap-3 shrink-0">
@@ -1475,7 +1475,7 @@ export default function InvestorChat() {
         <div 
           ref={chatContainerRef}
           onScroll={handleScroll}
-          className="flex-1 overflow-y-auto overscroll-contain px-3 py-4 md:px-5 space-y-3 bg-slate-50 dark:bg-slate-900/90"
+          className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-3 py-4 md:px-5 space-y-3 bg-slate-50 dark:bg-slate-900/90"
         >
           {loading ? (
             <div className="flex flex-col items-center justify-center h-full gap-2">
@@ -1816,9 +1816,9 @@ export default function InvestorChat() {
         </div>
       </div>
 
-      {/* Followed Members Feed Pane (Admin only) */}
+      {/* Followed Members Feed Pane (Admin only) — slides over on smaller screens, docks on xl */}
       {profile?.is_admin && showFollowedFeed && (
-        <div className="w-full md:w-96 flex flex-col bg-white dark:bg-[#17212b] rounded-3xl shadow-sm overflow-hidden h-full border border-gray-200 dark:border-[#2b3d4f] shrink-0">
+        <div className="fixed inset-y-0 right-0 z-50 w-full sm:w-96 xl:static xl:w-96 flex flex-col bg-white dark:bg-[#17212b] xl:rounded-3xl shadow-2xl xl:shadow-sm overflow-hidden h-full border-l xl:border border-gray-200 dark:border-[#2b3d4f] shrink-0 min-h-0 animate-in slide-in-from-right duration-200">
           
           {/* Header */}
           <div className="px-4 py-3 bg-[#0d141a] border-b border-gray-200 dark:border-[#2b3d4f] flex items-center justify-between shrink-0">
@@ -1843,7 +1843,7 @@ export default function InvestorChat() {
           </div>
 
           {/* Messages list */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50/50 dark:bg-[#0e1621]">
+          <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3 bg-gray-50/50 dark:bg-[#0e1621]">
             {followedMessages.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-center p-6 space-y-2">
                 <div className="p-3 bg-gray-100 dark:bg-[#1c2733] rounded-full text-gray-400 dark:text-[#4a6a80]">
