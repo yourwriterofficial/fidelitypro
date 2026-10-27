@@ -9,6 +9,7 @@ import {
   XCircle, RefreshCw, Smartphone, Trash2
 } from 'lucide-react';
 import { notifyAdmins, notifyAdminsWithEmail } from '../lib/notify';
+import { formatLastSeen } from '../lib/chatDate';
 
 interface KYCData {
   id?: string;
@@ -521,10 +522,19 @@ export default function Settings() {
               <div>
                 <h2 className="text-lg font-bold text-gray-900">{profile?.name || 'Investor'}</h2>
                 <p className="text-xs text-gray-400">{profile?.email}</p>
-                <div className="mt-2 flex flex-wrap gap-2">
+                <div className="mt-2 flex flex-wrap items-center gap-2">
                   <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 border border-gray-200">
                     ID: #{profile?.id.substring(0, 8)}
                   </span>
+                  <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    Active Now
+                  </span>
+                  {profile?.last_seen && (
+                    <span className="text-[11px] font-medium text-gray-400" title={new Date(profile.last_seen).toLocaleString()}>
+                      Last seen: {formatLastSeen(profile.last_seen)}
+                    </span>
+                  )}
                   {profile?.is_admin && (
                     <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200">
                       Administrator

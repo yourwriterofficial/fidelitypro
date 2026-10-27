@@ -24,6 +24,7 @@ export interface Profile {
   can_translate?: boolean;
   browser_language?: string;
   preferred_translation_lang?: string;
+  last_seen?: string;
 }
 
 interface AuthState {

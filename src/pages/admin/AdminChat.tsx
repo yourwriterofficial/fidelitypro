@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { queueMessageEmailToUser } from '../../lib/notify';
-import { isDifferentDay, formatChatDateSeparator, formatMessageTime } from '../../lib/chatDate';
+import { isDifferentDay, formatChatDateSeparator, formatMessageTime, formatLastSeen, isUserRecentlyActive } from '../../lib/chatDate';
 import ChatTranslationBar from '../../components/ChatTranslationBar';
 import IncomingTranslation from '../../components/IncomingTranslation';
 
@@ -75,30 +75,6 @@ export default function AdminChat() {
   // Formatting helpers
   const fmtCurrency = (n: number) => 
     new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n);
-  
-  const formatLastSeen = (dateStr?: string) => {
-    if (!dateStr) return 'Never active';
-    const date = new Date(dateStr);
-    const diffMs = new Date().getTime() - date.getTime();
-    if (diffMs <= 0) return 'Just now';
-    
-    let seconds = Math.floor(diffMs / 1000);
-    let minutes = Math.floor(seconds / 60);
-    let hours = Math.floor(minutes / 60);
-    const days = Math.floor(hours / 24);
-    
-    seconds = seconds % 60;
-    minutes = minutes % 60;
-    hours = hours % 24;
-    
-    const parts = [];
-    if (days > 0) parts.push(`${days} day${days > 1 ? 's' : ''}`);
-    if (hours > 0) parts.push(`${hours} hour${hours > 1 ? 's' : ''}`);
-    if (minutes > 0) parts.push(`${minutes} minute${minutes > 1 ? 's' : ''}`);
-    if (seconds > 0 || parts.length === 0) parts.push(`${seconds} second${seconds > 1 ? 's' : ''}`);
-    
-    return parts.join(', ') + ' ago';
-  };
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -907,9 +883,21 @@ export default function AdminChat() {
               </div>
               <h3 className="font-bold text-gray-950 text-sm mt-3">{activeUser.name || 'User'}</h3>
               <p className="text-xs text-gray-400 select-all font-medium mt-0.5">{activeUser.email}</p>
-              <p className="text-[10px] text-gray-450 font-bold mt-2 uppercase tracking-wider">
-                Last active: <span className="text-slate-800 font-extrabold">{formatLastSeen(activeUser.last_seen)}</span>
-              </p>
+              <div className="mt-2 flex items-center justify-center">
+                {isUserRecentlyActive(activeUser.last_seen) ? (
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    Online now
+                  </span>
+                ) : (
+                  <p
+                    className="text-[10px] text-gray-450 font-bold uppercase tracking-wider"
+                    title={activeUser.last_seen ? new Date(activeUser.last_seen).toLocaleString() : undefined}
+                  >
+                    Last active: <span className="text-slate-800 font-extrabold">{formatLastSeen(activeUser.last_seen)}</span>
+                  </p>
+                )}
+              </div>
             </div>
 
             <hr className="border-gray-50" />
@@ -1102,9 +1090,21 @@ export default function AdminChat() {
                 </div>
                 <h3 className="font-bold text-gray-950 text-sm mt-3">{activeUser.name || 'User'}</h3>
                 <p className="text-xs text-gray-400 select-all font-medium mt-0.5">{activeUser.email}</p>
-                <p className="text-[10px] text-gray-450 font-bold mt-2 uppercase tracking-wider">
-                  Last active: <span className="text-slate-800 font-extrabold">{formatLastSeen(activeUser.last_seen)}</span>
-                </p>
+              <div className="mt-2 flex items-center justify-center">
+                {isUserRecentlyActive(activeUser.last_seen) ? (
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    Online now
+                  </span>
+                ) : (
+                  <p
+                    className="text-[10px] text-gray-450 font-bold uppercase tracking-wider"
+                    title={activeUser.last_seen ? new Date(activeUser.last_seen).toLocaleString() : undefined}
+                  >
+                    Last active: <span className="text-slate-800 font-extrabold">{formatLastSeen(activeUser.last_seen)}</span>
+                  </p>
+                )}
+              </div>
               </div>
 
               <div className="bg-white border border-gray-150 rounded-2xl p-4 shadow-sm">

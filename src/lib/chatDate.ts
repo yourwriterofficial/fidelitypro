@@ -38,3 +38,34 @@ export function formatMessageTime(dateInput: string | Date): string {
   if (isNaN(d.getTime())) return '';
   return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
+
+export function formatLastSeen(dateStr?: string | null): string {
+  if (!dateStr) return 'Never active';
+  const date = new Date(dateStr);
+  const diffMs = Date.now() - date.getTime();
+  if (isNaN(diffMs)) return 'Never active';
+  if (diffMs <= 0 || diffMs < 45 * 1000) return 'Just now';
+
+  const seconds = Math.floor(diffMs / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+
+  if (seconds < 60) return `${seconds}s ago`;
+  if (minutes < 60) return `${minutes}m ago`;
+  if (hours < 24) {
+    const remM = minutes % 60;
+    return remM > 0 ? `${hours}h ${remM}m ago` : `${hours}h ago`;
+  }
+  if (days === 1) return 'Yesterday';
+  if (days < 7) return `${days} days ago`;
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+export function isUserRecentlyActive(dateStr?: string | null, thresholdMs = 70000): boolean {
+  if (!dateStr) return false;
+  const t = new Date(dateStr).getTime();
+  if (isNaN(t)) return false;
+  return Date.now() - t < thresholdMs;
+}
+

@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabaseClient';
 import { useAuthStore } from '../store/authStore';
 import { toast } from 'sonner';
 import { Bell, BellRing, Clock, ChevronDown, ChevronUp } from 'lucide-react';
+import { formatLastSeen } from '../lib/chatDate';
 import type { OnlineVisitor } from './Layout';
 
 interface LiteUser {
@@ -32,29 +33,7 @@ const getPageLabel = (path: string) => {
   return path || 'Unknown Page';
 };
 
-const formatLastSeen = (dateStr?: string) => {
-  if (!dateStr) return 'Never active';
-  const date = new Date(dateStr);
-  const diffMs = new Date().getTime() - date.getTime();
-  if (diffMs <= 0) return 'Just now';
 
-  let seconds = Math.floor(diffMs / 1000);
-  let minutes = Math.floor(seconds / 60);
-  let hours = Math.floor(minutes / 60);
-  const days = Math.floor(hours / 24);
-
-  seconds = seconds % 60;
-  minutes = minutes % 60;
-  hours = hours % 24;
-
-  const parts = [];
-  if (days > 0) parts.push(`${days} day${days > 1 ? 's' : ''}`);
-  if (hours > 0) parts.push(`${hours} hour${hours > 1 ? 's' : ''}`);
-  if (minutes > 0) parts.push(`${minutes} minute${minutes > 1 ? 's' : ''}`);
-  if (seconds > 0 || parts.length === 0) parts.push(`${seconds} second${seconds > 1 ? 's' : ''}`);
-
-  return parts.join(', ') + ' ago';
-};
 
 const formatDuration = (ms: number) => {
   const totalSeconds = Math.max(0, Math.round(ms / 1000));

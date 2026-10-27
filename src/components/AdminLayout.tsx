@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabaseClient';
+import { useUserActivityTracker } from '../hooks/useUserActivityTracker';
 
 const NAV_SECTIONS = [
   {
@@ -75,6 +76,9 @@ export default function AdminLayout() {
     () => typeof localStorage !== 'undefined' && localStorage.getItem('admin-sidebar-collapsed') === '1'
   );
   const [unreadChatCount, setUnreadChatCount] = useState(0);
+
+  // Continuous Admin Activity, Heartbeat & Page Visit tracking
+  useUserActivityTracker(profile);
 
   useEffect(() => {
     if (!profile?.id) return;

@@ -7,6 +7,7 @@ import {
   Ban, UserCheck, Eye, Languages, Edit, Plus, Minus, Save, X, Mail, Lock, Key, Check, CheckCheck, Trash2, Bell, BellRing, Clock, ChevronDown, ChevronUp
 } from 'lucide-react';
 import { sendEmailAndLog, queueMessageEmailToUser } from '../../lib/notify';
+import { formatLastSeen as formatLastSeenUtil } from '../../lib/chatDate';
 
 interface User {
   id: string;
@@ -122,27 +123,7 @@ export default function AdminUsers() {
   const [creatingUser, setCreatingUser] = useState(false);
 
   const formatLastSeen = (dateStr?: string) => {
-    if (!dateStr) return 'Never active';
-    const date = new Date(dateStr);
-    const diffMs = new Date().getTime() - date.getTime();
-    if (diffMs <= 0) return 'Just now';
-    
-    let seconds = Math.floor(diffMs / 1000);
-    let minutes = Math.floor(seconds / 60);
-    let hours = Math.floor(minutes / 60);
-    const days = Math.floor(hours / 24);
-    
-    seconds = seconds % 60;
-    minutes = minutes % 60;
-    hours = hours % 24;
-    
-    const parts = [];
-    if (days > 0) parts.push(`${days} day${days > 1 ? 's' : ''}`);
-    if (hours > 0) parts.push(`${hours} hour${hours > 1 ? 's' : ''}`);
-    if (minutes > 0) parts.push(`${minutes} minute${minutes > 1 ? 's' : ''}`);
-    if (seconds > 0 || parts.length === 0) parts.push(`${seconds} second${seconds > 1 ? 's' : ''}`);
-    
-    return parts.join(', ') + ' ago';
+    return formatLastSeenUtil(dateStr);
   };
 
   const formatDuration = (ms: number) => {
@@ -1312,7 +1293,12 @@ export default function AdminUsers() {
                         Online
                       </span>
                     ) : (
-                      <span className="text-gray-400 font-semibold text-xs">{formatLastSeen(u.last_seen)}</span>
+                      <span
+                        className="text-gray-400 font-semibold text-xs"
+                        title={u.last_seen ? new Date(u.last_seen).toLocaleString() : 'Never active'}
+                      >
+                        {formatLastSeen(u.last_seen)}
+                      </span>
                     )}
                   </td>
                   <td className="p-4">
@@ -1386,6 +1372,35 @@ export default function AdminUsers() {
             {/* Tab Content */}
             {activeTab === 'profile' && (
               <div className="space-y-4">
+                <div className="p-3.5 bg-gray-50 border border-gray-200 rounded-2xl flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5">
+                    {onlineUsers.some(ou => ou.user_id === selectedUser.id) ? (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">
+                        <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+                        Online Now
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-gray-200 text-gray-700">
+                        <span className="w-2 h-2 bg-gray-400 rounded-full" />
+                        Offline
+                      </span>
+                    )}
+                    <span className="text-xs text-gray-600 font-medium">
+                      Last seen:{' '}
+                      <strong className="text-gray-900 font-bold">{formatLastSeen(selectedUser.last_seen)}</strong>
+                      {selectedUser.last_seen && (
+                        <span className="text-[11px] text-gray-400 ml-1">
+                          ({new Date(selectedUser.last_seen).toLocaleString()})
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                  {selectedUser.created_at && (
+                    <span className="text-xs text-gray-400 font-medium">
+                      Member since: {new Date(selectedUser.created_at).toLocaleDateString()}
+                    </span>
+                  )}
+                </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Name</label>
                   <input

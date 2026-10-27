@@ -9,10 +9,11 @@ import {
 import { supabase } from '../lib/supabaseClient';
 import NotificationBell from './NotificationBell';
 import SiteTranslator from './SiteTranslator';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useAccountRestriction } from '../hooks/useAccountRestriction';
 import { toast } from 'sonner';
 import { initTelegramWebApp } from '../lib/telegramWebApp';
+import { useUserActivityTracker } from '../hooks/useUserActivityTracker';
 
 const mainNavItems = [
   { path: '/app',             icon: Home,          label: 'Dashboard' },
@@ -68,7 +69,6 @@ export default function Layout() {
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
   const [investorChatUnread, setInvestorChatUnread] = useState(0);
   const [investorChatFollowUnread, setInvestorChatFollowUnread] = useState(0);
-  const lastLoggedPathRef = useRef<string | null>(null);
   const [onlineUsers, setOnlineUsers] = useState<OnlineVisitor[]>([]);
 
   useEffect(() => {
@@ -307,40 +307,13 @@ export default function Layout() {
     };
   }, [profile?.is_admin]);
 
-  // Page Route Logging and Last Seen — run on every navigation.
+  // Continuous User Activity, Heartbeat & Page Visit tracking
+  useUserActivityTracker(profile);
+
+  // Optimistic local page update for current user
   useEffect(() => {
     if (!profile?.id) return;
-
-    // 1. Log page visit to user_page_visits table — guarded against firing
-    // twice in a row for the same path (e.g. a profile object refresh that
-    // doesn't represent an actual navigation).
-    const logPageVisit = async () => {
-      if (lastLoggedPathRef.current === location.pathname) return;
-      lastLoggedPathRef.current = location.pathname;
-      const nowIso = new Date().toISOString();
-      // Optimistic local update — don't wait on the INSERT's realtime
-      // round-trip just to see your own navigation reflected instantly.
-      setPageByUser(prev => ({ ...prev, [profile.id]: { path: location.pathname, at: nowIso } }));
-      await supabase.from('user_page_visits').insert({
-        user_id: profile.id,
-        path: location.pathname
-      });
-    };
-    logPageVisit();
-
-    // 2. Throttle last_seen updates in profiles table (max once per 5 seconds)
-    const updateLastSeen = async () => {
-      const now = new Date().toISOString();
-      const lastUpdate = localStorage.getItem('last_seen_updated');
-      if (!lastUpdate || (new Date(now).getTime() - new Date(lastUpdate).getTime() > 5000)) {
-        await supabase
-          .from('profiles')
-          .update({ last_seen: now })
-          .eq('id', profile.id);
-        localStorage.setItem('last_seen_updated', now);
-      }
-    };
-    updateLastSeen();
+    setPageByUser(prev => ({ ...prev, [profile.id]: { path: location.pathname, at: new Date().toISOString() } }));
   }, [location.pathname, profile?.id]);
 
   // Merge the live page-visit feed into the presence list so Live Visitors
