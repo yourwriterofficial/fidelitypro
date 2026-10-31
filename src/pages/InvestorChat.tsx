@@ -11,6 +11,8 @@ import { toast } from 'sonner';
 import { notifyUser, sendEmailToUser } from '../lib/notify';
 import { isDifferentDay, formatChatDateSeparator, formatMessageTime } from '../lib/chatDate';
 import IncomingTranslation from '../components/IncomingTranslation';
+import ChatTranslationBar from '../components/ChatTranslationBar';
+import { getSentTranslation, saveSentTranslation } from '../lib/translator';
 import { MacroMarketBriefingTicker } from '../components/investor/MacroMarketBriefingTicker';
 import { 
   HUMAN_MSGS, 
@@ -188,6 +190,7 @@ const getActiveTopic = (topicSetting: string, topics: string[]): string | undefi
 
 export default function InvestorChat() {
   const { profile } = useAuthStore();
+  const hasTranslationAccess = Boolean(profile?.is_admin || profile?.can_translate || (profile as any)?.has_translator || (profile as any)?.translator_access);
   const [messages, setMessages] = useState<InvestorChatMessage[]>([]);
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
@@ -1035,9 +1038,10 @@ export default function InvestorChat() {
   }, [profile, bannedUsers]);
 
   // Handle posting message
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!text.trim() || sending) return;
+  const handleSubmit = async (e?: React.FormEvent, customContent?: string) => {
+    if (e) e.preventDefault();
+    const messageBody = (customContent !== undefined ? customContent : text).trim();
+    if (!messageBody || sending) return;
     
     if (isCurrentBanned) {
       toast.error('You are banned from sending messages in this chat.');
@@ -1050,22 +1054,28 @@ export default function InvestorChat() {
       const senderCountry = impersonatedUser ? impersonatedUser.country : 'US';
 
       // Insert message into DB
-      const { error } = await supabase.from('investor_chat_messages').insert({
+      const { data: insertedMsg, error } = await supabase.from('investor_chat_messages').insert({
         sender_id: profile?.id || null,
         sender_name: senderName,
         sender_country: senderCountry,
-        body: text.trim(),
+        body: messageBody,
         reply_to_id: replyTarget?.id || null,
         reply_to_name: replyTarget?.sender_name || null,
         reply_to_body: replyTarget?.body || null,
         is_pinned: false
-      });
+      }).select().maybeSingle();
 
       if (error) throw error;
+      if (insertedMsg) {
+        const sentRec = getSentTranslation(messageBody);
+        if (sentRec) {
+          saveSentTranslation(messageBody, sentRec.originalText, sentRec.targetLangName, insertedMsg.id);
+        }
+      }
 
       // Extract mentions e.g. @Name
       const mentionRegex = /@(\w+)/g;
-      const matches = [...text.matchAll(mentionRegex)];
+      const matches = [...messageBody.matchAll(mentionRegex)];
       const mentionedNames = matches.map(m => m[1]);
 
       for (const name of mentionedNames) {
@@ -1081,7 +1091,7 @@ export default function InvestorChat() {
           await notifyUser({
             userId: matchedUser.id,
             title: 'Tagged in Investor Lounge',
-            message: `${senderName} tagged you in the community lounge: "${text.substring(0, 40)}..."`,
+            message: `${senderName} tagged you in the community lounge: "${messageBody.substring(0, 40)}..."`,
             type: 'info',
             link: '/app/investor-chat'
           });
@@ -1095,7 +1105,7 @@ export default function InvestorChat() {
                 <strong>${senderName}</strong> mentioned/tagged you in the global Investor Lounge.
               </p>
               <div style="background-color: #f9f9f9; padding: 15px; border-left: 4px solid #111; margin: 20px 0; font-style: italic; color: #333;">
-                "${text}"
+                "${messageBody}"
               </div>
               <p style="color: #555; font-size: 14px;">
                 Log into your account to read the full thread and reply to the conversation.
@@ -1125,7 +1135,7 @@ export default function InvestorChat() {
             await notifyUser({
               userId: repliedUser.id,
               title: '💬 Someone replied to your message',
-              message: `${senderName} replied to you: "${text.substring(0, 60)}${text.length > 60 ? '...' : ''}"`,
+              message: `${senderName} replied to you: "${messageBody.substring(0, 60)}${messageBody.length > 60 ? '...' : ''}"`,
               type: 'info',
               link: '/app/investor-chat'
             });
@@ -1605,12 +1615,17 @@ export default function InvestorChat() {
                         </div>
                       )}
 
-                      {/* Message text */}
-                      <p className={`text-[13.5px] leading-relaxed select-text break-words font-normal ${
-                        isMine && !isAdminSender ? 'text-white' : 'text-slate-800 dark:text-slate-100'
-                      }`}>
-                        {msg.body}
-                      </p>
+                      {/* Message text with Live Translation & English View behind translation */}
+                      <IncomingTranslation 
+                        hasAccess={hasTranslationAccess}
+                        messageText={msg.body}
+                        messageId={msg.id}
+                        isMe={isMine}
+                        currentUserId={profile?.id}
+                        className={`text-[13.5px] leading-relaxed select-text break-words font-normal ${
+                          isMine && !isAdminSender ? 'text-white' : 'text-slate-800 dark:text-slate-100'
+                        }`}
+                      />
 
                       {/* Footer: time + pin */}
                       <div className={`flex items-center justify-between gap-1.5 mt-2 pt-1.5 border-t ${
@@ -1627,13 +1642,6 @@ export default function InvestorChat() {
                           </span>
                         )}
                       </div>
-
-                      {/* Incoming translation pill */}
-                      <IncomingTranslation 
-                        hasAccess={Boolean(profile?.is_admin || (profile as any)?.has_translator || (profile as any)?.translator_access)}
-                        messageText={msg.body}
-                        isMe={isMine}
-                      />
 
                       {/* Admin mention quick-reply buttons */}
                       {profile?.is_admin && (() => {
@@ -1785,6 +1793,15 @@ export default function InvestorChat() {
                   </button>
                 ))}
               </div>
+
+              <ChatTranslationBar
+                hasAccess={hasTranslationAccess}
+                currentDraft={text}
+                onApplyTranslation={(translated) => setText(translated)}
+                onSendDirectly={(translated) => handleSubmit(undefined, translated)}
+                currentUserId={profile?.id}
+                className="pt-1 pb-1"
+              />
 
               <form onSubmit={handleSubmit} className="flex gap-2 items-center">
                 <input

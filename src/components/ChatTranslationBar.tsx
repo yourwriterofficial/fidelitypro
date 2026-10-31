@@ -4,7 +4,8 @@ import {
   SUPPORTED_LANGUAGES, 
   getSavedTargetLanguage, 
   saveTargetLanguage, 
-  translateText 
+  translateText,
+  saveSentTranslation
 } from '../lib/translator';
 import { toast } from 'sonner';
 
@@ -77,12 +78,14 @@ export default function ChatTranslationBar({
 
   const handleSendTranslated = () => {
     if (!preview) return;
+    saveSentTranslation(preview.translated, preview.original, preview.targetName);
     onSendDirectly(preview.translated);
     setPreview(null);
   };
 
   const handleApplyToInput = () => {
     if (!preview) return;
+    saveSentTranslation(preview.translated, preview.original, preview.targetName);
     onApplyTranslation(preview.translated);
     setPreview(null);
   };

@@ -11,6 +11,7 @@ import { queueMessageEmailToUser } from '../../lib/notify';
 import { isDifferentDay, formatChatDateSeparator, formatMessageTime, formatLastSeen, isUserRecentlyActive } from '../../lib/chatDate';
 import ChatTranslationBar from '../../components/ChatTranslationBar';
 import IncomingTranslation from '../../components/IncomingTranslation';
+import { getSentTranslation, saveSentTranslation } from '../../lib/translator';
 
 interface Profile {
   id: string;
@@ -410,6 +411,10 @@ export default function AdminChat() {
         .single();
       if (error) throw error;
       if (newMsg) {
+        const sentRec = getSentTranslation(textToSend.trim());
+        if (sentRec) {
+          saveSentTranslation(textToSend.trim(), sentRec.originalText, sentRec.targetLangName, newMsg.id);
+        }
         setMessages(prev => {
           if (prev.some(m => m.id === newMsg.id)) return prev;
           return [...prev, newMsg];
@@ -773,11 +778,13 @@ export default function AdminChat() {
                               </span>
                             </div>
                           )}
-                          <p className="leading-relaxed break-words font-medium">{msg.body}</p>
                           <IncomingTranslation
                             hasAccess={true}
                             messageText={msg.body}
+                            messageId={msg.id}
                             isMe={isMe}
+                            currentUserId={profile?.id}
+                            className="leading-relaxed break-words font-medium"
                           />
                           
                           <div className="flex items-center justify-end gap-1.5 mt-1.5">

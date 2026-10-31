@@ -158,3 +158,122 @@ export async function translateText(
     return { text: clean, sourceLang: 'en' };
   }
 }
+
+/**
+ * Helper to get user-friendly language name from code
+ */
+export function getLanguageName(code?: string): string {
+  if (!code) return 'Original language';
+  const clean = code.toLowerCase().trim();
+  const matched = SUPPORTED_LANGUAGES.find(
+    l => l.code.toLowerCase() === clean || l.code.split('-')[0].toLowerCase() === clean
+  );
+  return matched ? matched.name : code.toUpperCase();
+}
+
+export interface SentTranslationRecord {
+  originalText: string;
+  translatedText: string;
+  targetLangName?: string;
+  timestamp: number;
+}
+
+// In-memory cache for sent translations
+const sentTranslationsMemory = new Map<string, SentTranslationRecord>();
+const SENT_TRANS_STORAGE_KEY = 'rpm_sent_translations_v2';
+
+function getStoredSentTranslations(): Record<string, SentTranslationRecord> {
+  if (typeof window === 'undefined') return {};
+  try {
+    const raw = localStorage.getItem(SENT_TRANS_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Record a translated outgoing message so the user can always see the English
+ * (or original draft) version behind the translation they sent.
+ */
+export function saveSentTranslation(
+  translatedText: string,
+  originalText: string,
+  targetLangName?: string,
+  messageId?: string
+): void {
+  const cleanTrans = translatedText?.trim();
+  const cleanOrig = originalText?.trim();
+  if (!cleanTrans || !cleanOrig) return;
+
+  const record: SentTranslationRecord = {
+    originalText: cleanOrig,
+    translatedText: cleanTrans,
+    targetLangName: targetLangName || 'English',
+    timestamp: Date.now(),
+  };
+
+  const textKey = cleanTrans.toLowerCase();
+  sentTranslationsMemory.set(textKey, record);
+
+  if (messageId) {
+    sentTranslationsMemory.set(`id:${messageId}`, record);
+  }
+
+  if (typeof window !== 'undefined') {
+    try {
+      const stored = getStoredSentTranslations();
+      stored[textKey] = record;
+      if (messageId) {
+        stored[`id:${messageId}`] = record;
+      }
+      // Bound localStorage to last 300 entries
+      const keys = Object.keys(stored);
+      if (keys.length > 300) {
+        const prune = keys.slice(0, keys.length - 300);
+        prune.forEach(k => delete stored[k]);
+      }
+      localStorage.setItem(SENT_TRANS_STORAGE_KEY, JSON.stringify(stored));
+    } catch {
+      // Non-fatal
+    }
+  }
+}
+
+/**
+ * Retrieve the original draft (English version) of a sent translated message.
+ */
+export function getSentTranslation(
+  text: string,
+  messageId?: string
+): SentTranslationRecord | null {
+  if (messageId && sentTranslationsMemory.has(`id:${messageId}`)) {
+    return sentTranslationsMemory.get(`id:${messageId}`)!;
+  }
+
+  const clean = text?.trim().toLowerCase();
+  if (clean && sentTranslationsMemory.has(clean)) {
+    return sentTranslationsMemory.get(clean)!;
+  }
+
+  if (typeof window !== 'undefined') {
+    const stored = getStoredSentTranslations();
+    if (messageId && stored[`id:${messageId}`]) {
+      sentTranslationsMemory.set(`id:${messageId}`, stored[`id:${messageId}`]);
+      return stored[`id:${messageId}`];
+    }
+    if (clean && stored[clean]) {
+      sentTranslationsMemory.set(clean, stored[clean]);
+      return stored[clean];
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Quick check if a sent message was translated
+ */
+export function hasSentTranslation(text: string, messageId?: string): boolean {
+  return getSentTranslation(text, messageId) !== null;
+}

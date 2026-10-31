@@ -15,6 +15,7 @@ import { isDifferentDay, formatChatDateSeparator, formatMessageTime } from '../l
 import AdminChat from './admin/AdminChat';
 import ChatTranslationBar from '../components/ChatTranslationBar';
 import IncomingTranslation from '../components/IncomingTranslation';
+import { getSentTranslation, saveSentTranslation } from '../lib/translator';
 
 interface SupportMessage {
   id: string;
@@ -85,7 +86,7 @@ const SMART_SUGGESTIONS = [
 
 export default function Chat() {
   const { profile } = useAuthStore();
-  const hasTranslationAccess = Boolean(profile?.is_admin || profile?.can_translate);
+  const hasTranslationAccess = Boolean(profile?.is_admin || profile?.can_translate || (profile as any)?.has_translator || (profile as any)?.translator_access);
   const [searchParams, setSearchParams] = useSearchParams();
   const { subscribed, subscribe, unsubscribe } = usePushNotifications(profile?.id);
 
@@ -682,6 +683,10 @@ export default function Chat() {
 
         if (error) throw error;
         if (insertedMsg) {
+          const sentRec = getSentTranslation(cleanText);
+          if (sentRec) {
+            saveSentTranslation(cleanText, sentRec.originalText, sentRec.targetLangName, insertedMsg.id);
+          }
           setSupportMessages(prev => prev.some(m => m.id === insertedMsg.id) ? prev : [...prev, insertedMsg]);
           const userName = profile?.name || profile?.email || 'Investor';
           notifyAdmins({
@@ -709,6 +714,10 @@ export default function Chat() {
 
         if (error) throw error;
         if (insertedDm) {
+          const sentRec = getSentTranslation(cleanText);
+          if (sentRec) {
+            saveSentTranslation(cleanText, sentRec.originalText, sentRec.targetLangName, insertedDm.id);
+          }
           setDirectMessages(prev => prev.some(m => m.id === insertedDm.id) ? prev : [...prev, insertedDm]);
           notifyUser({
             userId: targetReceiverId,
@@ -1493,11 +1502,13 @@ export default function Chat() {
                             <CheckCircle2 size={11} className="text-blue-600" />
                           </div>
                         )}
-                        <p className="leading-relaxed font-medium">{msg.body}</p>
                         <IncomingTranslation
                           hasAccess={hasTranslationAccess}
                           messageText={msg.body}
+                          messageId={msg.id}
                           isMe={isMe}
+                          currentUserId={profile?.id}
+                          className="leading-relaxed font-medium"
                         />
                         
                         <div className="flex items-center justify-end gap-1.5 mt-1.5">
