@@ -52,6 +52,7 @@ const NAV_SECTIONS = [
     label: 'System',
     items: [
       { path: '/admin/statements',   icon: FileText,        label: 'Statements'     },
+      { path: '/admin/receipts',     icon: ShieldCheck,     label: 'Disbursement Receipts' },
       { path: '/admin/settings',     icon: Settings,        label: 'Settings'       },
     ],
   },

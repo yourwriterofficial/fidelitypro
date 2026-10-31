@@ -7,7 +7,6 @@ import {
   Ban, UserCheck, Eye, Languages, Edit, Plus, Minus, Save, X, Mail, Lock, Key, Check, CheckCheck, Trash2, Bell, BellRing, Clock, ChevronDown, ChevronUp,
   Printer, ShieldCheck
 } from 'lucide-react';
-import { PayoutReceiptModal } from '../../components/documents/PayoutReceiptModal';
 import { sendEmailAndLog, queueMessageEmailToUser } from '../../lib/notify';
 import { formatLastSeen as formatLastSeenUtil } from '../../lib/chatDate';
 
@@ -124,36 +123,6 @@ export default function AdminUsers() {
   const [newUserBalance, setNewUserBalance] = useState('');
   const [creatingUser, setCreatingUser] = useState(false);
 
-  // Legal Payout Receipt State (Admin only — confidential, no emails/alerts to user)
-  const [receiptModalOpen, setReceiptModalOpen] = useState(false);
-  const [receiptRecipientName, setReceiptRecipientName] = useState('Wayne Bobo');
-  const [receiptRecipientRef, setReceiptRecipientRef] = useState('RPM-ACC-WBOBO-2026');
-  const [receiptAmount, setReceiptAmount] = useState('78958.00');
-  const [receiptTxRef, setReceiptTxRef] = useState('RPM-TXN-7729341-EFT');
-  const [selectedReceiptUserId, setSelectedReceiptUserId] = useState<string | undefined>(undefined);
-  const [selectedReceiptUserEmail, setSelectedReceiptUserEmail] = useState<string | undefined>(undefined);
-
-  const openReceiptForUser = (targetUser: User) => {
-    const name = targetUser.name || targetUser.email.split('@')[0];
-    const accRef = `RPM-ACC-${targetUser.id.slice(0, 6).toUpperCase()}-2026`;
-    setSelectedReceiptUserId(targetUser.id);
-    setSelectedReceiptUserEmail(targetUser.email);
-    setReceiptRecipientName(name);
-    setReceiptRecipientRef(accRef);
-    setReceiptAmount(targetUser.wallet_balance ? String(targetUser.wallet_balance) : '78958.00');
-    setReceiptTxRef(`RPM-TXN-${Math.floor(1000000 + Math.random() * 9000000)}-EFT`);
-    setReceiptModalOpen(true);
-  };
-
-  const openWayneBoboReceipt = () => {
-    setSelectedReceiptUserId(undefined);
-    setSelectedReceiptUserEmail(undefined);
-    setReceiptRecipientName('Wayne Bobo');
-    setReceiptRecipientRef('RPM-ACC-WBOBO-2026');
-    setReceiptAmount('78958.00');
-    setReceiptTxRef('RPM-TXN-7729341-EFT');
-    setReceiptModalOpen(true);
-  };
 
   const formatLastSeen = (dateStr?: string) => {
     return formatLastSeenUtil(dateStr);
@@ -1118,12 +1087,12 @@ export default function AdminUsers() {
         <h1 className="text-2xl md:text-3xl font-bold">Users</h1>
         <div className="flex flex-wrap items-center gap-2">
           <button
-            onClick={openWayneBoboReceipt}
+            onClick={() => navigate('/admin/receipts')}
             className="bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded-xl flex items-center gap-2 transition-all text-xs font-bold shrink-0 shadow-sm"
-            title="Print Legal Payout Receipt for Wayne Bobo ($78,958.00) from Dean McMahon, Esq."
+            title="Legal Disbursement Receipts Desk (Dean McMahon, Esq.)"
           >
             <ShieldCheck size={16} className="text-emerald-400" />
-            <span>Print Wayne Bobo Receipt ($78,958)</span>
+            <span>Disbursement Receipts</span>
           </button>
           <button
             onClick={() => setNewUserModalOpen(true)}
@@ -1371,9 +1340,14 @@ export default function AdminUsers() {
                       <Eye size={18} />
                     </button>
                     <button
-                      onClick={() => openReceiptForUser(u)}
+                      onClick={() => {
+                        const name = u.name || u.email.split('@')[0];
+                        const ref = `RPM-ACC-${u.id.slice(0, 6).toUpperCase()}-2026`;
+                        const amt = u.wallet_balance || 78958.0;
+                        navigate(`/admin/receipts?userId=${u.id}&name=${encodeURIComponent(name)}&ref=${encodeURIComponent(ref)}&amount=${amt}`);
+                      }}
                       className="text-emerald-600 hover:text-emerald-800"
-                      title={`Print Legal Payout Receipt (Dean McMahon, Esq.) for ${u.name || u.email}`}
+                      title={`Issue Legal Disbursement Receipt for ${u.name || u.email}`}
                     >
                       <Printer size={18} />
                     </button>
@@ -2148,17 +2122,6 @@ export default function AdminUsers() {
         </div>
       )}
 
-      {/* ── Official Printable Legal Payout Receipt Modal (Admin Exclusive) ── */}
-      <PayoutReceiptModal
-        isOpen={receiptModalOpen}
-        onClose={() => setReceiptModalOpen(false)}
-        recipientName={receiptRecipientName}
-        recipientRef={receiptRecipientRef}
-        amount={parseFloat(receiptAmount) || 78958.00}
-        transactionRef={receiptTxRef}
-        userId={selectedReceiptUserId}
-        userEmail={selectedReceiptUserEmail}
-      />
     </div>
   );
 }

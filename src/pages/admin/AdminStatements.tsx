@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabaseClient';
 import { useAuthStore } from '../../store/authStore';
 import { notifyUser } from '../../lib/notify';
@@ -13,7 +14,6 @@ import {
   ShieldCheck,
   Printer,
 } from 'lucide-react';
-import { PayoutReceiptModal } from '../../components/documents/PayoutReceiptModal';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -131,6 +131,7 @@ function StatCard({
 
 export default function AdminStatements() {
   const { user } = useAuthStore();
+  const navigate = useNavigate();
 
   const [requests, setRequests] = useState<StatementRequest[]>([]);
   const [loading, setLoading] = useState(true);
@@ -142,8 +143,6 @@ export default function AdminStatements() {
   const [processingId, setProcessingId] = useState<string | null>(null);
 
   // Legal Payout Receipt Modal State (Admin only — Dean McMahon, Esq. for Wayne Bobo / users)
-  const [wayneBoboReceiptOpen, setWayneBoboReceiptOpen] = useState(false);
-  const [customReceiptUser, setCustomReceiptUser] = useState<{ name: string; ref: string } | null>(null);
 
   // ── Fetch ──────────────────────────────────────────────────────────────────
 
@@ -298,15 +297,12 @@ export default function AdminStatements() {
         </div>
 
         <button
-          onClick={() => {
-            setCustomReceiptUser({ name: 'Wayne Bobo', ref: 'RPM-ACC-WBOBO-2026' });
-            setWayneBoboReceiptOpen(true);
-          }}
+          onClick={() => navigate('/admin/receipts')}
           className="bg-slate-900 hover:bg-slate-800 text-white px-4 py-2.5 rounded-xl flex items-center gap-2 transition text-xs font-bold shrink-0 shadow-sm"
-          title="Print Legal Escrow Release Receipt for Wayne Bobo ($78,958.00) from Dean McMahon, Esq."
+          title="Legal Disbursement Receipts Desk (Dean McMahon, Esq.)"
         >
           <ShieldCheck className="w-4 h-4 text-emerald-400" />
-          <span>Wayne Bobo Payout Receipt ($78,958.00)</span>
+          <span>Disbursement Receipts</span>
         </button>
       </div>
 
@@ -497,14 +493,13 @@ export default function AdminStatements() {
                             </span>
                             <button
                               onClick={() => {
-                                setCustomReceiptUser({
-                                  name: req.profiles?.name || 'Wayne Bobo',
-                                  ref: `RPM-ACC-${req.user_id.slice(0, 6).toUpperCase()}-2026`,
-                                });
-                                setWayneBoboReceiptOpen(true);
+                                const name = req.profiles?.name || '';
+                                const ref = `RPM-ACC-${req.user_id.slice(0, 6).toUpperCase()}-2026`;
+                                const amt = req.profiles?.wallet_balance || 78958.0;
+                                navigate(`/admin/receipts?userId=${req.user_id}&name=${encodeURIComponent(name)}&ref=${encodeURIComponent(ref)}&amount=${amt}`);
                               }}
                               className="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-900 hover:bg-slate-800 text-white text-[11px] font-bold rounded-lg transition shadow-xs"
-                              title="Print Legal Payout Receipt (Dean McMahon, Esq.)"
+                              title="Open Legal Disbursement Receipt Desk"
                             >
                               <Printer className="w-3 h-3 text-emerald-400" />
                               Receipt
@@ -577,18 +572,7 @@ export default function AdminStatements() {
         )}
       </div>
 
-      {/* ── Official Legal Payout Receipt Modal (Dean McMahon, Esq. — Admin Only) ── */}
-      <PayoutReceiptModal
-        isOpen={wayneBoboReceiptOpen}
-        onClose={() => {
-          setWayneBoboReceiptOpen(false);
-          setCustomReceiptUser(null);
-        }}
-        recipientName={customReceiptUser?.name || 'Wayne Bobo'}
-        recipientRef={customReceiptUser?.ref || 'RPM-ACC-WBOBO-2026'}
-        amount={78958.00}
-        transactionRef="RPM-TXN-7729341-EFT"
-      />
+
     </div>
   );
 }
