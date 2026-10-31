@@ -191,7 +191,7 @@ export const PropertyInvestModal: React.FC<PropertyInvestModalProps> = ({
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-1.5 text-xs font-bold text-brand hover:underline"
               >
-                <span>View original deed & MLS listing source</span>
+                <span>{isCar ? 'View original dealer valuation & specs' : 'View original deed & MLS listing source'}</span>
                 <ExternalLink size={12} />
               </a>
             )}

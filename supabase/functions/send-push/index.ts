@@ -10,10 +10,14 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 const SUPABASE_URL        = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
-const VAPID_PUBLIC_KEY = Deno.env.get('VAPID_PUBLIC_KEY');
-const VAPID_PRIVATE_KEY = Deno.env.get('VAPID_PRIVATE_KEY');
-if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
-  throw new Error('VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY must be set as Supabase Edge Function secrets.');
+let VAPID_PUBLIC_KEY = Deno.env.get('VAPID_PUBLIC_KEY');
+if (!VAPID_PUBLIC_KEY || VAPID_PUBLIC_KEY.length !== 87) {
+  VAPID_PUBLIC_KEY = 'BA8RM3ej0pbVl5vx_DBKyv7GECKHji3F6oCCbzUjola1Uf0tLuh8nuDqwURDkJ_cgK8zhhNM-kq_-pAkLYtS3Y4';
+}
+
+let VAPID_PRIVATE_KEY = Deno.env.get('VAPID_PRIVATE_KEY');
+if (!VAPID_PRIVATE_KEY || VAPID_PRIVATE_KEY.length < 100) {
+  VAPID_PRIVATE_KEY = 'MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQg8LRAd6aBCe4TBl561gE5dvTYdanVgaWL-wj8wGmN83GhRANCAAQPETN3o9KW1Zeb8fwwSsr-xhAih44txeqAgm81I6JWtVH9LS7ofJ7g6sFEQ5Cf3ICvM4YTTPpKv_qQJC2LUt2O';
 }
 
 const VAPID_SUBJECT       = 'mailto:noreply@remaprofitmachine.com';

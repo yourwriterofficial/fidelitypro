@@ -10,6 +10,7 @@ import type {
   PropertyCategoryTab, 
   PropertyFilterState 
 } from '../types/property';
+import { applyPropertyOverrides, VERIFIED_ADDITIONAL_PROPERTIES } from '../data/verifiedProperties';
 
 const initialFilters: PropertyFilterState = {
   searchQuery: '',
@@ -56,10 +57,12 @@ export function useProperties() {
         return;
       }
 
-      // Purge duplicates across both categories
+      // Combine live DB items with verified expansion listings, apply overrides, and purge duplicates
+      const allRaw = [...(data || []), ...VERIFIED_ADDITIONAL_PROPERTIES];
       const seenTitles = new Set<string>();
       const uniqueList: Property[] = [];
-      for (const item of (data || [])) {
+      for (const rawItem of allRaw) {
+        const item = applyPropertyOverrides(rawItem);
         const key = `${(item.category || '').toLowerCase().trim()}-${(item.title || '').toLowerCase().trim()}`;
         if (!seenTitles.has(key)) {
           seenTitles.add(key);

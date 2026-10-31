@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { toast } from 'sonner';
 import { Plus, Edit, Trash, X, Building2, Link2, ArrowRight } from 'lucide-react';
+import { applyPropertyOverrides, VERIFIED_ADDITIONAL_PROPERTIES } from '../../data/verifiedProperties';
 
 const CATEGORY_SUGGESTIONS = ['House', 'Apartment', 'Land', 'Car', 'Business', 'Other'];
 
@@ -117,8 +118,22 @@ export default function AdminProperties() {
       .from('properties')
       .select('*')
       .order('created_at', { ascending: false });
-    if (error) toast.error('Failed to load listings');
-    else setProperties(data || []);
+    if (error) {
+      toast.error('Failed to load listings');
+    } else {
+      const allRaw = [...(data || []), ...VERIFIED_ADDITIONAL_PROPERTIES];
+      const seenTitles = new Set<string>();
+      const uniqueList: any[] = [];
+      for (const rawItem of allRaw) {
+        const item = applyPropertyOverrides(rawItem);
+        const key = `${(item.category || '').toLowerCase().trim()}-${(item.title || '').toLowerCase().trim()}`;
+        if (!seenTitles.has(key)) {
+          seenTitles.add(key);
+          uniqueList.push(item);
+        }
+      }
+      setProperties(uniqueList);
+    }
     setLoading(false);
   };
 
