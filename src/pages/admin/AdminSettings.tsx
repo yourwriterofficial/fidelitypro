@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { toast } from 'sonner';
-import { Save, Wallet, DollarSign, Bell, Gift, Settings as SettingsIcon } from 'lucide-react';
+import { Save, Wallet, DollarSign, Bell, Gift, Settings as SettingsIcon, FileText } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import { notifyUsers } from '../../lib/notify';
 
@@ -102,6 +102,9 @@ export default function AdminSettings() {
   // Property scroll speed
   const [scrollSpeed, setScrollSpeed] = useState('3');
 
+  // Statement Print Fee
+  const [statementPrintFee, setStatementPrintFee] = useState('1000');
+
   useEffect(() => {
     fetchSettings();
   }, []);
@@ -133,6 +136,7 @@ export default function AdminSettings() {
           try { setLockedNotif(JSON.parse(s.value)); } catch (err) { console.warn('Failed parsing locked notifications settings', err); }
         }
         if (s.key === 'property_scroll_speed') setScrollSpeed(s.value);
+        if (s.key === 'statement_print_fee') setStatementPrintFee(s.value);
       });
     }
     setLoading(false);
@@ -154,6 +158,7 @@ export default function AdminSettings() {
         { key: 'push_notifications', value: JSON.stringify(pushNotif) },
         { key: 'locked_notifications', value: JSON.stringify(lockedNotif) },
         { key: 'property_scroll_speed', value: scrollSpeed },
+        { key: 'statement_print_fee', value: statementPrintFee },
       ];
       for (const u of updates) {
         const { error } = await supabase
@@ -404,6 +409,26 @@ export default function AdminSettings() {
           </div>
         </div>
 
+        {/* Statement Print Fee */}
+        <div className="bg-white rounded-2xl shadow-sm border p-6">
+          <h2 className="text-xl font-semibold flex items-center gap-2"><FileText size={20} className="text-brand" /> Account Statement Settings</h2>
+          <p className="text-xs text-gray-500 mt-1">Set the fee users must pay before printing their certified account statement. Users pay this fee, upload proof, and await admin approval.</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Statement Print Fee (USD $)</label>
+              <input
+                type="number"
+                step="1"
+                min="0"
+                value={statementPrintFee}
+                onChange={(e) => setStatementPrintFee(e.target.value)}
+                className="w-full border rounded-xl px-4 py-2 mt-1 focus:ring-2 focus:ring-brand"
+                placeholder="1000"
+              />
+              <p className="text-xs text-gray-400 mt-1">Current fee: <strong>${statementPrintFee}</strong>. Set to 0 for free statements.</p>
+            </div>
+          </div>
+        </div>
         <button type="submit" disabled={saving} className="bg-brand hover:bg-brand-dark text-white px-6 py-2.5 rounded-xl flex items-center gap-2 transition disabled:opacity-70">
           <Save size={18} /> {saving ? 'Saving...' : 'Save All Settings'}
         </button>

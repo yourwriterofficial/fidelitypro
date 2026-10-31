@@ -3,7 +3,7 @@ import { useAuthStore } from '../store/authStore';
 import {
   LogOut, LayoutDashboard, Package, Users, DollarSign, ShoppingCart,
   Eye, Mail, CreditCard, Settings, Lock, Building, Gift, Bell,
-  Menu, X, MoreHorizontal, Activity, Megaphone, ChevronRight, ArrowLeftRight,
+  Menu, X, MoreHorizontal, Activity, Megaphone, ChevronRight, ArrowLeftRight, FileText,
   ChevronsLeft, ChevronsRight, MessageSquare, ShieldCheck,
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
@@ -51,6 +51,7 @@ const NAV_SECTIONS = [
   {
     label: 'System',
     items: [
+      { path: '/admin/statements',   icon: FileText,        label: 'Statements'     },
       { path: '/admin/settings',     icon: Settings,        label: 'Settings'       },
     ],
   },

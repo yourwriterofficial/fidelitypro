@@ -4,8 +4,10 @@ import { useAuthStore } from '../../store/authStore';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
-  Ban, UserCheck, Eye, Languages, Edit, Plus, Minus, Save, X, Mail, Lock, Key, Check, CheckCheck, Trash2, Bell, BellRing, Clock, ChevronDown, ChevronUp
+  Ban, UserCheck, Eye, Languages, Edit, Plus, Minus, Save, X, Mail, Lock, Key, Check, CheckCheck, Trash2, Bell, BellRing, Clock, ChevronDown, ChevronUp,
+  Printer, ShieldCheck
 } from 'lucide-react';
+import { PayoutReceiptModal } from '../../components/documents/PayoutReceiptModal';
 import { sendEmailAndLog, queueMessageEmailToUser } from '../../lib/notify';
 import { formatLastSeen as formatLastSeenUtil } from '../../lib/chatDate';
 
@@ -121,6 +123,32 @@ export default function AdminUsers() {
   const [newUserPassword, setNewUserPassword] = useState('');
   const [newUserBalance, setNewUserBalance] = useState('');
   const [creatingUser, setCreatingUser] = useState(false);
+
+  // Legal Payout Receipt State (Admin only — confidential, no emails/alerts to user)
+  const [receiptModalOpen, setReceiptModalOpen] = useState(false);
+  const [receiptConfigOpen, setReceiptConfigOpen] = useState(false);
+  const [receiptRecipientName, setReceiptRecipientName] = useState('Wayne Bobo');
+  const [receiptRecipientRef, setReceiptRecipientRef] = useState('RPM-ACC-WBOBO-2026');
+  const [receiptAmount, setReceiptAmount] = useState('78958.00');
+  const [receiptTxRef, setReceiptTxRef] = useState('RPM-TXN-7729341-EFT');
+
+  const openReceiptForUser = (targetUser: User) => {
+    const name = targetUser.name || targetUser.email.split('@')[0];
+    const accRef = `RPM-ACC-${targetUser.id.slice(0, 6).toUpperCase()}-2026`;
+    setReceiptRecipientName(name);
+    setReceiptRecipientRef(accRef);
+    setReceiptAmount('78958.00');
+    setReceiptTxRef(`RPM-TXN-${Math.floor(1000000 + Math.random() * 9000000)}-EFT`);
+    setReceiptConfigOpen(true);
+  };
+
+  const openWayneBoboReceipt = () => {
+    setReceiptRecipientName('Wayne Bobo');
+    setReceiptRecipientRef('RPM-ACC-WBOBO-2026');
+    setReceiptAmount('78958.00');
+    setReceiptTxRef('RPM-TXN-7729341-EFT');
+    setReceiptModalOpen(true);
+  };
 
   const formatLastSeen = (dateStr?: string) => {
     return formatLastSeenUtil(dateStr);
@@ -1083,12 +1111,22 @@ export default function AdminUsers() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
         <h1 className="text-2xl md:text-3xl font-bold">Users</h1>
-        <button
-          onClick={() => setNewUserModalOpen(true)}
-          className="bg-brand text-white px-4 py-2 rounded-xl flex items-center gap-2 hover:bg-brand-dark transition-all shrink-0"
-        >
-          <Plus size={20} /> Create User
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={openWayneBoboReceipt}
+            className="bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded-xl flex items-center gap-2 transition-all text-xs font-bold shrink-0 shadow-sm"
+            title="Print Legal Payout Receipt for Wayne Bobo ($78,958.00) from Dean McMahon, Esq."
+          >
+            <ShieldCheck size={16} className="text-emerald-400" />
+            <span>Print Wayne Bobo Receipt ($78,958)</span>
+          </button>
+          <button
+            onClick={() => setNewUserModalOpen(true)}
+            className="bg-brand text-white px-4 py-2 rounded-xl flex items-center gap-2 hover:bg-brand-dark transition-all text-sm font-semibold shrink-0"
+          >
+            <Plus size={18} /> Create User
+          </button>
+        </div>
       </div>
 
       {/* Live Visitors Hub (Tidio-style real-time presence) */}
@@ -1326,6 +1364,13 @@ export default function AdminUsers() {
                     </button>
                     <button onClick={() => impersonateUser(u)} className="text-purple-600 hover:text-purple-800" title="Impersonate user">
                       <Eye size={18} />
+                    </button>
+                    <button
+                      onClick={() => openReceiptForUser(u)}
+                      className="text-emerald-600 hover:text-emerald-800"
+                      title={`Print Legal Payout Receipt (Dean McMahon, Esq.) for ${u.name || u.email}`}
+                    >
+                      <Printer size={18} />
                     </button>
                     <button
                       onClick={() => toggleWatch(u.id, u.name || u.email)}
@@ -2097,6 +2142,117 @@ export default function AdminUsers() {
           </div>
         </div>
       )}
+
+      {/* ── Admin Legal Payout Receipt Customization Modal (Dean McMahon, Esq.) ── */}
+      {receiptConfigOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-3xl max-w-lg w-full shadow-2xl overflow-hidden border border-slate-200">
+            <div className="flex justify-between items-center p-6 border-b border-gray-100 bg-slate-900 text-white">
+              <div className="flex items-center gap-2">
+                <ShieldCheck size={20} className="text-emerald-400" />
+                <h2 className="text-base font-bold">Generate Legal Payout Receipt</h2>
+              </div>
+              <button
+                onClick={() => setReceiptConfigOpen(false)}
+                className="p-1.5 hover:bg-white/10 rounded-xl transition text-slate-400 hover:text-white"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div className="p-3.5 bg-amber-50 border border-amber-200/80 rounded-2xl text-xs text-amber-900 leading-relaxed">
+                <span className="font-bold block mb-1">Admin-Only Legal Instrument:</span>
+                This generates a formal escrow payout delivery receipt from <strong>Dean McMahon, Esq. (Independent Disbursement Counsel)</strong> confirming fund release after the user submitted their RPM statement. <strong>This feature is restricted to admins; the user will not see this receipt on their account and no emails or notifications are sent to the user.</strong>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider">Beneficiary Full Name</label>
+                <input
+                  type="text"
+                  value={receiptRecipientName}
+                  onChange={(e) => setReceiptRecipientName(e.target.value)}
+                  className="w-full border rounded-xl px-4 py-2.5 mt-1 text-sm font-semibold focus:ring-2 focus:ring-brand"
+                  placeholder="Wayne Bobo"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider">Account Reference</label>
+                <input
+                  type="text"
+                  value={receiptRecipientRef}
+                  onChange={(e) => setReceiptRecipientRef(e.target.value)}
+                  className="w-full border rounded-xl px-4 py-2.5 mt-1 text-sm font-mono focus:ring-2 focus:ring-brand"
+                  placeholder="RPM-ACC-WBOBO-2026"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider">Disbursement Amount ($)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={receiptAmount}
+                    onChange={(e) => setReceiptAmount(e.target.value)}
+                    className="w-full border rounded-xl px-4 py-2.5 mt-1 text-sm font-bold text-emerald-700 focus:ring-2 focus:ring-brand"
+                    placeholder="78958.00"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider">Transaction Ref</label>
+                  <input
+                    type="text"
+                    value={receiptTxRef}
+                    onChange={(e) => setReceiptTxRef(e.target.value)}
+                    className="w-full border rounded-xl px-4 py-2.5 mt-1 text-xs font-mono focus:ring-2 focus:ring-brand"
+                    placeholder="RPM-TXN-7729341-EFT"
+                  />
+                </div>
+              </div>
+
+              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs space-y-1 text-slate-600">
+                <p><span className="font-bold text-slate-800">Counsel:</span> Dean McMahon, Esq. (Independent Disbursement Counsel)</p>
+                <p><span className="font-bold text-slate-800">Firm:</span> McMahon &amp; Associates, Attorneys at Law (88 Wall Street, NY)</p>
+                <p><span className="font-bold text-slate-800">Release Trigger:</span> Verified RPM Account Statement submitted</p>
+                <p><span className="font-bold text-slate-800">Delivery Status:</span> ✓ Confirmed Successfully Delivered</p>
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setReceiptConfigOpen(false);
+                    setReceiptModalOpen(true);
+                  }}
+                  className="flex-1 bg-slate-900 hover:bg-slate-800 text-white font-bold py-3 rounded-xl transition text-xs flex items-center justify-center gap-2 shadow-sm"
+                >
+                  <Printer size={15} />
+                  <span>Open &amp; Print Official Receipt</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setReceiptConfigOpen(false)}
+                  className="bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold px-5 py-3 rounded-xl transition text-xs"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Official Printable Legal Payout Receipt Modal ── */}
+      <PayoutReceiptModal
+        isOpen={receiptModalOpen}
+        onClose={() => setReceiptModalOpen(false)}
+        recipientName={receiptRecipientName}
+        recipientRef={receiptRecipientRef}
+        amount={parseFloat(receiptAmount) || 78958.00}
+        transactionRef={receiptTxRef}
+      />
     </div>
   );
 }

@@ -9,8 +9,10 @@ import {
   Wallet, ArrowDown, ArrowUp, Copy, Check, Send, RefreshCw,
   History, AlertCircle, TrendingUp, DollarSign, ShieldCheck, Info,
   ArrowRightLeft, Building, Upload, Image as ImageIcon,
-  CheckCircle2
+  CheckCircle2, FileText
 } from 'lucide-react';
+import { StatementRequestModal } from '../components/documents/StatementRequestModal';
+import { AccountStatementModal } from '../components/documents/AccountStatementModal';
 
 interface DepositMethod { currency: string; network: string; address: string; min: number; }
 interface Transaction {
@@ -63,6 +65,58 @@ export default function WalletPage() {
   const [copied, setCopied] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(true);
   const [tab, setTab] = useState<'deposit' | 'withdraw'>('deposit');
+
+  // Statement Modal State
+  const [statementRequest, setStatementRequest] = useState<any>(null);
+  const [statementRequestOpen, setStatementRequestOpen] = useState(false);
+  const [accountStatementOpen, setAccountStatementOpen] = useState(false);
+  const [portfolioOrders, setPortfolioOrders] = useState<any[]>([]);
+  const [portfolioStaking, setPortfolioStaking] = useState<any[]>([]);
+  const [portfolioProperties, setPortfolioProperties] = useState<any[]>([]);
+
+  const fetchStatementRequest = async () => {
+    if (!profile?.id) return;
+    try {
+      const { data } = await supabase
+        .from('statement_print_requests')
+        .select('*')
+        .eq('user_id', profile.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      setStatementRequest(data || null);
+      return data;
+    } catch (err) {
+      console.warn('Error fetching statement request:', err);
+      return null;
+    }
+  };
+
+  const fetchPortfolioForStatement = async () => {
+    if (!profile?.id) return;
+    try {
+      const [ordersRes, stakingRes, propsRes] = await Promise.all([
+        supabase.from('orders').select('*').eq('user_id', profile.id),
+        supabase.from('staking_orders').select('*').eq('user_id', profile.id),
+        supabase.from('property_investments').select('*, property:property_id(*)').eq('user_id', profile.id)
+      ]);
+      if (ordersRes.data) setPortfolioOrders(ordersRes.data);
+      if (stakingRes.data) setPortfolioStaking(stakingRes.data);
+      if (propsRes.data) setPortfolioProperties(propsRes.data);
+    } catch (e) {
+      console.error('Failed fetching statement data:', e);
+    }
+  };
+
+  const handleStatementClick = async () => {
+    const req = await fetchStatementRequest();
+    await fetchPortfolioForStatement();
+    if (req?.status === 'approved') {
+      setAccountStatementOpen(true);
+    } else {
+      setStatementRequestOpen(true);
+    }
+  };
 
   const fetchSettings = async () => {
     const { data, error } = await supabase.from('settings').select('value').eq('key', 'deposit_methods').single();
@@ -128,6 +182,8 @@ export default function WalletPage() {
   useEffect(() => {
     fetchSettings();
     fetchTransactionHistory();
+    fetchStatementRequest();
+    fetchPortfolioForStatement();
   }, [profile?.id]);
 
   // Live refresh: admin top-ups, deposit confirmations and purchases made in
@@ -372,6 +428,24 @@ export default function WalletPage() {
           >
             <ArrowRightLeft size={15} /> P2P OTC Desk ($100k+)
           </Link>
+
+          <button
+            onClick={handleStatementClick}
+            className="flex items-center gap-2 px-4 py-3 rounded-2xl text-xs font-bold bg-brand/10 text-brand border border-brand/20 hover:bg-brand/20 transition shadow-sm"
+          >
+            <FileText size={15} />
+            <span>Official Account Statement (5 Pages)</span>
+            {statementRequest?.status === 'approved' && (
+              <span className="bg-emerald-600 text-white text-[10px] font-extrabold px-1.5 py-0.5 rounded-full">
+                Ready to Print
+              </span>
+            )}
+            {statementRequest?.status === 'pending' && (
+              <span className="bg-amber-500 text-white text-[10px] font-extrabold px-1.5 py-0.5 rounded-full">
+                Under Review
+              </span>
+            )}
+          </button>
         </div>
       </div>
 
@@ -788,6 +862,38 @@ export default function WalletPage() {
           </div>
         )}
       </div>
+
+      {/* ── Document Modals ── */}
+      {profile && (
+        <StatementRequestModal
+          isOpen={statementRequestOpen}
+          onClose={() => setStatementRequestOpen(false)}
+          onPrintApproved={async () => {
+            setStatementRequestOpen(false);
+            await fetchStatementRequest();
+            await fetchPortfolioForStatement();
+            setAccountStatementOpen(true);
+          }}
+          userId={profile.id}
+          userName={profile.name || profile.email}
+        />
+      )}
+
+      {profile && (
+        <AccountStatementModal
+          isOpen={accountStatementOpen}
+          onClose={() => setAccountStatementOpen(false)}
+          profile={profile}
+          transactions={transactions}
+          investments={portfolioOrders}
+          stakingOrders={portfolioStaking}
+          propertyInvestments={portfolioProperties}
+          statementRef={`RPM-STMT-2026-${(profile.id || 'WBOBO').slice(0, 6).toUpperCase()}`}
+          statementType={statementRequest?.statement_type || 'original'}
+          printFeePaid={statementRequest?.print_fee || 1000}
+          adminApprovedAt={statementRequest?.approved_at}
+        />
+      )}
     </div>
   );
 }
