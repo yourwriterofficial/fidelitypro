@@ -125,14 +125,14 @@ const getStatusClass = (s: string) =>
 ───────────────────────────────────────────── */
 
 /** Rotated circular watermark stamp in each page */
-const Stamp = ({ label = 'ORIGINAL' }: { label?: string }) => (
+const Stamp = ({ label = 'CERTIFIED & STAMPED' }: { label?: string }) => (
   <div
-    className="border-2 border-green-600 rounded-full w-24 h-24 flex items-center justify-center
-      text-center text-green-600 text-[8px] font-black uppercase tracking-wide
-      rotate-[-12deg] opacity-20 absolute top-4 right-4 pointer-events-none select-none z-0"
+    className="border-2 border-emerald-600 rounded-full w-28 h-28 flex items-center justify-center
+      text-center text-emerald-600 text-[8px] font-black uppercase tracking-wide
+      rotate-[-12deg] opacity-25 absolute top-4 right-4 pointer-events-none select-none z-0"
     aria-hidden
   >
-    <span className="leading-tight px-1">{label}</span>
+    <span className="leading-tight px-1 font-bold">{label}</span>
   </div>
 );
 
@@ -140,11 +140,10 @@ const Stamp = ({ label = 'ORIGINAL' }: { label?: string }) => (
 const PageHeader = ({
   page,
   statementRef,
-  statementType,
 }: {
   page: number;
   statementRef: string;
-  statementType: string;
+  statementType?: string;
 }) => (
   <div className="bg-slate-900 text-white px-6 py-4 flex items-center justify-between rounded-t-lg print:rounded-none">
     {/* Left branding */}
@@ -159,11 +158,11 @@ const PageHeader = ({
     </div>
     {/* Right statement info */}
     <div className="text-right">
-      <p className="font-bold text-xs uppercase tracking-widest text-slate-300">Official Account Statement</p>
+      <p className="font-bold text-xs uppercase tracking-widest text-slate-300">Official Certified Statement</p>
       <p className="text-[10px] text-slate-400 mt-0.5">
         Page {page} of 5 &nbsp;|&nbsp; Ref: <span className="text-white font-mono">{statementRef}</span>
       </p>
-      <p className="text-[9px] text-slate-500 mt-0.5 capitalize">{statementType.replace('_', ' ')}</p>
+      <p className="text-[9px] text-emerald-400 font-bold uppercase tracking-wider mt-0.5">Certified &amp; Stamped</p>
     </div>
   </div>
 );
@@ -753,7 +752,7 @@ const AccountStatementModal: React.FC<AccountStatementModalProps> = ({
                   {adminApprovedAt && (
                     <p><strong>Admin Approved:</strong> {fmtDateTime(adminApprovedAt)}</p>
                   )}
-                  <p><strong>Statement Type:</strong> {statementType === 'stamped_copy' ? 'Stamped Copy' : 'Original'}</p>
+                  <p><strong>Statement Classification:</strong> Official Certified &amp; Stamped Statement</p>
                 </div>
               </div>
 
@@ -793,9 +792,9 @@ const AccountStatementModal: React.FC<AccountStatementModalProps> = ({
                 {/* Stamp badges */}
                 <div className="flex flex-wrap items-center gap-3 mt-6 justify-center">
                   {[
-                    { label: '☑ ORIGINAL' },
-                    { label: 'NOTARY STAMP' },
-                    { label: 'COMPLIANCE' },
+                    { label: '✓ CERTIFIED' },
+                    { label: 'OFFICIAL STAMP' },
+                    { label: 'COMPLIANCE AUDITED' },
                     { label: 'RPM LEGAL' },
                   ].map((badge) => (
                     <div
@@ -821,9 +820,9 @@ const AccountStatementModal: React.FC<AccountStatementModalProps> = ({
                     </div>
                   )}
                   <div className="text-slate-400 text-[10px]">
-                    Type:{' '}
-                    <span className="text-white uppercase font-semibold">
-                      {statementType === 'stamped_copy' ? 'Stamped Copy' : 'Original'}
+                    Classification:{' '}
+                    <span className="text-emerald-400 uppercase font-semibold">
+                      Official Certified &amp; Stamped
                     </span>
                   </div>
                   <div className="text-slate-500 text-[9px]">
