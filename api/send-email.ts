@@ -58,21 +58,12 @@ export default async function handler(req: Request) {
       );
     }
 
-    // Safety firewall: check recipient and re-route to admin if not test/admin
+    // Destination recipient
     const rawRecipient = Array.isArray(to) ? to[0] : to;
-    const { finalRecipient, redirected, original } = sanitizeRecipient(rawRecipient);
+    const finalRecipient = (rawRecipient || '').trim();
 
-    const effectiveSubject = redirected
-      ? `[Admin Forward · Intended for: ${original}] ${subject}`
-      : subject;
-
-    const safetyBanner = redirected
-      ? `<div style="padding: 10px 14px; background: #fef3c7; border: 1px solid #f59e0b; border-radius: 8px; font-size: 12px; margin-bottom: 16px; color: #92400e; font-family: sans-serif;">
-           <strong>🔒 SAFETY GUARD ACTIVE:</strong> This email was originally targeted to <strong>${original}</strong>. Pursuant to security rules, actual user dispatches are barred and forwarded exclusively to the owner/admin inbox (<code>${finalRecipient}</code>).
-         </div>`
-      : '';
-
-    const effectiveHtml = `${safetyBanner}${html}`;
+    const effectiveSubject = subject;
+    const effectiveHtml = html;
 
     const resendKey = (
       process.env.RESEND_API_KEY ||
@@ -191,8 +182,6 @@ export default async function handler(req: Request) {
         status: deliveryStatus,
         providerId,
         error: providerError,
-        redirected,
-        intendedFor: original,
         deliveredTo: finalRecipient,
       }),
       { status: 200, headers: { 'Content-Type': 'application/json' } }

@@ -1762,7 +1762,10 @@ export default function AdminUsers() {
                     </div>
                   ) : (
                     chatMessages.map((msg, index) => {
-                      const isMe = msg.sender_id === user?.id;
+                      // Messages from selectedUser are Customer (Left). Messages from staff/admin are Support (Right).
+                      const isFromCustomer = msg.sender_id === selectedUser?.id;
+                      const isFromSupport = !isFromCustomer;
+                      const isMe = isFromSupport;
                       return (
                         <div key={msg.id || index} className={`flex ${isMe ? 'justify-end' : 'justify-start'} group relative mb-2`}>
                           {!isMe && (
@@ -1779,6 +1782,16 @@ export default function AdminUsers() {
                               ? 'bg-gray-900 text-white rounded-tr-none' 
                               : 'bg-white text-gray-800 rounded-tl-none border border-gray-100'
                           }`}>
+                            {isFromCustomer && (
+                              <div className="flex items-center gap-1 mb-1 text-[10px] font-bold text-gray-500">
+                                <span>{selectedUser?.name || 'Customer'}</span>
+                              </div>
+                            )}
+                            {isFromSupport && (
+                              <div className="flex items-center gap-1 mb-1 text-[10px] font-extrabold text-blue-300">
+                                <span>RPM Support</span>
+                              </div>
+                            )}
                             <p className="leading-relaxed break-words">{msg.body}</p>
                             <div className="flex items-center justify-end gap-1.5 mt-1 text-[9px] font-medium opacity-60">
                               <span>

@@ -1476,6 +1476,9 @@ export default function Chat() {
 
               {/* Render Active Messages (Support or Direct) */}
               {(activeChat === 'support' ? supportMessages : directMessages).map((msg, index) => {
+                const isSupportMode = activeChat === 'support';
+                // In Support Chat: user_id is the customer. Any message where sender_id !== user_id is from Support.
+                const isFromSupport = isSupportMode ? (msg.sender_id !== (msg as any).user_id) : false;
                 const isMe = msg.sender_id === profile?.id;
                 const messagesArray = activeChat === 'support' ? supportMessages : directMessages;
                 const prevMsg = index > 0 ? messagesArray[index - 1] : null;
@@ -1496,10 +1499,15 @@ export default function Chat() {
                           ? 'bg-gradient-to-br from-brand to-indigo-600 text-white rounded-tr-none border border-brand/5 shadow-brand/10' 
                           : 'bg-white text-slate-800 rounded-tl-none border border-slate-200/80 shadow-slate-100'
                       }`}>
-                        {!isMe && activeChat === 'support' && (
+                        {isSupportMode && isFromSupport && (
                           <div className="flex items-center gap-1 mb-1">
-                            <span className="text-[10px] font-extrabold text-blue-600">RPM Support</span>
-                            <CheckCircle2 size={11} className="text-blue-600" />
+                            <span className={`text-[10px] font-extrabold ${isMe ? 'text-blue-200' : 'text-blue-600'}`}>RPM Support</span>
+                            <CheckCircle2 size={11} className={isMe ? 'text-blue-200' : 'text-blue-600'} />
+                          </div>
+                        )}
+                        {isSupportMode && !isFromSupport && !isMe && (
+                          <div className="flex items-center gap-1 mb-1">
+                            <span className="text-[10px] font-bold text-slate-500">Customer</span>
                           </div>
                         )}
                         <IncomingTranslation

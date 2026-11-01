@@ -1559,14 +1559,13 @@ export default function InvestorChat() {
                       data-sender={msg.sender_name}
                       data-body={msg.body}
                       className={`flex items-end gap-2 group relative transition-colors duration-500 ${
-                        // Admin always shows on the left regardless of isMine — official channel style
-                        isAdminSender ? 'flex-row' : isMine ? 'flex-row-reverse' : 'flex-row'
+                        isMine ? 'flex-row-reverse' : 'flex-row'
                       } ${isCurrentPinned ? 'bg-blue-500/10 rounded-2xl' : ''}`}
                     >
                     {/* Bubble */}
                     <div className={`relative max-w-[85%] md:max-w-[70%] px-4 py-3 shadow-sm rounded-2xl ${
                       isAdminSender
-                        ? 'bg-amber-50/90 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-700/60 rounded-bl-sm'
+                        ? `bg-amber-50/90 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-700/60 ${isMine ? 'rounded-br-sm' : 'rounded-bl-sm'}`
                         : isMine
                           ? 'bg-emerald-600 dark:bg-emerald-700 text-white rounded-br-sm shadow-emerald-600/10'
                           : 'bg-white dark:bg-[#1a232f] border border-slate-200/80 dark:border-[#2b3d4f] rounded-bl-sm'

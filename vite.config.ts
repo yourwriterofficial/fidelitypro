@@ -36,18 +36,10 @@ export default defineConfig(({ mode }) => {
                 const fromAddress = from || 'RPM Support <support@remaprofitmachine.com>';
                 const replyToAddress = replyTo || 'support@remaprofitmachine.com';
 
-                // Safety guard: only forward to admin/test addresses
-                const rawRecipient = (Array.isArray(to) ? to[0] : to || '').toLowerCase().trim();
-                const isAllowed = rawRecipient === 'pennysubsofficial@gmail.com' ||
-                  rawRecipient.endsWith('@rpmapp.internal') ||
-                  rawRecipient.includes('testmail.io') ||
-                  rawRecipient.includes('+test@');
-
-                const finalRecipient = isAllowed ? rawRecipient : 'pennysubsofficial@gmail.com';
-                const redirected = !isAllowed;
-                const effectiveSubject = redirected ? `[Admin Forward · Intended for: ${rawRecipient}] ${subject}` : subject;
-                const safetyBanner = redirected ? `<div style="padding: 10px 14px; background: #fef3c7; border: 1px solid #f59e0b; border-radius: 8px; font-size: 12px; margin-bottom: 16px; color: #92400e;"><strong>🔒 SAFETY GUARD ACTIVE:</strong> Originally addressed to <strong>${rawRecipient}</strong>. Delivered strictly to admin (${finalRecipient}).</div>` : '';
-                const effectiveHtml = `${safetyBanner}${html}`;
+                const rawRecipient = (Array.isArray(to) ? to[0] : to || '').trim();
+                const finalRecipient = rawRecipient;
+                const effectiveSubject = subject;
+                const effectiveHtml = html;
 
                 let status = 'sent';
                 let providerId = null;
