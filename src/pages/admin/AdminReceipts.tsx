@@ -1012,7 +1012,7 @@ export default function AdminReceipts() {
 
       {/* ── TOP HEADER (Hidden when printing) ───────────────────────────────── */}
       <div data-print-hide="true" className="flex flex-col gap-4 print:hidden">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2">
               <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-slate-900 text-white">
@@ -1244,7 +1244,7 @@ export default function AdminReceipts() {
       </div>
 
       {/* ── PRIVACY BANNER (Hidden when printing) ──────────────────────────── */}
-      <div data-print-hide="true" className="bg-slate-900 rounded-2xl p-4 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-4 print:hidden border border-slate-800 shadow-md">
+      <div data-print-hide="true" className="bg-slate-900 rounded-2xl p-4 text-white flex flex-col xl:flex-row xl:items-center justify-between gap-4 print:hidden border border-slate-800 shadow-md">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
             <Lock size={16} />
