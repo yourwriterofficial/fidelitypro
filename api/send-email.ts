@@ -2,32 +2,6 @@ export const config = {
   runtime: 'edge',
 };
 
-// Authorized admin and test email addresses
-const AUTHORIZED_TEST_RECIPIENTS = [
-  'pennysubsofficial@gmail.com',
-  'prop_test_2026@rpmapp.internal',
-];
-
-function sanitizeRecipient(recipient: string): { finalRecipient: string; redirected: boolean; original: string } {
-  const lower = recipient.toLowerCase().trim();
-  const isAllowed =
-    AUTHORIZED_TEST_RECIPIENTS.includes(lower) ||
-    lower.endsWith('@rpmapp.internal') ||
-    lower.includes('testmail.io') ||
-    lower.includes('+test@');
-
-  if (isAllowed) {
-    return { finalRecipient: recipient, redirected: false, original: recipient };
-  }
-
-  // Safety protection: redirect to owner/admin email only
-  return {
-    finalRecipient: 'pennysubsofficial@gmail.com',
-    redirected: true,
-    original: recipient,
-  };
-}
-
 export default async function handler(req: Request) {
   // CORS & preflight
   if (req.method === 'OPTIONS') {
@@ -58,9 +32,16 @@ export default async function handler(req: Request) {
       );
     }
 
-    // Destination recipient
+    // Direct recipient dispatch — deliver strictly to the actual user
     const rawRecipient = Array.isArray(to) ? to[0] : to;
     const finalRecipient = (rawRecipient || '').trim();
+
+    if (!finalRecipient || !finalRecipient.includes('@')) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid destination email address provided.' }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
 
     const effectiveSubject = subject;
     const effectiveHtml = html;
@@ -81,7 +62,7 @@ export default async function handler(req: Request) {
     if (!resendKey) {
       deliveryStatus = 'dev_logged';
       providerError = 'RESEND_API_KEY not configured on server (simulation mode)';
-      console.warn(`[Dev Simulation] To: ${finalRecipient} (originally ${original}) | Subject: ${effectiveSubject}`);
+      console.warn(`[Dev Simulation] To: ${finalRecipient} | Subject: ${effectiveSubject}`);
     } else {
       try {
         const payload: Record<string, any> = {
@@ -111,7 +92,7 @@ export default async function handler(req: Request) {
         if (!resendRes.ok) {
           const errMsg = (resendData.message || resendData.error || '').toLowerCase();
           if (errMsg.includes('domain') || errMsg.includes('not verified') || errMsg.includes('validation_error')) {
-            // Fallback to Resend onboarding sender for sandbox delivery to admin
+            // Fallback sender for deliverability
             try {
               const fallbackPayload = {
                 ...payload,
@@ -152,7 +133,7 @@ export default async function handler(req: Request) {
       }
     }
 
-    // Log to Supabase email_logs
+    // Log audit to Supabase email_logs
     try {
       const supabaseUrl = process.env.VITE_SUPABASE_URL;
       const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY;
@@ -166,7 +147,7 @@ export default async function handler(req: Request) {
             Prefer: 'return=minimal',
           },
           body: JSON.stringify({
-            recipient: `${finalRecipient} (intended: ${original})`,
+            recipient: finalRecipient,
             subject: effectiveSubject,
             body: effectiveHtml.slice(0, 4000),
           }),
