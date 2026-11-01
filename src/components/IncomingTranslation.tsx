@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Languages, RefreshCw } from 'lucide-react';
 import { 
   translateText, 
   getSentTranslation, 
   saveSentTranslation, 
-  getSavedTargetLanguage, 
+  getSavedReadingLanguage,
   SUPPORTED_LANGUAGES, 
   getLanguageName 
 } from '../lib/translator';
@@ -196,109 +196,152 @@ function IncomingMessageTranslation({
   currentUserId?: string;
   className: string;
 }) {
-  const defaultLangCode = getSavedTargetLanguage(currentUserId) || 'en';
-  const defaultLangObj = SUPPORTED_LANGUAGES.find(l => l.code === defaultLangCode) || SUPPORTED_LANGUAGES[0];
+  const [readingLang, setReadingLang] = useState<string>(() => {
+    return getSavedReadingLanguage(currentUserId) || 'en';
+  });
 
   const [translatedText, setTranslatedText] = useState<string | null>(null);
   const [sourceLang, setSourceLang] = useState<string | null>(null);
-  const [showTranslated, setShowTranslated] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [alreadyDefault, setAlreadyDefault] = useState(false);
+  const [isForeign, setIsForeign] = useState<boolean>(false);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [showOriginalOnly, setShowOriginalOnly] = useState<boolean>(false);
 
-  const handleTranslate = async () => {
-    if (translatedText) {
-      setShowTranslated(true);
+  // Sync when reading language changes globally or in another component
+  useEffect(() => {
+    const handleReadingChanged = (e: any) => {
+      if (e.detail?.lang && e.detail.lang !== readingLang) {
+        setReadingLang(e.detail.lang);
+      }
+    };
+    window.addEventListener('rpm_reading_language_changed', handleReadingChanged);
+    return () => window.removeEventListener('rpm_reading_language_changed', handleReadingChanged);
+  }, [readingLang]);
+
+  // Auto-translate incoming message when mounted or when text/language changes
+  useEffect(() => {
+    let isCancelled = false;
+    const clean = messageText?.trim();
+    if (!clean) return;
+
+    // Ignore trivial text: purely numbers, punctuation, spaces
+    if (/^[\d\s.,!?:;@#$%^&*()_+=\-[\]{}|\\/<>~`"']+$/.test(clean)) {
+      setIsForeign(false);
+      setLoading(false);
       return;
     }
 
     setLoading(true);
-    try {
-      const res = await translateText(messageText, defaultLangCode, 'auto');
-      if (res.sourceLang === defaultLangCode || res.text.trim().toLowerCase() === messageText.trim().toLowerCase()) {
-        setAlreadyDefault(true);
-        setTimeout(() => setAlreadyDefault(false), 3000);
-      } else {
-        setSourceLang(res.sourceLang);
-        setTranslatedText(res.text);
-        setShowTranslated(true);
-      }
-    } catch {
-      toast.error('Could not translate message');
-    } finally {
-      setLoading(false);
-    }
-  };
+    translateText(clean, readingLang, 'auto')
+      .then((res) => {
+        if (isCancelled) return;
+        const sourceCode = (res.sourceLang || 'en').toLowerCase().split('-')[0];
+        const targetCode = (readingLang || 'en').toLowerCase().split('-')[0];
 
-  // State A: Translated view active
-  // Bigger text = defaulted language. Smaller text = language sent.
-  if (showTranslated && translatedText) {
+        const isSame =
+          sourceCode === targetCode ||
+          res.text.trim().toLowerCase() === clean.toLowerCase();
+
+        if (isSame) {
+          setIsForeign(false);
+          setTranslatedText(null);
+          setSourceLang(res.sourceLang);
+        } else {
+          setIsForeign(true);
+          setTranslatedText(res.text);
+          setSourceLang(res.sourceLang);
+        }
+      })
+      .catch((err) => {
+        if (!isCancelled) {
+          console.warn('Auto-translate error:', err);
+          setIsForeign(false);
+        }
+      })
+      .finally(() => {
+        if (!isCancelled) setLoading(false);
+      });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [messageText, readingLang]);
+
+  const readingLangObj =
+    SUPPORTED_LANGUAGES.find((l) => l.code === readingLang) || SUPPORTED_LANGUAGES[0];
+  const sourceLangName = getLanguageName(sourceLang || undefined);
+
+  // State 1: Message is in the user's reading language (e.g. English sent to English user)
+  if (!isForeign || !translatedText) {
     return (
-      <div className="space-y-1.5">
-        <div>
-          <div className="flex items-center justify-between gap-1 text-[10px] font-bold text-indigo-600 dark:text-indigo-400 mb-0.5 select-none">
-            <span className="flex items-center gap-1">
-              <Languages size={10} />
-              <span>{defaultLangObj.name} (Default):</span>
-            </span>
-            <button
-              type="button"
-              onClick={() => setShowTranslated(false)}
-              className="text-[9px] text-slate-400 dark:text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 underline font-normal transition"
-            >
-              Show original only
-            </button>
-          </div>
-          {/* Bigger text: Defaulted language version */}
-          <p className={`leading-relaxed break-words font-medium text-sm md:text-[15px] ${className}`}>
-            {translatedText}
-          </p>
-        </div>
-
-        {/* Smaller text: Language sent */}
-        <div className="pt-1.5 border-t border-slate-200/60 dark:border-slate-700/60 text-[11px] text-slate-500 dark:text-slate-400">
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 block mb-0.5">
-            Sent {sourceLang ? `in ${getLanguageName(sourceLang)}` : 'by sender'}:
+      <div>
+        <p className={`leading-relaxed break-words font-medium ${className}`}>
+          {messageText}
+        </p>
+        {loading && (
+          <span className="inline-block mt-0.5 text-[9px] text-slate-400 dark:text-slate-500 animate-pulse">
+            Checking language...
           </span>
-          <p className="italic leading-relaxed whitespace-pre-wrap text-slate-600 dark:text-slate-300">
-            {messageText}
-          </p>
-        </div>
+        )}
       </div>
     );
   }
 
-  // State B: Standard original view with translate action
-  return (
-    <div>
-      <p className={`leading-relaxed break-words font-medium ${className}`}>
-        {messageText}
-      </p>
-      <div className="mt-1 flex items-center gap-2 select-none">
-        <button
-          type="button"
-          onClick={handleTranslate}
-          disabled={loading}
-          className="text-[10px] text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 font-bold flex items-center gap-1 transition opacity-80 hover:opacity-100 disabled:opacity-50"
-        >
-          {loading ? (
-            <>
-              <RefreshCw size={10} className="animate-spin text-indigo-600 dark:text-indigo-400" />
-              <span>Translating...</span>
-            </>
-          ) : (
-            <>
-              <Languages size={10} className="text-indigo-600 dark:text-indigo-400" />
-              <span>
-                {translatedText ? `View ${defaultLangObj.name} translation` : `Translate to ${defaultLangObj.name}`}
-              </span>
-            </>
-          )}
-        </button>
-        {alreadyDefault && (
-          <span className="text-[10px] text-slate-400 dark:text-slate-500 italic">
-            Already in {defaultLangObj.name}
+  // State 2: Foreign text, but user toggled to view original only
+  if (showOriginalOnly) {
+    return (
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between gap-1 text-[10px] font-bold text-slate-500 dark:text-slate-400 mb-0.5 select-none">
+          <span className="flex items-center gap-1">
+            <Languages size={10} className="text-indigo-500" />
+            <span>Original ({sourceLangName}):</span>
           </span>
-        )}
+          <button
+            type="button"
+            onClick={() => setShowOriginalOnly(false)}
+            className="text-[9px] text-indigo-600 dark:text-indigo-400 hover:underline font-semibold transition"
+          >
+            Show {readingLangObj.name} translation
+          </button>
+        </div>
+        <p className={`leading-relaxed break-words font-medium ${className}`}>
+          {messageText}
+        </p>
+      </div>
+    );
+  }
+
+  // State 3: Foreign text - automatically show translated version (Default English)
+  // Bigger text = translated version. Smaller text = original sent.
+  return (
+    <div className="space-y-1.5">
+      <div>
+        <div className="flex items-center justify-between gap-2 text-[10px] font-bold text-indigo-600 dark:text-indigo-400 mb-0.5 select-none">
+          <span className="flex items-center gap-1">
+            <Languages size={11} className="text-indigo-600 dark:text-indigo-400 shrink-0" />
+            <span>{readingLangObj.name} (Translated from {sourceLangName}):</span>
+          </span>
+          <button
+            type="button"
+            onClick={() => setShowOriginalOnly(true)}
+            className="text-[9px] text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 underline font-normal transition shrink-0"
+          >
+            Show original only
+          </button>
+        </div>
+        {/* Bigger text: Defaulted language version */}
+        <p className={`leading-relaxed break-words font-medium text-sm md:text-[15px] ${className}`}>
+          {translatedText}
+        </p>
+      </div>
+
+      {/* Smaller text: Language sent */}
+      <div className="pt-1.5 border-t border-slate-200/60 dark:border-slate-700/60 text-[11px] text-slate-500 dark:text-slate-400">
+        <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 block mb-0.5">
+          Sent in {sourceLangName}:
+        </span>
+        <p className="italic leading-relaxed whitespace-pre-wrap text-slate-600 dark:text-slate-300">
+          {messageText}
+        </p>
       </div>
     </div>
   );

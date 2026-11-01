@@ -22,6 +22,52 @@
   }
 }
 
+/* Global Print Engine Hardening - Eliminates layout chrome and preserves document pagination */
+@media print {
+  html, body, #root {
+    overflow: visible !important;
+    overflow-x: visible !important;
+    overflow-y: visible !important;
+    max-width: none !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+
+  /* Unconditionally eradicate admin layout chrome during print */
+  header,
+  aside,
+  nav,
+  footer,
+  [data-print-hide="true"],
+  .print\:hidden,
+  .print\:\!hidden {
+    display: none !important;
+    visibility: hidden !important;
+    position: absolute !important;
+    left: -99999px !important;
+    top: -99999px !important;
+    height: 0 !important;
+    width: 0 !important;
+    max-height: 0 !important;
+    max-width: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+    z-index: -9999 !important;
+  }
+
+  /* Ensure main wrapper does not clip print pages */
+  main,
+  div {
+    overflow: visible !important;
+  }
+}
+
 /* Indeterminate progress bar used for pending deposits awaiting confirmation */
 @keyframes indeterminate-bar {
   0%   { transform: translateX(-100%); }

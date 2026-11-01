@@ -1,9 +1,11 @@
-import { useState } from 'react';
-import { Languages, Send, Check, X, RefreshCw, ChevronDown } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Languages, Send, Check, X, RefreshCw, ChevronDown, BookOpen } from 'lucide-react';
 import { 
   SUPPORTED_LANGUAGES, 
-  getSavedTargetLanguage, 
-  saveTargetLanguage, 
+  getSavedComposeLanguage, 
+  saveComposeLanguage, 
+  getSavedReadingLanguage, 
+  saveReadingLanguage, 
   translateText,
   saveSentTranslation
 } from '../lib/translator';
@@ -29,24 +31,47 @@ export default function ChatTranslationBar({
   className = '',
 }: ChatTranslationBarProps) {
   const [targetLang, setTargetLang] = useState<string>(() => {
-    return getSavedTargetLanguage(currentUserId) || 'en';
+    return getSavedComposeLanguage(currentUserId) || 'en';
+  });
+
+  const [readingLang, setReadingLang] = useState<string>(() => {
+    return getSavedReadingLanguage(currentUserId) || 'en';
   });
 
   const [isTranslating, setIsTranslating] = useState(false);
   const [preview, setPreview] = useState<{ original: string; translated: string; targetName: string } | null>(null);
-  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [composeDropdownOpen, setComposeDropdownOpen] = useState(false);
+  const [readingDropdownOpen, setReadingDropdownOpen] = useState(false);
+
+  useEffect(() => {
+    const handleReadingChanged = (e: any) => {
+      if (e.detail?.lang) {
+        setReadingLang(e.detail.lang);
+      }
+    };
+    window.addEventListener('rpm_reading_language_changed', handleReadingChanged);
+    return () => window.removeEventListener('rpm_reading_language_changed', handleReadingChanged);
+  }, []);
 
   // 100% Stealth: If user is not entitled, render absolutely nothing
   if (!hasAccess) return null;
 
-  const handleSelectLanguage = (code: string) => {
+  const handleSelectComposeLanguage = (code: string) => {
     setTargetLang(code);
-    saveTargetLanguage(code, currentUserId);
-    setDropdownOpen(false);
+    saveComposeLanguage(code, currentUserId);
+    setComposeDropdownOpen(false);
     // If a preview was open, refresh translation for new language
     if (preview && currentDraft.trim()) {
       doTranslate(currentDraft, code);
     }
+  };
+
+  const handleSelectReadingLanguage = (code: string) => {
+    setReadingLang(code);
+    saveReadingLanguage(code, currentUserId);
+    setReadingDropdownOpen(false);
+    const matched = SUPPORTED_LANGUAGES.find(l => l.code === code);
+    toast.success(`Incoming messages will now display in ${matched?.name || code}`);
   };
 
   const doTranslate = async (textToTranslate: string, langCode: string) => {
@@ -91,6 +116,7 @@ export default function ChatTranslationBar({
   };
 
   const currentLangObj = SUPPORTED_LANGUAGES.find(l => l.code === targetLang) || SUPPORTED_LANGUAGES[0];
+  const currentReadingObj = SUPPORTED_LANGUAGES.find(l => l.code === readingLang) || SUPPORTED_LANGUAGES[0];
   const partnerLangObj = partnerLanguageHint ? SUPPORTED_LANGUAGES.find(l => l.code === partnerLanguageHint) : null;
 
   return (
@@ -153,42 +179,98 @@ export default function ChatTranslationBar({
         </div>
       )}
 
-      {/* ── TOOLBAR: Language Picker & Translate Trigger ─────────────────── */}
-      <div className="flex items-center justify-between gap-2 px-1 text-xs">
-        <div className="flex items-center gap-2">
-          {/* Language selector toggle */}
+      {/* ── TOOLBAR: Language Pickers & Translate Trigger ─────────────────── */}
+      <div className="flex flex-wrap items-center justify-between gap-2 px-1 text-xs">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Outgoing target language selector */}
           <div className="relative">
             <button
               type="button"
-              onClick={() => setDropdownOpen(!dropdownOpen)}
-              className="flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-medium transition text-[11px] border border-slate-200/60"
+              onClick={() => {
+                setComposeDropdownOpen(!composeDropdownOpen);
+                setReadingDropdownOpen(false);
+              }}
+              className="flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl font-medium transition text-[11px] border border-slate-200/60 dark:border-slate-700/60"
+              title="Select language to translate your outgoing message into"
             >
-              <Languages size={12} className="text-indigo-600" />
-              <span>Translate to:</span>
-              <span className="font-bold text-slate-900 flex items-center gap-1">
+              <Languages size={12} className="text-indigo-600 dark:text-indigo-400" />
+              <span>Translate draft:</span>
+              <span className="font-bold text-slate-900 dark:text-white flex items-center gap-1">
                 <span>{currentLangObj.flag}</span>
                 <span>{currentLangObj.name}</span>
               </span>
               <ChevronDown size={11} className="text-slate-400" />
             </button>
 
-            {dropdownOpen && (
+            {composeDropdownOpen && (
               <>
-                <div className="fixed inset-0 z-40" onClick={() => setDropdownOpen(false)} />
-                <div className="absolute left-0 bottom-full mb-1 z-50 w-56 max-h-64 overflow-y-auto bg-white rounded-2xl shadow-xl border border-gray-100 p-1.5 divide-y divide-gray-50">
+                <div className="fixed inset-0 z-40" onClick={() => setComposeDropdownOpen(false)} />
+                <div className="absolute left-0 bottom-full mb-1 z-50 w-56 max-h-64 overflow-y-auto bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-gray-100 dark:border-slate-800 p-1.5 divide-y divide-gray-50 dark:divide-slate-800">
                   <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-gray-400">
-                    Select Target Language
+                    Draft Translation Target
                   </div>
                   <div className="py-1">
                     {SUPPORTED_LANGUAGES.map((lang) => (
                       <button
                         key={lang.code}
                         type="button"
-                        onClick={() => handleSelectLanguage(lang.code)}
+                        onClick={() => handleSelectComposeLanguage(lang.code)}
                         className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-xl text-left text-xs transition ${
                           targetLang === lang.code
-                            ? 'bg-indigo-50 text-indigo-700 font-bold'
-                            : 'hover:bg-gray-50 text-gray-700'
+                            ? 'bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 font-bold'
+                            : 'hover:bg-gray-50 dark:hover:bg-slate-800 text-gray-700 dark:text-slate-200'
+                        }`}
+                      >
+                        <span className="flex items-center gap-2">
+                          <span className="text-sm">{lang.flag}</span>
+                          <span>{lang.name}</span>
+                        </span>
+                        <span className="text-[10px] text-gray-400">{lang.nativeName}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Reading language preference selector */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => {
+                setReadingDropdownOpen(!readingDropdownOpen);
+                setComposeDropdownOpen(false);
+              }}
+              className="flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl font-medium transition text-[11px] border border-slate-200/60 dark:border-slate-700/60"
+              title="Language you want to read all incoming messages in"
+            >
+              <BookOpen size={12} className="text-emerald-600 dark:text-emerald-400" />
+              <span>Read in:</span>
+              <span className="font-bold text-slate-900 dark:text-white flex items-center gap-1">
+                <span>{currentReadingObj.flag}</span>
+                <span>{currentReadingObj.name}</span>
+              </span>
+              <ChevronDown size={11} className="text-slate-400" />
+            </button>
+
+            {readingDropdownOpen && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setReadingDropdownOpen(false)} />
+                <div className="absolute left-0 bottom-full mb-1 z-50 w-56 max-h-64 overflow-y-auto bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-gray-100 dark:border-slate-800 p-1.5 divide-y divide-gray-50 dark:divide-slate-800">
+                  <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                    Default Reading Language
+                  </div>
+                  <div className="py-1">
+                    {SUPPORTED_LANGUAGES.map((lang) => (
+                      <button
+                        key={lang.code}
+                        type="button"
+                        onClick={() => handleSelectReadingLanguage(lang.code)}
+                        className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-xl text-left text-xs transition ${
+                          readingLang === lang.code
+                            ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 font-bold'
+                            : 'hover:bg-gray-50 dark:hover:bg-slate-800 text-gray-700 dark:text-slate-200'
                         }`}
                       >
                         <span className="flex items-center gap-2">
@@ -208,11 +290,11 @@ export default function ChatTranslationBar({
           {partnerLangObj && targetLang !== partnerLangObj.code && (
             <button
               type="button"
-              onClick={() => handleSelectLanguage(partnerLangObj.code)}
+              onClick={() => handleSelectComposeLanguage(partnerLangObj.code)}
               className="text-[10px] text-indigo-600 hover:underline flex items-center gap-1"
               title={`Partner uses ${partnerLangObj.name} browser`}
             >
-              <span>Switch to recipient's language ({partnerLangObj.flag} {partnerLangObj.name})</span>
+              <span>Match recipient's language ({partnerLangObj.flag} {partnerLangObj.name})</span>
             </button>
           )}
         </div>
@@ -222,16 +304,16 @@ export default function ChatTranslationBar({
           type="button"
           onClick={handleTranslateClick}
           disabled={!currentDraft.trim() || isTranslating}
-          className="flex items-center gap-1 px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 disabled:opacity-40 disabled:hover:bg-indigo-50 text-indigo-700 rounded-xl font-bold transition text-[11px] border border-indigo-200/60"
+          className="flex items-center gap-1 px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 disabled:opacity-40 disabled:hover:bg-indigo-50 text-indigo-700 dark:text-indigo-300 dark:bg-indigo-950/50 dark:hover:bg-indigo-900/60 rounded-xl font-bold transition text-[11px] border border-indigo-200/60 dark:border-indigo-800/60"
         >
           {isTranslating ? (
             <>
-              <RefreshCw size={11} className="animate-spin text-indigo-600" />
+              <RefreshCw size={11} className="animate-spin text-indigo-600 dark:text-indigo-400" />
               <span>Translating...</span>
             </>
           ) : (
             <>
-              <Languages size={11} className="text-indigo-600" />
+              <Languages size={11} className="text-indigo-600 dark:text-indigo-400" />
               <span>Translate & Preview</span>
             </>
           )}

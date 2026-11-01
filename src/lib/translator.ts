@@ -71,41 +71,90 @@ export async function syncBrowserLanguage(userId?: string): Promise<string> {
   return detected;
 }
 
+export const DEFAULT_READING_LANGUAGE = 'en';
+
 /**
- * Get the saved language preference for a user (persisted across sessions)
- * Defaults to 'en' (English).
+ * Get the saved READING language preference for incoming messages.
+ * Default is strictly 'en' (English) unless the user explicitly changed it.
  */
-export function getSavedTargetLanguage(userId?: string): string {
-  if (typeof window === 'undefined') return 'en';
-  const isExplicit = localStorage.getItem('rpm_trans_target_explicit') === 'true';
-  const key = userId ? `rpm_trans_target_${userId}` : 'rpm_trans_target';
-  const saved = localStorage.getItem(key);
-  if (isExplicit && saved && SUPPORTED_LANGUAGES.some(l => l.code === saved)) {
-    return saved;
+export function getSavedReadingLanguage(userId?: string): string {
+  if (typeof window === 'undefined') return DEFAULT_READING_LANGUAGE;
+  const userKey = userId ? `rpm_reading_language_${userId}` : null;
+  const savedUser = userKey ? localStorage.getItem(userKey) : null;
+  const savedGlobal = localStorage.getItem('rpm_reading_language');
+  const candidate = savedUser || savedGlobal;
+  if (candidate && SUPPORTED_LANGUAGES.some(l => l.code === candidate)) {
+    return candidate;
   }
-  return 'en';
+  return DEFAULT_READING_LANGUAGE;
 }
 
 /**
- * Save language preference for a user
+ * Save the user's preferred READING language for incoming messages.
+ * Emits an event so all mounted chat bubbles update live.
  */
-export async function saveTargetLanguage(lang: string, userId?: string): Promise<void> {
+export async function saveReadingLanguage(lang: string, userId?: string): Promise<void> {
   if (typeof window === 'undefined') return;
-  const key = userId ? `rpm_trans_target_${userId}` : 'rpm_trans_target';
-  localStorage.setItem(key, lang);
-  localStorage.setItem('rpm_trans_target', lang);
-  localStorage.setItem('rpm_trans_target_explicit', 'true');
+  if (!SUPPORTED_LANGUAGES.some(l => l.code === lang)) return;
+
+  if (userId) {
+    localStorage.setItem(`rpm_reading_language_${userId}`, lang);
+  }
+  localStorage.setItem('rpm_reading_language', lang);
+
+  window.dispatchEvent(new CustomEvent('rpm_reading_language_changed', { detail: { lang } }));
 
   if (userId) {
     try {
       await supabase
         .from('profiles')
-        .update({ preferred_translation_lang: lang })
+        .update({ preferred_reading_lang: lang, preferred_translation_lang: lang })
         .eq('id', userId);
     } catch {
       // Non-fatal
     }
   }
+}
+
+/**
+ * Get the saved COMPOSE language preference for outgoing messages.
+ * Default is 'en' (or whatever language they choose to translate outgoing drafts into).
+ */
+export function getSavedComposeLanguage(userId?: string): string {
+  if (typeof window === 'undefined') return 'en';
+  const userKey = userId ? `rpm_compose_language_${userId}` : null;
+  const savedUser = userKey ? localStorage.getItem(userKey) : null;
+  const savedGlobal = localStorage.getItem('rpm_compose_language');
+  const candidate = savedUser || savedGlobal;
+  if (candidate && SUPPORTED_LANGUAGES.some(l => l.code === candidate)) {
+    return candidate;
+  }
+  return 'en';
+}
+
+/**
+ * Save COMPOSE language preference for outgoing drafts.
+ * Does NOT overwrite the reading language preference!
+ */
+export async function saveComposeLanguage(lang: string, userId?: string): Promise<void> {
+  if (typeof window === 'undefined') return;
+  if (!SUPPORTED_LANGUAGES.some(l => l.code === lang)) return;
+
+  if (userId) {
+    localStorage.setItem(`rpm_compose_language_${userId}`, lang);
+  }
+  localStorage.setItem('rpm_compose_language', lang);
+}
+
+/**
+ * Backwards-compatible aliases
+ */
+export function getSavedTargetLanguage(userId?: string): string {
+  return getSavedComposeLanguage(userId);
+}
+
+export async function saveTargetLanguage(lang: string, userId?: string): Promise<void> {
+  return saveComposeLanguage(lang, userId);
 }
 
 /**

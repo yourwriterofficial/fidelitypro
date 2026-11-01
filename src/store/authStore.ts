@@ -88,7 +88,7 @@ export const clearCache = () => {
 export const fetchProfileWithTimeout = async (
   userId: string,
   fallbackProfile?: Profile | null,
-  timeoutMs: number = 2500
+  timeoutMs: number = 6000
 ): Promise<Profile | null> => {
   try {
     const controller = new AbortController();
@@ -104,20 +104,22 @@ export const fetchProfileWithTimeout = async (
     clearTimeout(timer);
 
     if (error) {
-      if (error.code !== 'PGRST116') {
+      if (error.code !== 'PGRST116' && error.name !== 'AbortError' && !error.message?.includes('aborted')) {
         console.warn('Profile fetch warning (using fallback):', error.message || error);
       }
       return fallbackProfile || getCachedProfile();
     }
     return data || fallbackProfile || getCachedProfile();
-  } catch (err) {
-    console.warn('Network profile fetch error (using fallback):', err);
+  } catch (err: any) {
+    if (err?.name !== 'AbortError' && !err?.message?.includes('aborted')) {
+      console.warn('Network profile fetch error (using fallback):', err);
+    }
     return fallbackProfile || getCachedProfile();
   }
 };
 
 export const fetchProfile = (userId: string, fallbackProfile?: Profile | null) =>
-  fetchProfileWithTimeout(userId, fallbackProfile, 2500);
+  fetchProfileWithTimeout(userId, fallbackProfile, 6000);
 
 let authSubscription: { unsubscribe: () => void } | null = null;
 let isInitializing = false;
@@ -145,7 +147,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     if (data.user) {
       const cached = get().profile || getCachedProfile();
       saveCache(data.user, cached);
-      const profile = await fetchProfileWithTimeout(data.user.id, cached, 2500);
+      const profile = await fetchProfileWithTimeout(data.user.id, cached, 6000);
       saveCache(data.user, profile);
       set({
         user: data.user,
@@ -174,7 +176,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     if (!needsEmailConfirm && data.user) {
       const cached = get().profile || getCachedProfile();
       saveCache(data.user, cached);
-      const profile = await fetchProfileWithTimeout(data.user.id, cached, 2000);
+      const profile = await fetchProfileWithTimeout(data.user.id, cached, 6000);
       saveCache(data.user, profile);
       set({
         user: data.user,
@@ -246,7 +248,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           // Defer subsequent database query via setTimeout(0) to release Navigator Lock first!
           setTimeout(async () => {
             try {
-              const freshProfile = await fetchProfileWithTimeout(session.user.id, cachedProfile, 2500);
+              const freshProfile = await fetchProfileWithTimeout(session.user.id, cachedProfile, 6000);
               if (freshProfile) {
                 saveCache(session.user, freshProfile);
                 set({
@@ -293,7 +295,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         });
 
         // Background update without blocking initial render
-        fetchProfileWithTimeout(session.user.id, cachedProfile, 2500).then((freshProfile) => {
+        fetchProfileWithTimeout(session.user.id, cachedProfile, 6000).then((freshProfile) => {
           if (freshProfile) {
             saveCache(session.user, freshProfile);
             set({
@@ -325,7 +327,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     const { user } = get();
     if (user) {
       const cachedProfile = get().profile || getCachedProfile();
-      const profile = await fetchProfileWithTimeout(user.id, cachedProfile, 2500);
+      const profile = await fetchProfileWithTimeout(user.id, cachedProfile, 6000);
       if (profile) {
         saveCache(user, profile);
         set({ profile, isAdmin: profile.is_admin || false });

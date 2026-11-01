@@ -847,8 +847,8 @@ export default function Landing() {
                 <span className="text-xl font-bold text-white tracking-tight">RPM</span>
               </div>
               <p className="text-sm text-gray-400 mb-3 leading-relaxed">Properties, Staking, P2P trading, and managed investments — one platform for long‑term wealth growth.</p>
-              <a href="mailto:teamonline4u@gmail.com" className="inline-flex items-center gap-2 text-sm text-gray-400 hover:text-white transition">
-                <Mail size={14} /><span>teamonline4u@gmail.com</span>
+              <a href="mailto:support@remaprofitmachine.com" className="inline-flex items-center gap-2 text-sm text-gray-400 hover:text-white transition">
+                <Mail size={14} /><span>support@remaprofitmachine.com</span>
               </a>
               <div className="mt-2 flex items-center gap-2 text-sm text-gray-500">
                 <Phone size={13} /><span>+1 (800) 555‑0199</span>

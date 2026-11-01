@@ -102,7 +102,7 @@ export default function FAQ() {
           <h3 className="font-bold text-gray-900 text-lg">Still have questions?</h3>
           <p className="text-xs text-gray-500 mt-1 mb-4">Our specialized asset management support team is ready 24/7 to assist you.</p>
           <a
-            href="mailto:teamonline4u@gmail.com"
+            href="mailto:support@remaprofitmachine.com"
             className="inline-flex items-center gap-2 bg-brand hover:bg-brand-dark text-white font-bold text-xs px-6 py-3 rounded-xl transition shadow-sm"
           >
             Contact Support

@@ -9,6 +9,7 @@ import {
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { useUserActivityTracker } from '../hooks/useUserActivityTracker';
+import { getUnreadInboxCount } from '../lib/supportInboxService';
 
 const NAV_SECTIONS = [
   {
@@ -43,6 +44,7 @@ const NAV_SECTIONS = [
       { path: '/admin/kyc',              icon: ShieldCheck, label: 'KYC Verifications' },
       { path: '/admin/chat',             icon: MessageSquare,label: 'Live Chat'        },
       { path: '/admin/notifications',    icon: Bell,        label: 'Notifications'  },
+      { path: '/admin/inbox',            icon: Mail,        label: 'Support Inbox'  },
       { path: '/admin/announcements',    icon: Megaphone,   label: 'Announcements'  },
       { path: '/admin/email-templates',  icon: Mail,        label: 'Email Templates'},
       { path: '/admin/email-logs',       icon: Mail,        label: 'Email Logs'     },
@@ -78,9 +80,64 @@ export default function AdminLayout() {
     () => typeof localStorage !== 'undefined' && localStorage.getItem('admin-sidebar-collapsed') === '1'
   );
   const [unreadChatCount, setUnreadChatCount] = useState(0);
+  const [unreadInboxCount, setUnreadInboxCount] = useState(0);
+  const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
 
   // Continuous Admin Activity, Heartbeat & Page Visit tracking
   useUserActivityTracker(profile);
+
+  // Support Inbox Unread Tracking
+  useEffect(() => {
+    const updateInboxCount = () => {
+      setUnreadInboxCount(getUnreadInboxCount());
+    };
+    updateInboxCount();
+    window.addEventListener('rpm_inbound_email', updateInboxCount);
+    window.addEventListener('storage', updateInboxCount);
+    return () => {
+      window.removeEventListener('rpm_inbound_email', updateInboxCount);
+      window.removeEventListener('storage', updateInboxCount);
+    };
+  }, []);
+
+  // Admin In-App Notifications Unread Tracking
+  useEffect(() => {
+    if (!profile?.id) return;
+
+    const fetchNotificationsCount = async () => {
+      try {
+        const { count, error } = await supabase
+          .from('notifications')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', profile.id)
+          .eq('read', false);
+        if (!error && count !== null) {
+          setUnreadNotificationsCount(count);
+        }
+      } catch {
+        // Non-fatal
+      }
+    };
+
+    fetchNotificationsCount();
+
+    const notifChannel = supabase
+      .channel('admin_notif_bell_count')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'notifications' },
+        () => {
+          fetchNotificationsCount();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(notifChannel);
+    };
+  }, [profile?.id]);
+
+  const totalBellCount = unreadNotificationsCount + unreadInboxCount;
 
   useEffect(() => {
     if (!profile?.id) return;
@@ -141,7 +198,7 @@ export default function AdminLayout() {
     <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row">
 
       {/* ===== DESKTOP SIDEBAR (collapsible) ===== */}
-      <aside className={`bg-white border-r border-gray-100 hidden md:flex md:flex-col md:fixed md:inset-y-0 md:left-0 md:z-30 transition-[width] duration-200 ${collapsed ? 'md:w-20' : 'md:w-64'}`}>
+      <aside data-print-hide="true" className={`bg-white border-r border-gray-100 hidden md:flex md:flex-col md:fixed md:inset-y-0 md:left-0 md:z-30 transition-[width] duration-200 print:!hidden ${collapsed ? 'md:w-20' : 'md:w-64'}`}>
         {/* Logo + collapse toggle */}
         <div className={`px-3 py-5 border-b border-gray-100 flex items-center ${collapsed ? 'justify-center' : 'justify-between px-5'}`}>
           {!collapsed && (
@@ -160,6 +217,11 @@ export default function AdminLayout() {
               className="relative p-2 rounded-xl text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition-colors"
               title="Admin Notifications">
               <Bell size={18} className={location.pathname === '/admin/notifications' ? 'text-gray-900' : 'text-gray-400'} />
+              {totalBellCount > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[17px] h-[17px] flex items-center justify-center px-0.5 animate-pulse">
+                  {totalBellCount > 99 ? '99+' : totalBellCount}
+                </span>
+              )}
             </Link>
             {!collapsed && (
               <Link to="/admin/chat"
@@ -215,7 +277,23 @@ export default function AdminLayout() {
                       {collapsed && label === 'Live Chat' && unreadChatCount > 0 && (
                         <span className="absolute top-1 right-2 bg-red-500 w-2 h-2 rounded-full" />
                       )}
-                      {!collapsed && active && label !== 'Live Chat' && <ChevronRight size={12} className="ml-auto opacity-60" />}
+                      {!collapsed && label === 'Notifications' && totalBellCount > 0 && (
+                        <span className="ml-auto bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0">
+                          {totalBellCount}
+                        </span>
+                      )}
+                      {collapsed && label === 'Notifications' && totalBellCount > 0 && (
+                        <span className="absolute top-1 right-2 bg-red-500 w-2 h-2 rounded-full" />
+                      )}
+                      {!collapsed && label === 'Support Inbox' && unreadInboxCount > 0 && (
+                        <span className="ml-auto bg-emerald-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0">
+                          {unreadInboxCount}
+                        </span>
+                      )}
+                      {collapsed && label === 'Support Inbox' && unreadInboxCount > 0 && (
+                        <span className="absolute top-1 right-2 bg-emerald-600 w-2 h-2 rounded-full" />
+                      )}
+                      {!collapsed && active && label !== 'Live Chat' && label !== 'Support Inbox' && label !== 'Notifications' && <ChevronRight size={12} className="ml-auto opacity-60" />}
                     </Link>
                   );
                 })}
@@ -239,10 +317,10 @@ export default function AdminLayout() {
       </aside>
 
       {/* ===== MAIN CONTENT ===== */}
-      <main className={`flex-1 min-h-screen flex flex-col min-w-0 max-w-full md:overflow-hidden transition-[margin] duration-200 ${collapsed ? 'md:ml-20' : 'md:ml-64'}`}>
+      <main className={`flex-1 min-h-screen flex flex-col min-w-0 max-w-full md:overflow-hidden transition-[margin] duration-200 print:m-0 print:p-0 print:overflow-visible ${collapsed ? 'md:ml-20' : 'md:ml-64'}`}>
 
         {/* Mobile Header */}
-        <header className="md:hidden bg-white border-b border-gray-100 px-4 py-3 flex items-center justify-between fixed top-0 left-0 right-0 z-30 shadow-sm h-14">
+        <header data-print-hide="true" className="md:hidden bg-white border-b border-gray-100 px-4 py-3 flex items-center justify-between fixed top-0 left-0 right-0 z-30 shadow-sm h-14 print:!hidden">
           <div className="flex items-center gap-2">
             <div className="w-7 h-7 bg-gray-900 rounded-lg flex items-center justify-center">
               <span className="text-white font-extrabold text-xs">R</span>
@@ -257,6 +335,11 @@ export default function AdminLayout() {
               className="relative p-2 rounded-xl text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition-colors"
               title="Admin Notifications">
               <Bell size={19} className={location.pathname === '/admin/notifications' ? 'text-gray-900' : 'text-gray-500'} />
+              {totalBellCount > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[17px] h-[17px] flex items-center justify-center px-0.5 animate-pulse">
+                  {totalBellCount > 99 ? '99+' : totalBellCount}
+                </span>
+              )}
             </Link>
             <Link to="/admin/chat"
               className="relative p-2 rounded-xl text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition-colors"
@@ -276,12 +359,12 @@ export default function AdminLayout() {
         </header>
 
         {/* Page content */}
-        <div className="flex-1 p-4 md:p-6 pb-24 md:pb-6 overflow-x-hidden w-full min-w-0 pt-[68px] md:pt-6">
+        <div className="flex-1 p-4 md:p-6 pb-24 md:pb-6 overflow-x-hidden w-full min-w-0 pt-[68px] md:pt-6 print:p-0 print:m-0 print:overflow-visible">
           <Outlet />
         </div>
 
         {/* Mobile Bottom Navigation */}
-        <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 flex items-center justify-around px-2 py-2 z-30 shadow-[0_-1px_12px_rgba(0,0,0,0.06)]">
+        <nav data-print-hide="true" className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 flex items-center justify-around px-2 py-2 z-30 shadow-[0_-1px_12px_rgba(0,0,0,0.06)] print:!hidden">
           {bottomNavItems.map(({ path, icon: Icon, label }) => {
             const active = isActive(path);
             return (
@@ -308,7 +391,7 @@ export default function AdminLayout() {
 
       {/* ===== MOBILE MENU — fixed bottom sheet (renders in viewport, no scroll needed) ===== */}
       {mobileMenuOpen && (
-        <div className="md:hidden fixed inset-0 z-50">
+        <div data-print-hide="true" className="md:hidden fixed inset-0 z-50 print:!hidden">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-fade-in" onClick={() => setMobileMenuOpen(false)} />
           <div className="absolute bottom-0 inset-x-0 bg-white rounded-t-3xl shadow-2xl max-h-[85vh] flex flex-col animate-sheet-up">
             {/* Grabber + header */}
@@ -343,6 +426,16 @@ export default function AdminLayout() {
                           {label === 'Live Chat' && unreadChatCount > 0 && (
                             <span className="ml-auto bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0">
                               {unreadChatCount}
+                            </span>
+                          )}
+                          {label === 'Notifications' && totalBellCount > 0 && (
+                            <span className="ml-auto bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0">
+                              {totalBellCount}
+                            </span>
+                          )}
+                          {label === 'Support Inbox' && unreadInboxCount > 0 && (
+                            <span className="ml-auto bg-emerald-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0">
+                              {unreadInboxCount}
                             </span>
                           )}
                         </Link>

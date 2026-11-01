@@ -24,8 +24,8 @@ export default function Contact() {
             </div>
             <h3 className="font-bold text-gray-900 text-base mb-1">Email Desk</h3>
             <p className="text-xs text-gray-500 mb-3">General inquiries & support</p>
-            <a href="mailto:teamonline4u@gmail.com" className="text-xs font-bold text-brand hover:underline">
-              teamonline4u@gmail.com
+            <a href="mailto:support@remaprofitmachine.com" className="text-xs font-bold text-brand hover:underline">
+              support@remaprofitmachine.com
             </a>
           </div>
 

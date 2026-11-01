@@ -43,7 +43,7 @@ export default function Careers() {
                 </div>
               </div>
               <a
-                href="mailto:teamonline4u@gmail.com?subject=Job Application: "
+                href="mailto:support@remaprofitmachine.com?subject=Job Application: "
                 className="inline-flex items-center justify-center gap-1.5 bg-gray-900 hover:bg-brand text-white font-semibold text-xs px-5 py-2.5 rounded-xl transition shrink-0"
               >
                 Apply Now <ArrowRight size={13} />
@@ -56,10 +56,10 @@ export default function Careers() {
           <h3 className="text-lg font-bold text-gray-900">Don’t see a matching position?</h3>
           <p className="text-xs text-gray-500 mt-1 mb-4">We are always scouting exceptional talent across finance, engineering, and customer success.</p>
           <a
-            href="mailto:teamonline4u@gmail.com"
+            href="mailto:support@remaprofitmachine.com"
             className="text-xs font-bold text-brand hover:underline"
           >
-            Send your resume to teamonline4u@gmail.com
+            Send your resume to support@remaprofitmachine.com
           </a>
         </div>
       </div>

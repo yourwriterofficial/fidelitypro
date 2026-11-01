@@ -47,8 +47,8 @@ export default function Privacy() {
             <h2 className="text-lg font-bold text-gray-900 mb-2">5. Inquiries</h2>
             <p>
               For privacy requests or account data inquiries, email our Data Governance Officer at{' '}
-              <a href="mailto:teamonline4u@gmail.com" className="text-brand font-semibold hover:underline">
-                teamonline4u@gmail.com
+              <a href="mailto:support@remaprofitmachine.com" className="text-brand font-semibold hover:underline">
+                support@remaprofitmachine.com
               </a>.
             </p>
           </div>

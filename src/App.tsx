@@ -64,6 +64,7 @@ const AdminAnnouncements = lazy(() => import('./pages/admin/AdminAnnouncements')
 const AdminSettings = lazy(() => import('./pages/admin/AdminSettings'));
 const AdminStatements = lazy(() => import('./pages/admin/AdminStatements'));
 const AdminReceipts = lazy(() => import('./pages/admin/AdminReceipts'));
+const AdminSupportInbox = lazy(() => import('./pages/admin/AdminSupportInbox'));
 const AdminActivityLogs = lazy(() => import('./pages/admin/AdminActivityLogs'));
 const AdminChat = lazy(() => import('./pages/admin/AdminChat'));
 const AdminP2P = lazy(() => import('./pages/admin/AdminP2P'));
@@ -147,6 +148,7 @@ function App() {
                     <Route path="notifications" element={<AdminNotifications />} />
                     <Route path="email-templates" element={<EmailTemplates />} />
                     <Route path="email-logs" element={<AdminEmailLogs />} />
+                    <Route path="inbox" element={<AdminSupportInbox />} />
                     <Route path="announcements" element={<AdminAnnouncements />} />
                     <Route path="statements" element={<AdminStatements />} />
                     <Route path="receipts" element={<AdminReceipts />} />
