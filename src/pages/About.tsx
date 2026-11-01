@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Home, Layers, ArrowLeftRight, TrendingUp, ArrowRight, Sparkles } from 'lucide-react';
+import { Home, Layers, ArrowLeftRight, TrendingUp, ArrowRight, Building2 } from 'lucide-react';
 
 export default function About() {
   return (
@@ -8,7 +8,7 @@ export default function About() {
         {/* Header */}
         <div className="text-center max-w-3xl mx-auto mb-12">
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-brand/10 text-brand text-xs font-bold uppercase tracking-wider mb-4">
-            <Sparkles size={13} /> Our Mission & Heritage
+            <Building2 size={13} /> Our Mission & Heritage
           </div>
           <h1 className="text-3xl sm:text-5xl font-extrabold text-gray-900 tracking-tight">
             About RPM

@@ -4,7 +4,7 @@ import {
   Printer,
   ShieldCheck,
   FileText,
-  Sparkles,
+  PenTool,
   Edit3,
   Check,
   RotateCcw,
@@ -246,7 +246,7 @@ export const PayoutReceiptModal: React.FC<PayoutReceiptModalProps> = ({
                     : 'text-slate-400 hover:text-white'
                 }`}
               >
-                <Sparkles size={13} />
+                <PenTool size={13} />
                 <span>AI Prompt</span>
               </button>
             </div>
@@ -308,7 +308,7 @@ export const PayoutReceiptModal: React.FC<PayoutReceiptModalProps> = ({
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <div className="p-1.5 rounded-lg bg-brand/10 text-brand">
-                    <Sparkles size={16} />
+                    <PenTool size={16} />
                   </div>
                   <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
                     Describe Receipt for Gemini Generation
@@ -373,7 +373,7 @@ export const PayoutReceiptModal: React.FC<PayoutReceiptModalProps> = ({
                   disabled={isGenerating}
                   className="px-4 py-2 rounded-xl bg-brand text-white text-xs font-bold hover:bg-brand/90 transition flex items-center gap-1.5 shadow-xs disabled:opacity-50"
                 >
-                  <Sparkles size={13} className={isGenerating ? 'animate-spin' : ''} />
+                  <PenTool size={13} className={isGenerating ? 'animate-spin' : ''} />
                   <span>{isGenerating ? 'Generating with Gemini...' : 'Generate Receipt'}</span>
                 </button>
               </div>

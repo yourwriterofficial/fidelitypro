@@ -1,3 +1,4 @@
+import { confirmAction } from '../../components/ui/ConfirmDialog';
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { toast } from 'sonner';
@@ -175,7 +176,13 @@ export default function EmailTemplates() {
   };
 
   const handleSeedTemplates = async () => {
-    if (!window.confirm('This will seed/overwrite the default templates. Proceed?')) return;
+    const ok = await confirmAction({
+      title: 'Reset Email Templates',
+      message: 'This will seed/overwrite the default templates with baseline configurations. Proceed?',
+      confirmText: 'Seed Defaults',
+      variant: 'warning',
+    });
+    if (!ok) return;
     setSeeding(true);
     try {
       // Clean up old FidelityPro templates from the database

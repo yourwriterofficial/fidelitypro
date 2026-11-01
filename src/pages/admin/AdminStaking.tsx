@@ -1,3 +1,4 @@
+import { confirmAction } from '../../components/ui/ConfirmDialog';
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { toast } from 'sonner';
@@ -77,7 +78,13 @@ export default function AdminStaking() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Delete this product?')) return;
+    const ok = await confirmAction({
+      title: 'Delete Staking Plan',
+      message: 'Are you sure you want to permanently delete this staking product?',
+      confirmText: 'Delete',
+      variant: 'danger',
+    });
+    if (!ok) return;
     const { error } = await supabase.from('staking_products').delete().eq('id', id);
     if (error) toast.error(error.message);
     else { toast.success('Deleted'); fetchProducts(); }

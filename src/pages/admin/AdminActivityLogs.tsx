@@ -1,3 +1,4 @@
+import { confirmAction } from '../../components/ui/ConfirmDialog';
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { toast } from 'sonner';
@@ -159,7 +160,13 @@ export default function AdminActivityLogs() {
       return;
     }
 
-    if (!confirm(`Are you sure you want to permanently delete this ${type} record from the database?`)) return;
+    const ok = await confirmAction({
+      title: 'Delete Activity Record',
+      message: `Are you sure you want to permanently delete this ${type} record from the database?`,
+      confirmText: 'Delete',
+      variant: 'danger',
+    });
+    if (!ok) return;
 
     try {
       const { error } = await supabase.from(tableName).delete().eq('id', dbId);
@@ -188,7 +195,13 @@ export default function AdminActivityLogs() {
 
   const handleDeleteBulk = async () => {
     if (selectedIds.length === 0) return;
-    if (!confirm(`Are you sure you want to permanently delete the ${selectedIds.length} selected records from the database?`)) return;
+    const ok = await confirmAction({
+      title: 'Batch Delete Activity Records',
+      message: `Are you sure you want to permanently delete the ${selectedIds.length} selected records from the database?`,
+      confirmText: 'Delete All',
+      variant: 'danger',
+    });
+    if (!ok) return;
 
     toast.loading(`Deleting ${selectedIds.length} records...`, { id: 'bulk-delete' });
     try {

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ChevronDown, Sparkles } from 'lucide-react';
+import { ChevronDown, HelpCircle } from 'lucide-react';
 
 export default function FAQ() {
   const [openIdx, setOpenIdx] = useState<number | null>(0);
@@ -53,7 +53,7 @@ export default function FAQ() {
         {/* Header */}
         <div className="text-center max-w-2xl mx-auto mb-12">
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-brand/10 text-brand text-xs font-bold uppercase tracking-wider mb-4">
-            <Sparkles size={13} /> Knowledge Base
+            <HelpCircle size={13} /> Knowledge Base
           </div>
           <h1 className="text-3xl sm:text-5xl font-extrabold text-gray-900 tracking-tight">
             Frequently Asked Questions

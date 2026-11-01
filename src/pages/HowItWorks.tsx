@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Home, Layers, ArrowLeftRight, TrendingUp, ShieldCheck, CheckCircle2, ArrowRight, Sparkles } from 'lucide-react';
+import { Home, Layers, ArrowLeftRight, TrendingUp, ShieldCheck, CheckCircle2, ArrowRight, Compass } from 'lucide-react';
 
 export default function HowItWorks() {
   const [activeTab, setActiveTab] = useState<'properties' | 'staking' | 'p2p' | 'invest'>('properties');
@@ -144,7 +144,7 @@ export default function HowItWorks() {
         {/* Page Header */}
         <div className="text-center max-w-3xl mx-auto mb-12">
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-brand/10 text-brand text-xs font-bold uppercase tracking-wider mb-4">
-            <Sparkles size={13} /> Complete Platform Guide
+            <Compass size={13} /> Complete Platform Guide
           </div>
           <h1 className="text-3xl sm:text-5xl font-extrabold text-gray-900 tracking-tight">
             How RPM Works

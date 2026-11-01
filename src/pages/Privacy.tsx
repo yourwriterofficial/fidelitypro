@@ -1,4 +1,4 @@
-import { Sparkles } from 'lucide-react';
+import { ShieldCheck } from 'lucide-react';
 
 export default function Privacy() {
   return (
@@ -6,7 +6,7 @@ export default function Privacy() {
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center max-w-2xl mx-auto mb-10">
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-brand/10 text-brand text-xs font-bold uppercase tracking-wider mb-4">
-            <Sparkles size={13} /> Data Governance
+            <ShieldCheck size={13} /> Data Governance
           </div>
           <h1 className="text-3xl sm:text-5xl font-extrabold text-gray-900 tracking-tight">
             Privacy Policy

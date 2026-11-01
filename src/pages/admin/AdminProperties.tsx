@@ -1,3 +1,4 @@
+import { confirmAction } from '../../components/ui/ConfirmDialog';
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { toast } from 'sonner';
@@ -235,7 +236,13 @@ export default function AdminProperties() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Delete this listing?')) return;
+    const ok = await confirmAction({
+      title: 'Delete Real Estate Listing',
+      message: 'Are you sure you want to permanently delete this property listing?',
+      confirmText: 'Delete',
+      variant: 'danger',
+    });
+    if (!ok) return;
     const { error } = await supabase.from('properties').delete().eq('id', id);
     if (error) toast.error(error.message);
     else { toast.success('Deleted'); fetchProperties(); }

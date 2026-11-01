@@ -1,3 +1,4 @@
+import { confirmAction } from '../../components/ui/ConfirmDialog';
 import { useState, useEffect, useRef } from 'react';
 import { useAuthStore } from '../../store/authStore';
 import { supabase } from '../../lib/supabaseClient';
@@ -257,7 +258,13 @@ export default function AdminChat() {
 
   const handleDeleteMessage = async (messageId: string) => {
     if (messageId === 'temp') return;
-    if (!confirm('Are you sure you want to permanently delete this message?')) return;
+    const ok = await confirmAction({
+      title: 'Delete Chat Message',
+      message: 'Are you sure you want to permanently delete this message from the database?',
+      confirmText: 'Delete',
+      variant: 'danger',
+    });
+    if (!ok) return;
     try {
       // .select() returns the deleted rows so an RLS-blocked delete (0 rows)
       // is reported instead of silently "succeeding". The DB trigger also

@@ -1,3 +1,4 @@
+import { confirmAction } from '../../components/ui/ConfirmDialog';
 import { useEffect, useState, useRef } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { useAuthStore } from '../../store/authStore';
@@ -515,7 +516,13 @@ export default function AdminUsers() {
   };
 
   const handleDeleteMessage = async (messageId: string) => {
-    if (!confirm('Are you sure you want to permanently delete this message?')) return;
+    const ok = await confirmAction({
+      title: 'Delete Chat Message',
+      message: 'Are you sure you want to permanently delete this message?',
+      confirmText: 'Delete',
+      variant: 'danger',
+    });
+    if (!ok) return;
     try {
       // .select() returns deleted rows so an RLS-blocked delete is reported.
       // The DB trigger also removes the linked notification and queued email.
@@ -903,7 +910,13 @@ export default function AdminUsers() {
       toast.error('Password must be at least 6 characters');
       return;
     }
-    if (!confirm(`Set a temporary password for ${selectedUser.name || selectedUser.email}?\n\nThey can log in with it immediately and change it later.\n\nPassword: ${pwd}`)) {
+    const ok = await confirmAction({
+      title: 'Issue Temporary Password',
+      message: `Set a temporary password for ${selectedUser.name || selectedUser.email}?\n\nThey can log in with it immediately and change it later.\n\nTemporary Password: ${pwd}`,
+      confirmText: 'Set Password',
+      variant: 'warning',
+    });
+    if (!ok) {
       return;
     }
     setSettingPassword(true);
@@ -1907,7 +1920,13 @@ export default function AdminUsers() {
                       </button>
                       <button
                         onClick={async () => {
-                          if (confirm(`Are you sure you want to delete user ${selectedUser.name || selectedUser.email}?`)) {
+                          const ok = await confirmAction({
+      title: 'Delete Member Account',
+      message: `Are you sure you want to permanently delete user account ${selectedUser.name || selectedUser.email}? All account assets, logs, and access will be purged.`,
+      confirmText: 'Delete Account',
+      variant: 'danger',
+    });
+    if (ok) {
                             toast.loading('Deleting user...', { id: 'delete-user' });
                             try {
                               const { error } = await supabase.functions.invoke('admin-action', {

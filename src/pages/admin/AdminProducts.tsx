@@ -1,3 +1,4 @@
+import { confirmAction } from '../../components/ui/ConfirmDialog';
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { toast } from 'sonner';
@@ -80,7 +81,13 @@ export default function AdminProducts() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Delete this product?')) return;
+    const ok = await confirmAction({
+      title: 'Delete Product',
+      message: 'Are you sure you want to permanently delete this investment product?',
+      confirmText: 'Delete',
+      variant: 'danger',
+    });
+    if (!ok) return;
     const { error } = await supabase.from('products').delete().eq('id', id);
     if (error) {
       toast.error(error.message);

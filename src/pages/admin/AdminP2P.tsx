@@ -1,3 +1,4 @@
+import { confirmAction } from '../../components/ui/ConfirmDialog';
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { toast } from 'sonner';
@@ -91,7 +92,13 @@ export default function AdminP2P() {
   }, []);
 
   const handleCompleteOrder = async (order: P2POrder) => {
-    if (!confirm(`Mark P2P Order ${order.id.slice(0, 8)} as COMPLETED? This confirms the bank wire/crypto was dispatched to the client.`)) return;
+    const ok = await confirmAction({
+      title: 'Complete P2P Escrow Order',
+      message: `Mark P2P Order ${order.id.slice(0, 8)} as COMPLETED? This confirms the bank wire/crypto was dispatched to the client.`,
+      confirmText: 'Mark Completed',
+      variant: 'success',
+    });
+    if (!ok) return;
     setActionId(order.id);
     try {
       const { error } = await supabase
@@ -129,7 +136,13 @@ export default function AdminP2P() {
   };
 
   const handleCancelAndRefund = async (order: P2POrder) => {
-    if (!confirm(`Cancel P2P Order ${order.id.slice(0, 8)} and REFUND ${fmt(order.amount_usd)} back to user's wallet?`)) return;
+    const ok = await confirmAction({
+      title: 'Cancel & Refund P2P Order',
+      message: `Cancel P2P Order ${order.id.slice(0, 8)} and REFUND ${fmt(order.amount_usd)} back to user's wallet?`,
+      confirmText: 'Refund & Cancel',
+      variant: 'danger',
+    });
+    if (!ok) return;
     setActionId(order.id);
     try {
       // Refund balance

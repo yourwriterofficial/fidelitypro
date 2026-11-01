@@ -1,3 +1,4 @@
+import { confirmAction } from '../../components/ui/ConfirmDialog';
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { toast } from 'sonner';
@@ -154,7 +155,13 @@ export default function AdminNotifications() {
   };
 
   const handlePrune = async () => {
-    if (!confirm('Are you sure you want to permanently delete all notifications in the system?')) return;
+    const ok = await confirmAction({
+      title: 'Purge All Notifications',
+      message: 'Are you sure you want to permanently delete all notifications in the system? This action cannot be undone.',
+      confirmText: 'Purge All',
+      variant: 'danger',
+    });
+    if (!ok) return;
     const { error } = await supabase.from('notifications').delete().neq('id', '');
     if (error) toast.error(error.message);
     else toast.success('All system notifications cleared');

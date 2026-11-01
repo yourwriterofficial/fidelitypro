@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { toast } from 'sonner';
+import { confirmAction } from '../../components/ui/ConfirmDialog';
 import { Plus, Edit, Trash, Pin, X, Megaphone } from 'lucide-react';
 
 interface Announcement {
@@ -40,7 +41,13 @@ export default function AdminAnnouncements() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Delete this announcement?')) return;
+    const ok = await confirmAction({
+      title: 'Delete Announcement',
+      message: 'Are you sure you want to permanently delete this announcement?',
+      confirmText: 'Delete',
+      variant: 'danger',
+    });
+    if (!ok) return;
     const { error } = await supabase.from('announcements').delete().eq('id', id);
     if (error) toast.error(error.message); else { toast.success('Deleted'); fetchAnnouncements(); }
   };

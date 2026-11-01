@@ -12,6 +12,7 @@ import PushAutoSubscriber from './components/PushAutoSubscriber';
 import PWAUpdater from './components/PWAUpdater';
 import InstallPWAPrompt from './components/InstallPWAPrompt';
 import PageLoader from './components/PageLoader';
+import ConfirmDialog from './components/ui/ConfirmDialog';
 import { triggerPassiveHeartbeat } from './lib/heartbeat';
 
 // ── Lazy-loaded Public Pages ──────────────────────────────────────────────────
@@ -87,6 +88,7 @@ function App() {
       <ErrorBoundary>
         <BrowserRouter>
           <Toaster position="top-center" richColors theme="light" />
+          <ConfirmDialog />
           <PushAutoSubscriber />
           <PWAUpdater />
           <InstallPWAPrompt />
